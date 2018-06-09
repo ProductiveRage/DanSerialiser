@@ -34,7 +34,7 @@ namespace UnitTests
 		{
 			var clone = Clone(new ClassWithNoMembersAndNoInheritance());
 			Assert.NotNull(clone);
-			Assert.Equal(typeof(ClassWithNoMembersAndNoInheritance), clone.GetType());
+			Assert.IsType<ClassWithNoMembersAndNoInheritance>(clone);
 		}
 
 		[Fact]
@@ -49,7 +49,7 @@ namespace UnitTests
 		{
 			var clone = Clone(new ClassWithSinglePublicFieldAndNoInheritance { Name = "abc" });
 			Assert.NotNull(clone);
-			Assert.Equal(typeof(ClassWithSinglePublicFieldAndNoInheritance), clone.GetType());
+			Assert.IsType<ClassWithSinglePublicFieldAndNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
 		}
 
@@ -58,7 +58,7 @@ namespace UnitTests
 		{
 			var clone = Clone(new ClassWithSinglePublicAutoPropertyAndNoInheritance { Name = "abc" });
 			Assert.NotNull(clone);
-			Assert.Equal(typeof(ClassWithSinglePublicAutoPropertyAndNoInheritance), clone.GetType());
+			Assert.IsType<ClassWithSinglePublicAutoPropertyAndNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
 		}
 
@@ -67,7 +67,7 @@ namespace UnitTests
 		{
 			var clone = Clone(new ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance("abc"));
 			Assert.NotNull(clone);
-			Assert.Equal(typeof(ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance), clone.GetType());
+			Assert.IsType<ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
 		}
 
@@ -79,7 +79,7 @@ namespace UnitTests
 		{
 			var clone = Clone<IHaveName>(new ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance { Name = "abc" });
 			Assert.NotNull(clone);
-			Assert.Equal(typeof(ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance), clone.GetType());
+			Assert.IsType<ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
 		}
 
@@ -91,7 +91,7 @@ namespace UnitTests
 		{
 			var clone = Clone<IHaveName>(new ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance { Name = "abc" });
 			Assert.NotNull(clone);
-			Assert.Equal(typeof(ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance), clone.GetType());
+			Assert.IsType<ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
 		}
 
@@ -104,7 +104,7 @@ namespace UnitTests
 		{
 			var clone = Clone<NamedItem>(new ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance { Name = "abc", OtherProperty = "xyz" });
 			Assert.NotNull(clone);
-			Assert.Equal(typeof(ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance), clone.GetType());
+			Assert.IsType<ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
 			Assert.Equal("xyz", ((ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance)clone).OtherProperty);
 		}
@@ -114,7 +114,7 @@ namespace UnitTests
 		{
 			var source = new SupervisorDetails(123, "abc");
 			var clone = Clone(new SupervisorDetails(123, "abc"));
-			Assert.Equal(typeof(SupervisorDetails), clone.GetType());
+			Assert.IsType<SupervisorDetails>(clone);
 			Assert.Equal(123, clone.Id);
 			Assert.Equal("abc", clone.Name);
 		}
@@ -124,7 +124,7 @@ namespace UnitTests
 		{
 			var source = new ManagerDetails(123, "abc");
 			var clone = Clone(new ManagerDetails(123, "abc"));
-			Assert.Equal(typeof(ManagerDetails), clone.GetType());
+			Assert.IsType<ManagerDetails>(clone);
 			Assert.Equal(123, clone.Id);
 			Assert.Equal("abc", ((EmployeeDetails)clone).Name);
 		}
@@ -133,14 +133,14 @@ namespace UnitTests
 		public static void PrivateStructWithNoMembers()
 		{
 			var clone = Clone(new StructWithNoMembers());
-			Assert.Equal(typeof(StructWithNoMembers), clone.GetType());
+			Assert.IsType<StructWithNoMembers>(clone);
 		}
 
 		[Fact]
 		public static void PrivateStructWithSinglePublicField()
 		{
 			var clone = Clone(new StructWithSinglePublicField { Name = "abc" });
-			Assert.Equal(typeof(StructWithSinglePublicField), clone.GetType());
+			Assert.IsType<StructWithSinglePublicField>(clone);
 			Assert.Equal("abc", clone.Name);
 		}
 
@@ -148,7 +148,7 @@ namespace UnitTests
 		public static void PrivateStructWithSinglePublicAutoProperty()
 		{
 			var clone = Clone(new StructWithSinglePublicAutoProperty { Name = "abc" });
-			Assert.Equal(typeof(StructWithSinglePublicAutoProperty), clone.GetType());
+			Assert.IsType<StructWithSinglePublicAutoProperty>(clone);
 			Assert.Equal("abc", clone.Name);
 		}
 
