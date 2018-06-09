@@ -30,7 +30,7 @@ namespace UnitTests
 		}
 
 		[Fact]
-		public static void SealedClassWithNoProperties()
+		public static void PrivateSealedClassWithNoProperties()
 		{
 			var clone = Clone(new ClassWithNoPropertiesAndNoInheritance());
 			Assert.NotNull(clone);
@@ -38,7 +38,7 @@ namespace UnitTests
 		}
 
 		[Fact]
-		public static void NullSealedClassWithNoProperties()
+		public static void PrivateNullSealedClassWithNoProperties()
 		{
 			var clone = Clone((ClassWithNoPropertiesAndNoInheritance)null);
 			Assert.Null(clone);
