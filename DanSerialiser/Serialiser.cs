@@ -12,13 +12,13 @@ namespace DanSerialiser
 			if (writer == null)
 				throw new ArgumentNullException(nameof(writer));
 
-			if (value is Int32)
+			if (typeof(T) == typeof(Int32))
 			{
 				writer.Int32((Int32)(object)value);
 				return;
 			}
 
-			if (value is String)
+			if (typeof(T) == typeof(String))
 			{
 				writer.String((String)(object)value);
 				return;

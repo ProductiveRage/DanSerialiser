@@ -12,6 +12,18 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void NullString()
+		{
+			AssertCloneMatchesOriginal((string)null);
+		}
+
+		[Fact]
+		public static void BlankString()
+		{
+			AssertCloneMatchesOriginal("");
+		}
+
+		[Fact]
 		public static void String()
 		{
 			AssertCloneMatchesOriginal("Café");
