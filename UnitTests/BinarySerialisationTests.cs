@@ -102,11 +102,11 @@ namespace UnitTests
 		[Fact]
 		public static void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToAbstractClass()
 		{
-			var clone = Clone<NamedItem>(new ClassWithSinglePublicAutoPropertyToInheritFromAnAbstractClassButNoOtherInheritance { Name = "abc", OtherProperty = "xyz" });
+			var clone = Clone<NamedItem>(new ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance { Name = "abc", OtherProperty = "xyz" });
 			Assert.NotNull(clone);
-			Assert.Equal(typeof(ClassWithSinglePublicAutoPropertyToInheritFromAnAbstractClassButNoOtherInheritance), clone.GetType());
+			Assert.Equal(typeof(ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance), clone.GetType());
 			Assert.Equal("abc", clone.Name);
-			Assert.Equal("xyz", ((ClassWithSinglePublicAutoPropertyToInheritFromAnAbstractClassButNoOtherInheritance)clone).OtherProperty);
+			Assert.Equal("xyz", ((ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance)clone).OtherProperty);
 		}
 
 		[Fact]
@@ -185,7 +185,7 @@ namespace UnitTests
 			string Name { get; }
 		}
 
-		private sealed class ClassWithSinglePublicAutoPropertyToInheritFromAnAbstractClassButNoOtherInheritance : NamedItem
+		private sealed class ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance : NamedItem
 		{
 			public string OtherProperty { get; set; }
 		}
