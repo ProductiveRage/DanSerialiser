@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using System.Text;
 
 namespace DanSerialiser
@@ -15,6 +16,11 @@ namespace DanSerialiser
 
 		public T Read<T>()
 		{
+			return (T)Read(typeof(T));
+		}
+
+		private object Read(Type type)
+		{
 			if (_index >= _data.Length)
 				throw new InvalidOperationException("No data to read");
 
@@ -24,24 +30,34 @@ namespace DanSerialiser
 					throw new NotImplementedException();
 
 				case DataType.Int:
-					return (T)(object)BitConverter.ToInt32(ReadNext(4), 0);
+					return BitConverter.ToInt32(ReadNext(4), 0);
 
 				case DataType.String:
-					return (T)(object)ReadNextString();
+					return ReadNextString();
 
 				case DataType.ObjectStart:
 					var typeName = ReadNextString();
-					T value;
 					if (typeName == null)
-						value = default(T);
-					else
 					{
-						var type = Type.GetType(typeName, throwOnError: true);
-						value = (T)Activator.CreateInstance(type);
+						if ((DataType)ReadNext() != DataType.ObjectEnd)
+							throw new InvalidOperationException("Expected ObjectEnd was not encountered");
+						return null;
 					}
-					if ((DataType)ReadNext() != DataType.ObjectEnd)
-						throw new InvalidOperationException("Expected ObjectEnd was not encountered");
-					return value;
+					var value = Activator.CreateInstance(Type.GetType(typeName, throwOnError: true));
+					while (true)
+					{
+						var nextEntryType = (DataType)ReadNext();
+						if (nextEntryType == DataType.ObjectEnd)
+							return value;
+						else if (nextEntryType == DataType.String)
+						{
+							var fieldName = ReadNextString();
+							var field = value.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public);
+							field.SetValue(value, Read(field.FieldType));
+						}
+						else
+							throw new InvalidOperationException("Unexpected data type encountered while enumerating object properties: " + nextEntryType);
+					}
 			}
 		}
 

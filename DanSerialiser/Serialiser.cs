@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 
 namespace DanSerialiser
 {
@@ -12,19 +13,32 @@ namespace DanSerialiser
 			if (writer == null)
 				throw new ArgumentNullException(nameof(writer));
 
-			if (typeof(T) == typeof(Int32))
+			Serialise(value, typeof(T), writer);
+		}
+
+		private void Serialise(object value, Type type, IWrite writer)
+		{
+			if (type == typeof(Int32))
 			{
-				writer.Int32((Int32)(object)value);
+				writer.Int32((Int32)value);
 				return;
 			}
 
-			if (typeof(T) == typeof(String))
+			if (type == typeof(String))
 			{
-				writer.String((String)(object)value);
+				writer.String((String)value);
 				return;
 			}
 
 			writer.ObjectStart(value);
+			if (value != null)
+			{
+				foreach (var field in value.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public))
+				{
+					writer.String(field.Name);
+					Serialise(field.GetValue(value), field.FieldType, writer);
+				}
+			}
 			writer.ObjectEnd();
 		}
 	}
