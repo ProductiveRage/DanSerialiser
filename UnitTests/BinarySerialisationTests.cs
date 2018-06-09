@@ -71,6 +71,18 @@ namespace UnitTests
 			Assert.Equal("abc", clone.Name);
 		}
 
+		/// <summary>
+		/// This specifies the target type as an interface but the data that will be serialised and deserialised is an implementation of that interface
+		/// </summary>
+		[Fact]
+		public static void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToInterface()
+		{
+			var clone = Clone<IHaveName>(new ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance { Name = "abc" });
+			Assert.NotNull(clone);
+			Assert.Equal(typeof(ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance), clone.GetType());
+			Assert.Equal("abc", clone.Name);
+		}
+
 		[Fact]
 		public static void PrivateStructWithNoMembers()
 		{
@@ -128,6 +140,16 @@ namespace UnitTests
 			}
 
 			public string Name { get; }
+		}
+
+		private sealed class ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance : IHaveName
+		{
+			public string Name { get; set; }
+		}
+
+		private interface IHaveName
+		{
+			string Name { get; }
 		}
 
 		private struct StructWithNoMembers { }
