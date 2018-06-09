@@ -1,8 +1,6 @@
-﻿using System;
-
-namespace DanSerialiser
+﻿namespace DanSerialiser
 {
-	public interface IWrite : IDisposable
+	public interface IWrite
 	{
 		void Int32(int value);
 		void String(string value);

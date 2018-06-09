@@ -6,7 +6,7 @@ namespace DanSerialiser
 {
 	public sealed class BinaryWriter : IWrite
 	{
-		private List<byte> _data;
+		private readonly List<byte> _data;
 		public BinaryWriter()
 		{
 			_data = new List<byte>();
@@ -38,11 +38,6 @@ namespace DanSerialiser
 		public byte[] GetData()
 		{
 			return _data.ToArray();
-		}
-
-		public void Dispose()
-		{
-			_data = null;
 		}
 
 		private void StringWithoutDataType(string value)
