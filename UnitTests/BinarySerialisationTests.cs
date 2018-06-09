@@ -30,18 +30,25 @@ namespace UnitTests
 		}
 
 		[Fact]
-		public static void PrivateSealedClassWithNoProperties()
+		public static void PrivateSealedClassWithNoMembers()
 		{
-			var clone = Clone(new ClassWithNoPropertiesAndNoInheritance());
+			var clone = Clone(new ClassWithNoMembersAndNoInheritance());
 			Assert.NotNull(clone);
-			Assert.Equal(typeof(ClassWithNoPropertiesAndNoInheritance), clone.GetType());
+			Assert.Equal(typeof(ClassWithNoMembersAndNoInheritance), clone.GetType());
 		}
 
 		[Fact]
-		public static void PrivateNullSealedClassWithNoProperties()
+		public static void PrivateNullSealedClassWithNoMembers()
 		{
-			var clone = Clone((ClassWithNoPropertiesAndNoInheritance)null);
+			var clone = Clone((ClassWithNoMembersAndNoInheritance)null);
 			Assert.Null(clone);
+		}
+
+		[Fact]
+		public static void PrivateStructClassWithNoMembers()
+		{
+			var clone = Clone(new StructWithNoMembers());
+			Assert.Equal(typeof(StructWithNoMembers), clone.GetType());
 		}
 
 		private static void AssertCloneMatchesOriginal<T>(T value)
@@ -58,6 +65,8 @@ namespace UnitTests
 			return reader.Read<T>();
 		}
 
-		private sealed class ClassWithNoPropertiesAndNoInheritance { }
+		private sealed class ClassWithNoMembersAndNoInheritance { }
+
+		private struct StructWithNoMembers { }
 	}
 }
