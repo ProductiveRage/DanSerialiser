@@ -110,6 +110,26 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void PropertyOnBaseClassThatIsOverriddenOnDerivedClass()
+		{
+			var source = new SupervisorDetails(123, "abc");
+			var clone = Clone(new SupervisorDetails(123, "abc"));
+			Assert.Equal(typeof(SupervisorDetails), clone.GetType());
+			Assert.Equal(123, clone.Id);
+			Assert.Equal("abc", clone.Name);
+		}
+
+		[Fact]
+		public static void PropertyOnBaseClassThatIsOverriddenWithNewOnDerivedClass()
+		{
+			var source = new ManagerDetails(123, "abc");
+			var clone = Clone(new ManagerDetails(123, "abc"));
+			Assert.Equal(typeof(ManagerDetails), clone.GetType());
+			Assert.Equal(123, clone.Id);
+			Assert.Equal("abc", ((EmployeeDetails)clone).Name);
+		}
+
+		[Fact]
 		public static void PrivateStructWithNoMembers()
 		{
 			var clone = Clone(new StructWithNoMembers());
@@ -193,6 +213,29 @@ namespace UnitTests
 		private abstract class NamedItem
 		{
 			public string Name { get; set; }
+		}
+
+		private class SupervisorDetails : EmployeeDetails
+		{
+			public SupervisorDetails(int id, string name) : base(id, name) { }
+			public override string Name { get; protected set; }
+		}
+
+		private class ManagerDetails : EmployeeDetails
+		{
+			public ManagerDetails(int id, string name) : base(id, name) { }
+			public new string Name { get; }
+		}
+
+		private class EmployeeDetails
+		{
+			public EmployeeDetails(int id, string name)
+			{
+				Id = id;
+				Name = name;
+			}
+			public int Id { get; }
+			public virtual string Name { get; protected set; }
 		}
 
 		private struct StructWithNoMembers { }

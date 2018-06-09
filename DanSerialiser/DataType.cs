@@ -7,6 +7,7 @@
 		String,
 
 		ObjectStart,
+		FieldName,
 		ObjectEnd
 	}
 }

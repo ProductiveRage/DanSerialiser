@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace DanSerialiser
@@ -33,13 +34,19 @@ namespace DanSerialiser
 			writer.ObjectStart(value);
 			if (value != null)
 			{
+				// Track what field names have been used while enumerating them down through the type hierarchy - if there are no ambiguities then we only need to
+				// serialise the field names themselves but if names are repeated (if fields are overridden or if they are replaced on derived classes by using
+				// "new") then the DeclaringType will have to be serialised as well (the first use of the name won't need the type but subsequent will)
+				var fieldNamesUsed = new HashSet<string>();
 				var currentTypeToEnumerateMembersFor = value.GetType();
 				while (currentTypeToEnumerateMembersFor != null)
 				{
 					foreach (var field in currentTypeToEnumerateMembersFor.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
 					{
-						writer.String(field.Name);
+						var includeTypeName = fieldNamesUsed.Contains(field.Name);
+						writer.FieldName(field.Name, includeTypeName ? field.DeclaringType.AssemblyQualifiedName : null);
 						Serialise(field.GetValue(value), field.FieldType, writer);
+						fieldNamesUsed.Add(field.Name);
 					}
 					currentTypeToEnumerateMembersFor = currentTypeToEnumerateMembersFor.BaseType;
 				}

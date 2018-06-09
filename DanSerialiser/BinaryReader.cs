@@ -50,15 +50,26 @@ namespace DanSerialiser
 						var nextEntryType = (DataType)ReadNext();
 						if (nextEntryType == DataType.ObjectEnd)
 							return value;
-						else if (nextEntryType == DataType.String)
+						else if (nextEntryType == DataType.FieldName)
 						{
-							var fieldName = ReadNextString();
+							var fieldOrTypeName = ReadNextString();
+							string typeNameIfRequired, fieldName;
+							if (fieldOrTypeName.StartsWith(BinaryWriter.FieldTypeNamePrefix))
+							{
+								typeNameIfRequired = fieldOrTypeName.Substring(BinaryWriter.FieldTypeNamePrefix.Length);
+								fieldName = ReadNextString();
+							}
+							else
+							{
+								typeNameIfRequired = null;
+								fieldName = fieldOrTypeName;
+							}
 							var typeToLookForMemberOn = value.GetType();
 							FieldInfo field;
 							while (true)
 							{
 								field = typeToLookForMemberOn.GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-								if (field != null)
+								if ((field != null) && ((typeNameIfRequired == null) || (field.DeclaringType.AssemblyQualifiedName == typeNameIfRequired)))
 									break;
 								typeToLookForMemberOn = typeToLookForMemberOn.BaseType;
 								if (typeToLookForMemberOn == null)

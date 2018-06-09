@@ -30,6 +30,18 @@ namespace DanSerialiser
 			StringWithoutDataType(value?.GetType()?.AssemblyQualifiedName);
 		}
 
+		public const string FieldTypeNamePrefix = "#type#";
+		public void FieldName(string name, string typeNameIfRequired)
+		{
+			if (name == null)
+				throw new ArgumentNullException(nameof(name));
+
+			_data.Add((byte)DataType.FieldName);
+			if (typeNameIfRequired != null)
+				StringWithoutDataType(FieldTypeNamePrefix + typeNameIfRequired);
+			StringWithoutDataType(name);
+		}
+
 		public void ObjectEnd()
 		{
 			_data.Add((byte)DataType.ObjectEnd);
