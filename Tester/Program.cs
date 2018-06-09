@@ -7,10 +7,15 @@ namespace Tester
 	{
 		static void Main()
 		{
-			Console.WriteLine("Hi!");
+			var value = 32;
 
-			var serialiser = new Serialiser();
-			serialiser.Serialise(null, NullWriter.Instance);
+			var serialiser = Serialiser.Instance;
+
+			var writer = new BinaryWriter();
+			serialiser.Serialise(value, writer);
+
+			var reader = new BinaryReader(writer.GetData());
+			var clone = reader.Read<int>();
 
 			Console.ReadLine();
 		}
