@@ -72,14 +72,14 @@ namespace UnitTests
 		}
 
 		[Fact]
-		public static void PrivateStructClassWithNoMembers()
+		public static void PrivateStructWithNoMembers()
 		{
 			var clone = Clone(new StructWithNoMembers());
 			Assert.Equal(typeof(StructWithNoMembers), clone.GetType());
 		}
 
 		[Fact]
-		public static void PrivateStructClassWithSinglePublicField()
+		public static void PrivateStructWithSinglePublicField()
 		{
 			var clone = Clone(new StructWithSinglePublicField { Name = "abc" });
 			Assert.Equal(typeof(StructWithSinglePublicField), clone.GetType());
@@ -87,7 +87,7 @@ namespace UnitTests
 		}
 
 		[Fact]
-		public static void PrivateStructClassWithSinglePublicAutoProperty()
+		public static void PrivateStructWithSinglePublicAutoProperty()
 		{
 			var clone = Clone(new StructWithSinglePublicAutoProperty { Name = "abc" });
 			Assert.Equal(typeof(StructWithSinglePublicAutoProperty), clone.GetType());
