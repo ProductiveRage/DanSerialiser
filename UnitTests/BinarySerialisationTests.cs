@@ -63,6 +63,15 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void PrivateSealedClassWithSinglePublicReadonlyAutoProperty()
+		{
+			var clone = Clone(new ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance("abc"));
+			Assert.NotNull(clone);
+			Assert.Equal(typeof(ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance), clone.GetType());
+			Assert.Equal("abc", clone.Name);
+		}
+
+		[Fact]
 		public static void PrivateStructClassWithNoMembers()
 		{
 			var clone = Clone(new StructWithNoMembers());
@@ -109,6 +118,16 @@ namespace UnitTests
 		private sealed class ClassWithSinglePublicAutoPropertyAndNoInheritance
 		{
 			public string Name { get; set; }
+		}
+
+		private sealed class ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance
+		{
+			public ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance(string name)
+			{
+				Name = name;
+			}
+
+			public string Name { get; }
 		}
 
 		private struct StructWithNoMembers { }

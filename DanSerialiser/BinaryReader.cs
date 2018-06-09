@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Reflection;
+using System.Runtime.Serialization;
 using System.Text;
 
 namespace DanSerialiser
@@ -43,7 +44,7 @@ namespace DanSerialiser
 							throw new InvalidOperationException("Expected ObjectEnd was not encountered");
 						return null;
 					}
-					var value = Activator.CreateInstance(Type.GetType(typeName, throwOnError: true));
+					var value = FormatterServices.GetUninitializedObject(Type.GetType(typeName, throwOnError: true));
 					while (true)
 					{
 						var nextEntryType = (DataType)ReadNext();
