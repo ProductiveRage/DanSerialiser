@@ -84,6 +84,18 @@ namespace UnitTests
 		}
 
 		/// <summary>
+		/// This is basically the same as above but the class implements the interface explicitly
+		/// </summary>
+		[Fact]
+		public static void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToInterfaceThatIsExplicitlyImplemented()
+		{
+			var clone = Clone<IHaveName>(new ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance { Name = "abc" });
+			Assert.NotNull(clone);
+			Assert.Equal(typeof(ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance), clone.GetType());
+			Assert.Equal("abc", clone.Name);
+		}
+
+		/// <summary>
 		/// This specifies the target type as an abstract class but the data that will be serialised and deserialised is an implementation of that interface (this test confirms
 		/// not only will the type be maintained but that a property will be set on the base class class AND one defined on the derived type)
 		/// </summary>
@@ -159,6 +171,13 @@ namespace UnitTests
 		private sealed class ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance : IHaveName
 		{
 			public string Name { get; set; }
+		}
+
+		private sealed class ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance : IHaveName
+		{
+			public string Name { get; set; }
+
+			string IHaveName.Name { get { return Name; } }
 		}
 
 		private interface IHaveName
