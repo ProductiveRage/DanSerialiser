@@ -24,7 +24,8 @@ namespace DanSerialiser
 				return;
 			}
 
-			throw new NotImplementedException();
+			writer.ObjectStart(value);
+			writer.ObjectEnd();
 		}
 	}
 }

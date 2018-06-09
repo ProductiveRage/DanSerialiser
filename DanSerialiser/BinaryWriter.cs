@@ -21,14 +21,18 @@ namespace DanSerialiser
 		public void String(string value)
 		{
 			_data.Add((byte)DataType.String);
-			if (value == null)
-			{
-				_data.AddRange(BitConverter.GetBytes(-1));
-				return;
-			}
-			var bytes = Encoding.UTF8.GetBytes(value);
-			_data.AddRange(BitConverter.GetBytes(bytes.Length));
-			_data.AddRange(bytes);
+			StringWithoutDataType(value);
+		}
+
+		public void ObjectStart<T>(T value)
+		{
+			_data.Add((byte)DataType.ObjectStart);
+			StringWithoutDataType(value?.GetType()?.AssemblyQualifiedName);
+		}
+
+		public void ObjectEnd()
+		{
+			_data.Add((byte)DataType.ObjectEnd);
 		}
 
 		public byte[] GetData()
@@ -39,6 +43,18 @@ namespace DanSerialiser
 		public void Dispose()
 		{
 			_data = null;
+		}
+
+		private void StringWithoutDataType(string value)
+		{
+			if (value == null)
+			{
+				_data.AddRange(BitConverter.GetBytes(-1));
+				return;
+			}
+			var bytes = Encoding.UTF8.GetBytes(value);
+			_data.AddRange(BitConverter.GetBytes(bytes.Length));
+			_data.AddRange(bytes);
 		}
 	}
 }

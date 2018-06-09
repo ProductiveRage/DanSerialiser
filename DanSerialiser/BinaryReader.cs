@@ -27,11 +27,28 @@ namespace DanSerialiser
 					return (T)(object)BitConverter.ToInt32(ReadNext(4), 0);
 
 				case DataType.String:
-					var length = BitConverter.ToInt32(ReadNext(4), 0);
-					var value = (length == -1) ? null : Encoding.UTF8.GetString(ReadNext(length));
-					return (T)(object)value;
-			}
+					return (T)(object)ReadNextString();
 
+				case DataType.ObjectStart:
+					var typeName = ReadNextString();
+					T value;
+					if (typeName == null)
+						value = default(T);
+					else
+					{
+						var type = Type.GetType(typeName, throwOnError: true);
+						value = (T)Activator.CreateInstance(type);
+					}
+					if ((DataType)ReadNext() != DataType.ObjectEnd)
+						throw new InvalidOperationException("Expected ObjectEnd was not encountered");
+					return value;
+			}
+		}
+
+		private string ReadNextString()
+		{
+			var length = BitConverter.ToInt32(ReadNext(4), 0);
+			return (length == -1) ? null : Encoding.UTF8.GetString(ReadNext(length));
 		}
 
 		private byte ReadNext()

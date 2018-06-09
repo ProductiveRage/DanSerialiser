@@ -29,13 +29,35 @@ namespace UnitTests
 			AssertCloneMatchesOriginal("Café");
 		}
 
+		[Fact]
+		public static void SealedClassWithNoProperties()
+		{
+			var clone = Clone(new ClassWithNoPropertiesAndNoInheritance());
+			Assert.NotNull(clone);
+			Assert.Equal(typeof(ClassWithNoPropertiesAndNoInheritance), clone.GetType());
+		}
+
+		[Fact]
+		public static void NullSealedClassWithNoProperties()
+		{
+			var clone = Clone((ClassWithNoPropertiesAndNoInheritance)null);
+			Assert.Null(clone);
+		}
+
 		private static void AssertCloneMatchesOriginal<T>(T value)
+		{
+			var clone = Clone(value);
+			Assert.Equal(value, clone);
+		}
+
+		private static T Clone<T>(T value)
 		{
 			var writer = new BinaryWriter();
 			Serialiser.Instance.Serialise(value, writer);
 			var reader = new BinaryReader(writer.GetData());
-			var clone = reader.Read<T>();
-			Assert.Equal(value, clone);
+			return reader.Read<T>();
 		}
+
+		private sealed class ClassWithNoPropertiesAndNoInheritance { }
 	}
 }

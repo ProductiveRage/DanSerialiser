@@ -6,6 +6,7 @@
 
 		String,
 
-		Object
+		ObjectStart,
+		ObjectEnd
 	}
 }
