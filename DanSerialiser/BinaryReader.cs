@@ -52,8 +52,9 @@ namespace DanSerialiser
 						else if (nextEntryType == DataType.String)
 						{
 							var fieldName = ReadNextString();
-							var field = value.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public);
-							field.SetValue(value, Read(field.FieldType));
+							var field = value.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+							var fieldValue = Read(field.FieldType);
+							field.SetValue(value, fieldValue);
 						}
 						else
 							throw new InvalidOperationException("Unexpected data type encountered while enumerating object properties: " + nextEntryType);

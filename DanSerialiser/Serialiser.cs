@@ -33,7 +33,7 @@ namespace DanSerialiser
 			writer.ObjectStart(value);
 			if (value != null)
 			{
-				foreach (var field in value.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public))
+				foreach (var field in value.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
 				{
 					writer.String(field.Name);
 					Serialise(field.GetValue(value), field.FieldType, writer);
