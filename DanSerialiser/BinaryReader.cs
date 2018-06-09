@@ -53,7 +53,17 @@ namespace DanSerialiser
 						else if (nextEntryType == DataType.String)
 						{
 							var fieldName = ReadNextString();
-							var field = value.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+							var typeToLookForMemberOn = value.GetType();
+							FieldInfo field;
+							while (true)
+							{
+								field = typeToLookForMemberOn.GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+								if (field != null)
+									break;
+								typeToLookForMemberOn = typeToLookForMemberOn.BaseType;
+								if (typeToLookForMemberOn == null)
+									break;
+							}
 							var fieldValue = Read(field.FieldType);
 							field.SetValue(value, fieldValue);
 						}

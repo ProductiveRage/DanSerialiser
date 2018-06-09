@@ -83,6 +83,20 @@ namespace UnitTests
 			Assert.Equal("abc", clone.Name);
 		}
 
+		/// <summary>
+		/// This specifies the target type as an abstract class but the data that will be serialised and deserialised is an implementation of that interface (this test confirms
+		/// not only will the type be maintained but that a property will be set on the base class class AND one defined on the derived type)
+		/// </summary>
+		[Fact]
+		public static void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToAbstractClass()
+		{
+			var clone = Clone<NamedItem>(new ClassWithSinglePublicAutoPropertyToInheritFromAnAbstractClassButNoOtherInheritance { Name = "abc", OtherProperty = "xyz" });
+			Assert.NotNull(clone);
+			Assert.Equal(typeof(ClassWithSinglePublicAutoPropertyToInheritFromAnAbstractClassButNoOtherInheritance), clone.GetType());
+			Assert.Equal("abc", clone.Name);
+			Assert.Equal("xyz", ((ClassWithSinglePublicAutoPropertyToInheritFromAnAbstractClassButNoOtherInheritance)clone).OtherProperty);
+		}
+
 		[Fact]
 		public static void PrivateStructWithNoMembers()
 		{
@@ -150,6 +164,16 @@ namespace UnitTests
 		private interface IHaveName
 		{
 			string Name { get; }
+		}
+
+		private sealed class ClassWithSinglePublicAutoPropertyToInheritFromAnAbstractClassButNoOtherInheritance : NamedItem
+		{
+			public string OtherProperty { get; set; }
+		}
+
+		private abstract class NamedItem
+		{
+			public string Name { get; set; }
 		}
 
 		private struct StructWithNoMembers { }
