@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 
 namespace DanSerialiser
 {
@@ -17,11 +18,20 @@ namespace DanSerialiser
 			if (_index >= _data.Length)
 				throw new InvalidOperationException("No data to read");
 
-			var type = ReadNext();
-			if (type == (byte)DataType.Int)
-				return (T)(object)BitConverter.ToInt32(ReadNext(4), 0);
+			switch ((DataType)ReadNext())
+			{
+				default:
+					throw new NotImplementedException();
 
-			throw new NotImplementedException();
+				case DataType.Int:
+					return (T)(object)BitConverter.ToInt32(ReadNext(4), 0);
+
+				case DataType.String:
+					var length = BitConverter.ToInt32(ReadNext(4), 0);
+					var value = (length == -1) ? null : Encoding.UTF8.GetString(ReadNext(length));
+					return (T)(object)value;
+			}
+
 		}
 
 		private byte ReadNext()

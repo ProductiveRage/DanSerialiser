@@ -5,5 +5,6 @@ namespace DanSerialiser
 	public interface IWrite : IDisposable
 	{
 		void Int32(int value);
+		void String(string value);
 	}
 }

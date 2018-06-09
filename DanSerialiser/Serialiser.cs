@@ -18,6 +18,12 @@ namespace DanSerialiser
 				return;
 			}
 
+			if (value is String)
+			{
+				writer.String((String)(object)value);
+				return;
+			}
+
 			throw new NotImplementedException();
 		}
 	}

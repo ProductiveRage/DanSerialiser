@@ -8,11 +8,21 @@ namespace UnitTests
 		[Fact]
 		public static void Int32()
 		{
-			var value = 32;
+			AssertCloneMatchesOriginal(32);
+		}
+
+		[Fact]
+		public static void String()
+		{
+			AssertCloneMatchesOriginal("Café");
+		}
+
+		private static void AssertCloneMatchesOriginal<T>(T value)
+		{
 			var writer = new BinaryWriter();
 			Serialiser.Instance.Serialise(value, writer);
 			var reader = new BinaryReader(writer.GetData());
-			var clone = reader.Read<int>();
+			var clone = reader.Read<T>();
 			Assert.Equal(value, clone);
 		}
 	}
