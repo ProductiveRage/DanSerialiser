@@ -19,6 +19,12 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void EnumWithDifferentBaseType()
+		{
+			AssertCloneMatchesOriginal(ByteEnum.Value2);
+		}
+
+		[Fact]
 		public static void NullableInt32()
 		{
 			AssertCloneMatchesOriginal((int?)32);
@@ -323,5 +329,7 @@ namespace UnitTests
 		}
 
 		private enum DefaultTypeEnum { Value1, Value2 }
+
+		private enum ByteEnum : byte { Value1, Value2 }
 	}
 }

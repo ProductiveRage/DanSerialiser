@@ -2,6 +2,7 @@
 {
 	public interface IWrite
 	{
+		void Byte(byte value);
 		void Int32(int value);
 		void String(string value);
 		void ListStart<T>(T value);

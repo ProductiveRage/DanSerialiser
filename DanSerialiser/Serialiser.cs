@@ -25,6 +25,12 @@ namespace DanSerialiser
 			if (parents.Contains(value, ReferenceEqualityComparer.Instance))
 				throw new CircularReferenceException();
 
+			if (type == typeof(Byte))
+			{
+				writer.Byte((Byte)value);
+				return;
+			}
+
 			if (type == typeof(Int32))
 			{
 				writer.Int32((Int32)value);
