@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -36,12 +37,12 @@ namespace DanSerialiser
 				return;
 			}
 
-			if (type.IsArray)
+			if (typeof(IEnumerable).IsAssignableFrom(type))
 			{
 				writer.ListStart(value);
 				if (value != null)
 				{
-					foreach (var element in (Array)value)
+					foreach (var element in (IEnumerable)value)
 						Serialise(element, type.GetElementType(), writer, parents.Append(value));
 				}
 				writer.ListEnd();

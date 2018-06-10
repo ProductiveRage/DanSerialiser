@@ -1,4 +1,5 @@
-﻿using DanSerialiser;
+﻿using System.Collections.Generic;
+using DanSerialiser;
 using Xunit;
 
 namespace UnitTests
@@ -57,6 +58,24 @@ namespace UnitTests
 		public static void ArrayOfInt32()
 		{
 			AssertCloneMatchesOriginal(new[] { 32 });
+		}
+
+		[Fact]
+		public static void NullListOfInt32()
+		{
+			AssertCloneMatchesOriginal((List<int>)null);
+		}
+
+		[Fact]
+		public static void EmptyListOfInt32()
+		{
+			AssertCloneMatchesOriginal(new List<int>());
+		}
+
+		[Fact]
+		public static void ListOfInt32()
+		{
+			AssertCloneMatchesOriginal(new List<int> { 32 });
 		}
 
 		[Fact]

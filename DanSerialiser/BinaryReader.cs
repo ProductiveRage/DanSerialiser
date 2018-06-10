@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
@@ -114,13 +116,27 @@ namespace DanSerialiser
 			}
 			var type = Type.GetType(typeName, throwOnError: true);
 			var elementType = type.GetElementType();
+			if (elementType == null)
+			{
+				var enumerablesImplemented = type.FindInterfaces((t, criteria) => t.IsGenericType && (t.GetGenericTypeDefinition() == typeof(IEnumerable<>)), null);
+				if (enumerablesImplemented.Length == 0)
+					throw new InvalidOperationException("Unable to determine element type from list type: " + type.Name);
+				elementType = enumerablesImplemented[0].GetGenericArguments()[0];
+			}
 			var items = Array.CreateInstance(elementType, length: ReadNextInt());
 			for (var i = 0; i < items.Length; i++)
 				items.SetValue(Read(elementType), i);
 			var nextEntryType = (DataType)ReadNext();
 			if (nextEntryType != DataType.ListEnd)
 				throw new InvalidOperationException("Expected ListEnd was not encountered");
-			return items;
+			if (type.IsArray)
+				return items;
+			var constructor =
+				type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(IEnumerable<>).MakeGenericType(elementType) }, null) ??
+				type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(IEnumerable) }, null);
+			if (constructor == null)
+				throw new InvalidOperationException("Unable to identify constructor for list type: " + type.Name);
+			return constructor.Invoke(new[] { items });
 		}
 
 		private byte ReadNext()
