@@ -19,6 +19,12 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void SByte()
+		{
+			AssertCloneMatchesOriginal(sbyte.MaxValue);
+		}
+
+		[Fact]
 		public static void Int16()
 		{
 			AssertCloneMatchesOriginal(short.MaxValue);

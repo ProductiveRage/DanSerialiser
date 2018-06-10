@@ -18,11 +18,15 @@ namespace DanSerialiser
 			_data.Add((byte)DataType.Boolean);
 			_data.Add(value ? (byte)1 : (byte)0);
 		}
-
 		public void Byte(byte value)
 		{
 			_data.Add((byte)DataType.Byte);
 			_data.Add(value);
+		}
+		public void SByte(sbyte value)
+		{
+			_data.Add((byte)DataType.SByte);
+			_data.Add((byte)value);
 		}
 
 		public void Int16(short value)

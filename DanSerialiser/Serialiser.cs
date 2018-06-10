@@ -35,6 +35,11 @@ namespace DanSerialiser
 				writer.Byte((Byte)value);
 				return;
 			}
+			if (type == typeof(SByte))
+			{
+				writer.SByte((SByte)value);
+				return;
+			}
 
 			if (type == typeof(Int16))
 			{

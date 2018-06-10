@@ -4,6 +4,7 @@
 	{
 		Boolean,
 		Byte,
+		SByte,
 
 		Int16,
 		Int32,

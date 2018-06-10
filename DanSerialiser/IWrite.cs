@@ -4,6 +4,7 @@
 	{
 		void Boolean(bool value);
 		void Byte(byte value);
+		void SByte(sbyte value);
 
 		void Int16(short value);
 		void Int32(int value);
