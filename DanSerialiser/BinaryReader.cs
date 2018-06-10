@@ -31,63 +31,96 @@ namespace DanSerialiser
 					throw new NotImplementedException();
 
 				case DataType.Int:
-					return BitConverter.ToInt32(ReadNext(4), 0);
+					return ReadNextInt();
 
 				case DataType.String:
 					return ReadNextString();
 
+				case DataType.ListStart:
+					return ReadNextList();
+
 				case DataType.ObjectStart:
-					var typeName = ReadNextString();
-					if (typeName == null)
-					{
-						if ((DataType)ReadNext() != DataType.ObjectEnd)
-							throw new InvalidOperationException("Expected ObjectEnd was not encountered");
-						return null;
-					}
-					var value = FormatterServices.GetUninitializedObject(Type.GetType(typeName, throwOnError: true));
-					while (true)
-					{
-						var nextEntryType = (DataType)ReadNext();
-						if (nextEntryType == DataType.ObjectEnd)
-							return value;
-						else if (nextEntryType == DataType.FieldName)
-						{
-							var fieldOrTypeName = ReadNextString();
-							string typeNameIfRequired, fieldName;
-							if (fieldOrTypeName.StartsWith(BinaryWriter.FieldTypeNamePrefix))
-							{
-								typeNameIfRequired = fieldOrTypeName.Substring(BinaryWriter.FieldTypeNamePrefix.Length);
-								fieldName = ReadNextString();
-							}
-							else
-							{
-								typeNameIfRequired = null;
-								fieldName = fieldOrTypeName;
-							}
-							var typeToLookForMemberOn = value.GetType();
-							FieldInfo field;
-							while (true)
-							{
-								field = typeToLookForMemberOn.GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-								if ((field != null) && ((typeNameIfRequired == null) || (field.DeclaringType.AssemblyQualifiedName == typeNameIfRequired)))
-									break;
-								typeToLookForMemberOn = typeToLookForMemberOn.BaseType;
-								if (typeToLookForMemberOn == null)
-									break;
-							}
-							var fieldValue = Read(field.FieldType);
-							field.SetValue(value, fieldValue);
-						}
-						else
-							throw new InvalidOperationException("Unexpected data type encountered while enumerating object properties: " + nextEntryType);
-					}
+					return ReadNextObject();
 			}
+		}
+
+		private int ReadNextInt()
+		{
+			return BitConverter.ToInt32(ReadNext(4), 0);
 		}
 
 		private string ReadNextString()
 		{
 			var length = BitConverter.ToInt32(ReadNext(4), 0);
 			return (length == -1) ? null : Encoding.UTF8.GetString(ReadNext(length));
+		}
+
+		private object ReadNextObject()
+		{
+			var typeName = ReadNextString();
+			if (typeName == null)
+			{
+				if ((DataType)ReadNext() != DataType.ObjectEnd)
+					throw new InvalidOperationException("Expected ObjectEnd was not encountered");
+				return null;
+			}
+			var value = FormatterServices.GetUninitializedObject(Type.GetType(typeName, throwOnError: true));
+			while (true)
+			{
+				var nextEntryType = (DataType)ReadNext();
+				if (nextEntryType == DataType.ObjectEnd)
+					return value;
+				else if (nextEntryType == DataType.FieldName)
+				{
+					var fieldOrTypeName = ReadNextString();
+					string typeNameIfRequired, fieldName;
+					if (fieldOrTypeName.StartsWith(BinaryWriter.FieldTypeNamePrefix))
+					{
+						typeNameIfRequired = fieldOrTypeName.Substring(BinaryWriter.FieldTypeNamePrefix.Length);
+						fieldName = ReadNextString();
+					}
+					else
+					{
+						typeNameIfRequired = null;
+						fieldName = fieldOrTypeName;
+					}
+					var typeToLookForMemberOn = value.GetType();
+					FieldInfo field;
+					while (true)
+					{
+						field = typeToLookForMemberOn.GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+						if ((field != null) && ((typeNameIfRequired == null) || (field.DeclaringType.AssemblyQualifiedName == typeNameIfRequired)))
+							break;
+						typeToLookForMemberOn = typeToLookForMemberOn.BaseType;
+						if (typeToLookForMemberOn == null)
+							break;
+					}
+					var fieldValue = Read(field.FieldType);
+					field.SetValue(value, fieldValue);
+				}
+				else
+					throw new InvalidOperationException("Unexpected data type encountered while enumerating object properties: " + nextEntryType);
+			}
+		}
+
+		private object ReadNextList()
+		{
+			var typeName = ReadNextString();
+			if (typeName == null)
+			{
+				if ((DataType)ReadNext() != DataType.ListEnd)
+					throw new InvalidOperationException("Expected ListEnd was not encountered");
+				return null;
+			}
+			var type = Type.GetType(typeName, throwOnError: true);
+			var elementType = type.GetElementType();
+			var items = Array.CreateInstance(elementType, length: ReadNextInt());
+			for (var i = 0; i < items.Length; i++)
+				items.SetValue(Read(elementType), i);
+			var nextEntryType = (DataType)ReadNext();
+			if (nextEntryType != DataType.ListEnd)
+				throw new InvalidOperationException("Expected ListEnd was not encountered");
+			return items;
 		}
 
 		private byte ReadNext()

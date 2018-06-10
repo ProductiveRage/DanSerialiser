@@ -8,6 +8,9 @@
 
 		ObjectStart,
 		FieldName,
-		ObjectEnd
+		ObjectEnd,
+
+		ListStart,
+		ListEnd
 	}
 }

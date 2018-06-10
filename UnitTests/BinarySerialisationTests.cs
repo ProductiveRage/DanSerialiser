@@ -42,6 +42,12 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void ArrayOfInt32()
+		{
+			AssertCloneMatchesOriginal(new[] { 32 });
+		}
+
+		[Fact]
 		public static void PrivateSealedClassWithNoMembers()
 		{
 			var clone = Clone(new ClassWithNoMembersAndNoInheritance());

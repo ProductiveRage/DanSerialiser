@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
@@ -15,13 +16,32 @@ namespace DanSerialiser
 		public void Int32(int value)
 		{
 			_data.Add((byte)DataType.Int);
-			_data.AddRange(BitConverter.GetBytes(value));
+			IntWithoutDataType(value);
 		}
 
 		public void String(string value)
 		{
 			_data.Add((byte)DataType.String);
 			StringWithoutDataType(value);
+		}
+
+		public void ListStart<T>(T value)
+		{
+			_data.Add((byte)DataType.ListStart);
+			StringWithoutDataType(value?.GetType()?.AssemblyQualifiedName);
+			if (value == null)
+				return;
+			if (!(value is IEnumerable enumerableValue))
+				throw new ArgumentException("Unable to process list as value does not implement IEnumerable");
+			var count = 0;
+			foreach (var item in enumerableValue)
+				count++;
+			IntWithoutDataType(count);
+		}
+
+		public void ListEnd()
+		{
+			_data.Add((byte)DataType.ListEnd);
 		}
 
 		public void ObjectStart<T>(T value)
@@ -50,6 +70,11 @@ namespace DanSerialiser
 		public byte[] GetData()
 		{
 			return _data.ToArray();
+		}
+
+		private void IntWithoutDataType(int value)
+		{
+			_data.AddRange(BitConverter.GetBytes(value));
 		}
 
 		private void StringWithoutDataType(string value)
