@@ -152,6 +152,18 @@ namespace UnitTests
 			Assert.Equal("abc", clone.Name);
 		}
 
+		[Fact]
+		public static void CircularReferenceThrows()
+		{
+			var source = new Node();
+			source.Child = source;
+			Assert.Throws<CircularReferenceException>(() =>
+			{
+				var writer = new BinaryWriter();
+				Serialiser.Instance.Serialise(source, writer);
+			});
+		}
+
 		private static void AssertCloneMatchesOriginal<T>(T value)
 		{
 			var clone = Clone(value);
@@ -236,6 +248,11 @@ namespace UnitTests
 			}
 			public int Id { get; }
 			public virtual string Name { get; protected set; }
+		}
+
+		public sealed class Node
+		{
+			public Node Child { get; set; }
 		}
 
 		private struct StructWithNoMembers { }

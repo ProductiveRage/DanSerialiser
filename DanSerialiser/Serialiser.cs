@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace DanSerialiser
@@ -14,11 +15,14 @@ namespace DanSerialiser
 			if (writer == null)
 				throw new ArgumentNullException(nameof(writer));
 
-			Serialise(value, typeof(T), writer);
+			Serialise(value, typeof(T), writer, new object[0]);
 		}
 
-		private void Serialise(object value, Type type, IWrite writer)
+		private void Serialise(object value, Type type, IWrite writer, IEnumerable<object> parents)
 		{
+			if (parents.Contains(value))
+				throw new CircularReferenceException();
+
 			if (type == typeof(Int32))
 			{
 				writer.Int32((Int32)value);
@@ -45,7 +49,7 @@ namespace DanSerialiser
 					{
 						var includeTypeName = fieldNamesUsed.Contains(field.Name);
 						writer.FieldName(field.Name, includeTypeName ? field.DeclaringType.AssemblyQualifiedName : null);
-						Serialise(field.GetValue(value), field.FieldType, writer);
+						Serialise(field.GetValue(value), field.FieldType, writer, parents.Concat(new[] { value }));
 						fieldNamesUsed.Add(field.Name);
 					}
 					currentTypeToEnumerateMembersFor = currentTypeToEnumerateMembersFor.BaseType;
