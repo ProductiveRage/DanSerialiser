@@ -13,9 +13,9 @@ namespace DanSerialiser
 			_data = new List<byte>();
 		}
 
-		public void Bool(bool value)
+		public void Boolean(bool value)
 		{
-			_data.Add((byte)DataType.Bool);
+			_data.Add((byte)DataType.Boolean);
 			_data.Add(value ? (byte)1 : (byte)0);
 		}
 

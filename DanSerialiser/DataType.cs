@@ -2,7 +2,7 @@
 {
 	internal enum DataType : byte
 	{
-		Bool,
+		Boolean,
 		Byte,
 		Int16,
 		Int32,
