@@ -250,7 +250,7 @@ namespace UnitTests
 			public virtual string Name { get; protected set; }
 		}
 
-		public sealed class Node
+		private sealed class Node
 		{
 			public Node Child { get; set; }
 		}
