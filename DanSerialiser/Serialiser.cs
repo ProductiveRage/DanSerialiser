@@ -39,8 +39,11 @@ namespace DanSerialiser
 			if (type.IsArray)
 			{
 				writer.ListStart(value);
-				foreach (var element in (Array)value)
-					Serialise(element, type.GetElementType(), writer, parents.Append(value));
+				if (value != null)
+				{
+					foreach (var element in (Array)value)
+						Serialise(element, type.GetElementType(), writer, parents.Append(value));
+				}
 				writer.ListEnd();
 			}
 

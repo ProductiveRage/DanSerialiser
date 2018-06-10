@@ -42,6 +42,18 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void NullArrayOfInt32()
+		{
+			AssertCloneMatchesOriginal((int[])null);
+		}
+
+		[Fact]
+		public static void EmptyArrayOfInt32()
+		{
+			AssertCloneMatchesOriginal(new int[0]);
+		}
+
+		[Fact]
 		public static void ArrayOfInt32()
 		{
 			AssertCloneMatchesOriginal(new[] { 32 });
