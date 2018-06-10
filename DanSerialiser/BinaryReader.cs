@@ -35,8 +35,12 @@ namespace DanSerialiser
 				case DataType.Byte:
 					return ReadNext();
 
-				case DataType.Int:
+				case DataType.Int16:
+					return BitConverter.ToInt16(ReadNext(2), 0);
+				case DataType.Int32:
 					return ReadNextInt();
+				case DataType.Int64:
+					return BitConverter.ToInt64(ReadNext(8), 0);
 
 				case DataType.String:
 					return ReadNextString();

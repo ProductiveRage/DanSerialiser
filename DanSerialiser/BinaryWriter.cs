@@ -19,10 +19,20 @@ namespace DanSerialiser
 			_data.Add(value);
 		}
 
+		public void Int16(short value)
+		{
+			_data.Add((byte)DataType.Int16);
+			_data.AddRange(BitConverter.GetBytes(value));
+		}
 		public void Int32(int value)
 		{
-			_data.Add((byte)DataType.Int);
+			_data.Add((byte)DataType.Int32);
 			IntWithoutDataType(value);
+		}
+		public void Int64(long value)
+		{
+			_data.Add((byte)DataType.Int64);
+			_data.AddRange(BitConverter.GetBytes(value));
 		}
 
 		public void String(string value)

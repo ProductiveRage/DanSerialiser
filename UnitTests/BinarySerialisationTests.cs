@@ -7,9 +7,21 @@ namespace UnitTests
 	public static class BinarySerialisationTests
 	{
 		[Fact]
+		public static void Int16()
+		{
+			AssertCloneMatchesOriginal(short.MaxValue);
+		}
+
+		[Fact]
 		public static void Int32()
 		{
-			AssertCloneMatchesOriginal(32);
+			AssertCloneMatchesOriginal(int.MaxValue);
+		}
+
+		[Fact]
+		public static void Int64()
+		{
+			AssertCloneMatchesOriginal(long.MaxValue);
 		}
 
 		[Fact]

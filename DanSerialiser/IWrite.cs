@@ -3,7 +3,9 @@
 	public interface IWrite
 	{
 		void Byte(byte value);
+		void Int16(short value);
 		void Int32(int value);
+		void Int64(long value);
 		void String(string value);
 		void ListStart<T>(T value);
 		void ListEnd();
