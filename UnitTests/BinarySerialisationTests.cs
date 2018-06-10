@@ -12,6 +12,18 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void NullableInt32()
+		{
+			AssertCloneMatchesOriginal((int?)32);
+		}
+
+		[Fact]
+		public static void NullableInt32WhenNull()
+		{
+			AssertCloneMatchesOriginal((int?)null);
+		}
+
+		[Fact]
 		public static void NullString()
 		{
 			AssertCloneMatchesOriginal((string)null);

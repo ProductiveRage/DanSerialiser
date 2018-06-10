@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace DanSerialiser
 {
@@ -20,7 +21,7 @@ namespace DanSerialiser
 
 		private void Serialise(object value, Type type, IWrite writer, IEnumerable<object> parents)
 		{
-			if (parents.Contains(value))
+			if (parents.Contains(value, ReferenceEqualityComparer.Instance))
 				throw new CircularReferenceException();
 
 			if (type == typeof(Int32))
@@ -49,13 +50,22 @@ namespace DanSerialiser
 					{
 						var includeTypeName = fieldNamesUsed.Contains(field.Name);
 						writer.FieldName(field.Name, includeTypeName ? field.DeclaringType.AssemblyQualifiedName : null);
-						Serialise(field.GetValue(value), field.FieldType, writer, parents.Concat(new[] { value }));
+						Serialise(field.GetValue(value), field.FieldType, writer, parents.Append(value));
 						fieldNamesUsed.Add(field.Name);
 					}
 					currentTypeToEnumerateMembersFor = currentTypeToEnumerateMembersFor.BaseType;
 				}
 			}
 			writer.ObjectEnd();
+		}
+
+		// Courtesy of https://stackoverflow.com/a/41169463/3813189
+		private sealed class ReferenceEqualityComparer : IEqualityComparer<object>
+		{
+			public static ReferenceEqualityComparer Instance { get; } = new ReferenceEqualityComparer();
+
+			public new bool Equals(object x, object y) => ReferenceEquals(x, y);
+			public int GetHashCode(object obj) => RuntimeHelpers.GetHashCode(obj);
 		}
 	}
 }
