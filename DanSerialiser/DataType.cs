@@ -14,6 +14,10 @@
 		UInt32,
 		UInt64,
 
+		Single,
+		Double,
+		Decimal,
+
 		Char,
 		String,
 

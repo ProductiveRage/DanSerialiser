@@ -73,6 +73,22 @@ namespace DanSerialiser
 				return;
 			}
 
+			if (type == typeof(Single))
+			{
+				writer.Single((Single)value);
+				return;
+			}
+			if (type == typeof(Double))
+			{
+				writer.Double((Double)value);
+				return;
+			}
+			if (type == typeof(Decimal))
+			{
+				writer.Decimal((Decimal)value);
+				return;
+			}
+
 			if (type == typeof(Char))
 			{
 				writer.Char((Char)value);

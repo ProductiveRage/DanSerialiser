@@ -53,6 +53,18 @@ namespace DanSerialiser
 				case DataType.UInt64:
 					return BitConverter.ToUInt64(ReadNext(sizeof(UInt64)), 0);
 
+				case DataType.Single:
+					return BitConverter.ToSingle(ReadNext(sizeof(Single)), 0);
+				case DataType.Double:
+					return BitConverter.ToDouble(ReadNext(sizeof(Double)), 0);
+				case DataType.Decimal:
+					// BitConverter does not deal with decimal (there is no GetBytes overloads for it and no ToDecimal method) so BinaryWriter used decimal.GetBits, which
+					// returns four int values and so we need to do the opposite here
+					var partialValues = new int[4];
+					for (var i = 0; i < 4; i++)
+						partialValues[i] = ReadNextInt();
+					return new decimal(partialValues);
+
 				case DataType.Char:
 					return BitConverter.ToChar(ReadNext(sizeof(Char)), 0);
 				case DataType.String:

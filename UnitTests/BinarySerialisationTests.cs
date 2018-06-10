@@ -60,6 +60,24 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void Single()
+		{
+			AssertCloneMatchesOriginal(float.MaxValue);
+		}
+
+		[Fact]
+		public static void Double()
+		{
+			AssertCloneMatchesOriginal(double.MaxValue);
+		}
+
+		[Fact]
+		public static void Decimal()
+		{
+			AssertCloneMatchesOriginal(decimal.MaxValue);
+		}
+
+		[Fact]
 		public static void Enum()
 		{
 			AssertCloneMatchesOriginal(DefaultTypeEnum.Value2);

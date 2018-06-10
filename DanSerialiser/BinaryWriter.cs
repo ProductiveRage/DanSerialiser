@@ -45,6 +45,24 @@ namespace DanSerialiser
 			_data.AddRange(BitConverter.GetBytes(value));
 		}
 
+		public void Single(float value)
+		{
+			_data.Add((byte)DataType.Single);
+			_data.AddRange(BitConverter.GetBytes(value));
+		}
+		public void Double(double value)
+		{
+			_data.Add((byte)DataType.Double);
+			_data.AddRange(BitConverter.GetBytes(value));
+		}
+		public void Decimal(decimal value)
+		{
+			// BitConverter's "GetBytes" method doesn't support decimal so use "decimal.GetBits" that returns four int values
+			_data.Add((byte)DataType.Decimal);
+			foreach (var partialValue in decimal.GetBits(value))
+				IntWithoutDataType(partialValue);
+		}
+
 		public void UInt16(ushort value)
 		{
 			_data.Add((byte)DataType.UInt16);

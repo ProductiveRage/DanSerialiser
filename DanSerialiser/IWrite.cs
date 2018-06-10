@@ -14,6 +14,10 @@
 		void UInt32(uint value);
 		void UInt64(ulong value);
 
+		void Single(float value);
+		void Double(double value);
+		void Decimal(decimal value);
+
 		void Char(char value);
 		void String(string value);
 
