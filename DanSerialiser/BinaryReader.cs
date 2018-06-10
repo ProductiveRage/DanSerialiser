@@ -32,6 +32,8 @@ namespace DanSerialiser
 				default:
 					throw new NotImplementedException();
 
+				case DataType.Bool:
+					return ReadNext() != 0;
 				case DataType.Byte:
 					return ReadNext();
 

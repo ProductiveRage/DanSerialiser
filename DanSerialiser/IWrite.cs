@@ -2,6 +2,7 @@
 {
 	public interface IWrite
 	{
+		void Bool(bool value);
 		void Byte(byte value);
 		void Int16(short value);
 		void Int32(int value);
