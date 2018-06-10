@@ -35,6 +35,23 @@ namespace UnitTests
 		{
 			AssertCloneMatchesOriginal(long.MaxValue);
 		}
+		[Fact]
+		public static void UInt16()
+		{
+			AssertCloneMatchesOriginal(ushort.MaxValue);
+		}
+
+		[Fact]
+		public static void UInt32()
+		{
+			AssertCloneMatchesOriginal(uint.MaxValue);
+		}
+
+		[Fact]
+		public static void UInt64()
+		{
+			AssertCloneMatchesOriginal(ulong.MaxValue);
+		}
 
 		[Fact]
 		public static void Enum()

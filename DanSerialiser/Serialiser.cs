@@ -52,6 +52,22 @@ namespace DanSerialiser
 				return;
 			}
 
+			if (type == typeof(UInt16))
+			{
+				writer.UInt16((UInt16)value);
+				return;
+			}
+			if (type == typeof(UInt32))
+			{
+				writer.UInt32((UInt32)value);
+				return;
+			}
+			if (type == typeof(UInt64))
+			{
+				writer.UInt64((UInt64)value);
+				return;
+			}
+
 			if (type == typeof(Char))
 			{
 				writer.Char((Char)value);
