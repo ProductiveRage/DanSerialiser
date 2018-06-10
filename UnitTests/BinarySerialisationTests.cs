@@ -50,7 +50,7 @@ namespace UnitTests
 		}
 
 		[Fact]
-		public static void PrivateNullSealedClassWithNoMembers()
+		public static void NullPrivateSealedClassWithNoMembers()
 		{
 			var clone = Clone((ClassWithNoMembersAndNoInheritance)null);
 			Assert.Null(clone);
