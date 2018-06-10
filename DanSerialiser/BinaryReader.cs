@@ -40,21 +40,21 @@ namespace DanSerialiser
 					return (sbyte)ReadNext();
 
 				case DataType.Int16:
-					return BitConverter.ToInt16(ReadNext(2), 0);
+					return BitConverter.ToInt16(ReadNext(sizeof(Int16)), 0);
 				case DataType.Int32:
 					return ReadNextInt();
 				case DataType.Int64:
-					return BitConverter.ToInt64(ReadNext(8), 0);
+					return BitConverter.ToInt64(ReadNext(sizeof(Int64)), 0);
 
 				case DataType.UInt16:
-					return BitConverter.ToUInt16(ReadNext(2), 0);
+					return BitConverter.ToUInt16(ReadNext(sizeof(UInt16)), 0);
 				case DataType.UInt32:
-					return BitConverter.ToUInt32(ReadNext(4), 0);
+					return BitConverter.ToUInt32(ReadNext(sizeof(UInt32)), 0);
 				case DataType.UInt64:
-					return BitConverter.ToUInt64(ReadNext(8), 0);
+					return BitConverter.ToUInt64(ReadNext(sizeof(UInt64)), 0);
 
 				case DataType.Char:
-					return BitConverter.ToChar(ReadNext(2), 0);
+					return BitConverter.ToChar(ReadNext(sizeof(Char)), 0);
 				case DataType.String:
 					return ReadNextString();
 
@@ -68,12 +68,12 @@ namespace DanSerialiser
 
 		private int ReadNextInt()
 		{
-			return BitConverter.ToInt32(ReadNext(4), 0);
+			return BitConverter.ToInt32(ReadNext(sizeof(Int32)), 0);
 		}
 
 		private string ReadNextString()
 		{
-			var length = BitConverter.ToInt32(ReadNext(4), 0);
+			var length = ReadNextInt();
 			return (length == -1) ? null : Encoding.UTF8.GetString(ReadNext(length));
 		}
 
