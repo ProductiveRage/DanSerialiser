@@ -90,6 +90,12 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void NullObject()
+		{
+			AssertCloneMatchesOriginal<object>(null);
+		}
+
+		[Fact]
 		public static void BlankString()
 		{
 			AssertCloneMatchesOriginal("");
