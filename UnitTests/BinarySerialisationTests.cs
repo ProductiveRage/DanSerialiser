@@ -225,6 +225,27 @@ namespace UnitTests
 			});
 		}
 
+		[Fact]
+		public static void StaticDataIsNotSerialised()
+		{
+			// Only instance fields will be serialised, which means that any static fields / properties will be unaffected by the deserialisation process. To illustrate this..
+			// - Create something to clone that has a static property and set that property to a known value
+			var source = new ClassWithStaticProperty();
+			ClassWithStaticProperty.Count = 1;
+			// - Serialise that data (if static fields were going to be serialised then the value of the static field would be captured here)
+			var writer = new BinaryWriter();
+			Serialiser.Instance.Serialise(source, writer);
+			var serialisedData = writer.GetData();
+			// - Change the static property to a different value
+			ClassWithStaticProperty.Count = 2;
+			// - Deserialise.. if this were to read a value for the static property from the serialised data and set it then the static property value would revert back to
+			//   the value that it had when it was serialised
+			var reader = new BinaryReader(serialisedData);
+			var clone = reader.Read<ClassWithStaticProperty>();
+			// - Confirm that the static property was NOT reverted back to the value that it had when the data was serialised
+			Assert.Equal(2, ClassWithStaticProperty.Count);
+		}
+
 		private static void AssertCloneMatchesOriginal<T>(T value)
 		{
 			var clone = Clone(value);
@@ -314,6 +335,11 @@ namespace UnitTests
 		private sealed class Node
 		{
 			public Node Child { get; set; }
+		}
+
+		private class ClassWithStaticProperty
+		{
+			public static int Count { get; set; }
 		}
 
 		private struct StructWithNoMembers { }
