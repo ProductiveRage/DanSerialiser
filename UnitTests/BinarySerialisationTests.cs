@@ -90,21 +90,15 @@ namespace UnitTests
 		}
 
 		[Fact]
-		public static void NullObject()
+		public static void Char()
 		{
-			AssertCloneMatchesOriginal<object>(null);
+			AssertCloneMatchesOriginal('é');
 		}
 
 		[Fact]
 		public static void BlankString()
 		{
 			AssertCloneMatchesOriginal("");
-		}
-
-		[Fact]
-		public static void Char()
-		{
-			AssertCloneMatchesOriginal('é');
 		}
 
 		[Fact]
@@ -147,6 +141,12 @@ namespace UnitTests
 		public static void ListOfInt32()
 		{
 			AssertCloneMatchesOriginal(new List<int> { 32 });
+		}
+
+		[Fact]
+		public static void NullObject()
+		{
+			AssertCloneMatchesOriginal<object>(null);
 		}
 
 		[Fact]
