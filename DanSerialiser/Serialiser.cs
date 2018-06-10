@@ -52,6 +52,11 @@ namespace DanSerialiser
 				return;
 			}
 
+			if (type == typeof(Char))
+			{
+				writer.Char((Char)value);
+				return;
+			}
 			if (type == typeof(String))
 			{
 				writer.String((String)value);

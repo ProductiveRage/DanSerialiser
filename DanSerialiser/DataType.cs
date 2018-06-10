@@ -8,6 +8,7 @@
 		Int32,
 		Int64,
 
+		Char,
 		String,
 
 		ObjectStart,

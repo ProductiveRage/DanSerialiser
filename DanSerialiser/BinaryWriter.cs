@@ -41,6 +41,11 @@ namespace DanSerialiser
 			_data.AddRange(BitConverter.GetBytes(value));
 		}
 
+		public void Char(char value)
+		{
+			_data.Add((byte)DataType.Char);
+			_data.AddRange(BitConverter.GetBytes(value));
+		}
 		public void String(string value)
 		{
 			_data.Add((byte)DataType.String);

@@ -73,6 +73,12 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void Char()
+		{
+			AssertCloneMatchesOriginal('é');
+		}
+
+		[Fact]
 		public static void String()
 		{
 			AssertCloneMatchesOriginal("Café");
