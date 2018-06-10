@@ -13,6 +13,12 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void Enum()
+		{
+			AssertCloneMatchesOriginal(DefaultTypeEnum.Value2);
+		}
+
+		[Fact]
 		public static void NullableInt32()
 		{
 			AssertCloneMatchesOriginal((int?)32);
@@ -315,5 +321,7 @@ namespace UnitTests
 		{
 			public string Name { get; set; }
 		}
+
+		private enum DefaultTypeEnum { Value1, Value2 }
 	}
 }

@@ -37,13 +37,22 @@ namespace DanSerialiser
 				return;
 			}
 
+			if (type.IsEnum)
+			{
+				Serialise(value, type.GetEnumUnderlyingType(), writer, parents);
+				return;
+			}
+
 			if (typeof(IEnumerable).IsAssignableFrom(type))
 			{
 				writer.ListStart(value);
 				if (value != null)
 				{
+					var elementType = type.GetElementType() ?? type.TryToGetIEnumerableElementType();
+					if (elementType == null)
+						throw new InvalidOperationException("Unable to determine element type from list type: " + type.Name);
 					foreach (var element in (IEnumerable)value)
-						Serialise(element, type.GetElementType(), writer, parents.Append(value));
+						Serialise(element, elementType, writer, parents.Append(value));
 				}
 				writer.ListEnd();
 			}

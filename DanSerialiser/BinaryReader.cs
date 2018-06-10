@@ -118,10 +118,9 @@ namespace DanSerialiser
 			var elementType = type.GetElementType();
 			if (elementType == null)
 			{
-				var enumerablesImplemented = type.FindInterfaces((t, criteria) => t.IsGenericType && (t.GetGenericTypeDefinition() == typeof(IEnumerable<>)), null);
-				if (enumerablesImplemented.Length == 0)
+				elementType = type.TryToGetIEnumerableElementType();
+				if (elementType == null)
 					throw new InvalidOperationException("Unable to determine element type from list type: " + type.Name);
-				elementType = enumerablesImplemented[0].GetGenericArguments()[0];
 			}
 			var items = Array.CreateInstance(elementType, length: ReadNextInt());
 			for (var i = 0; i < items.Length; i++)
