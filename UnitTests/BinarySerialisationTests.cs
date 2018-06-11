@@ -170,7 +170,7 @@ namespace UnitTests
 		[Fact]
 		public static void PrivateSealedClassWithNoMembers()
 		{
-			var clone = Clone(new ClassWithNoMembersAndNoInheritance());
+			var clone = BinarySerialisationCloner.Clone(new ClassWithNoMembersAndNoInheritance());
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithNoMembersAndNoInheritance>(clone);
 		}
@@ -178,14 +178,14 @@ namespace UnitTests
 		[Fact]
 		public static void NullPrivateSealedClassWithNoMembers()
 		{
-			var clone = Clone((ClassWithNoMembersAndNoInheritance)null);
+			var clone = BinarySerialisationCloner.Clone((ClassWithNoMembersAndNoInheritance)null);
 			Assert.Null(clone);
 		}
 
 		[Fact]
 		public static void PrivateSealedClassWithSinglePublicField()
 		{
-			var clone = Clone(new ClassWithSinglePublicFieldAndNoInheritance { Name = "abc" });
+			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicFieldAndNoInheritance { Name = "abc" });
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithSinglePublicFieldAndNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
@@ -194,7 +194,7 @@ namespace UnitTests
 		[Fact]
 		public static void PrivateSealedClassWithSinglePublicAutoProperty()
 		{
-			var clone = Clone(new ClassWithSinglePublicAutoPropertyAndNoInheritance { Name = "abc" });
+			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicAutoPropertyAndNoInheritance { Name = "abc" });
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithSinglePublicAutoPropertyAndNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
@@ -203,7 +203,7 @@ namespace UnitTests
 		[Fact]
 		public static void PrivateSealedClassWithSinglePublicReadonlyAutoProperty()
 		{
-			var clone = Clone(new ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance("abc"));
+			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance("abc"));
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
@@ -215,7 +215,7 @@ namespace UnitTests
 		[Fact]
 		public static void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToInterface()
 		{
-			var clone = Clone<IHaveName>(new ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance { Name = "abc" });
+			var clone = BinarySerialisationCloner.Clone<IHaveName>(new ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance { Name = "abc" });
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
@@ -227,7 +227,7 @@ namespace UnitTests
 		[Fact]
 		public static void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToInterfaceThatIsExplicitlyImplemented()
 		{
-			var clone = Clone<IHaveName>(new ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance { Name = "abc" });
+			var clone = BinarySerialisationCloner.Clone<IHaveName>(new ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance { Name = "abc" });
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
@@ -240,7 +240,7 @@ namespace UnitTests
 		[Fact]
 		public static void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToAbstractClass()
 		{
-			var clone = Clone<NamedItem>(new ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance { Name = "abc", OtherProperty = "xyz" });
+			var clone = BinarySerialisationCloner.Clone<NamedItem>(new ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance { Name = "abc", OtherProperty = "xyz" });
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
@@ -251,7 +251,7 @@ namespace UnitTests
 		public static void PropertyOnBaseClassThatIsOverriddenOnDerivedClass()
 		{
 			var source = new SupervisorDetails(123, "abc");
-			var clone = Clone(new SupervisorDetails(123, "abc"));
+			var clone = BinarySerialisationCloner.Clone(new SupervisorDetails(123, "abc"));
 			Assert.IsType<SupervisorDetails>(clone);
 			Assert.Equal(123, clone.Id);
 			Assert.Equal("abc", clone.Name);
@@ -261,7 +261,7 @@ namespace UnitTests
 		public static void PropertyOnBaseClassThatIsOverriddenWithNewOnDerivedClass()
 		{
 			var source = new ManagerDetails(123, "abc");
-			var clone = Clone(new ManagerDetails(123, "abc"));
+			var clone = BinarySerialisationCloner.Clone(new ManagerDetails(123, "abc"));
 			Assert.IsType<ManagerDetails>(clone);
 			Assert.Equal(123, clone.Id);
 			Assert.Equal("abc", ((EmployeeDetails)clone).Name);
@@ -270,14 +270,14 @@ namespace UnitTests
 		[Fact]
 		public static void PrivateStructWithNoMembers()
 		{
-			var clone = Clone(new StructWithNoMembers());
+			var clone = BinarySerialisationCloner.Clone(new StructWithNoMembers());
 			Assert.IsType<StructWithNoMembers>(clone);
 		}
 
 		[Fact]
 		public static void PrivateStructWithSinglePublicField()
 		{
-			var clone = Clone(new StructWithSinglePublicField { Name = "abc" });
+			var clone = BinarySerialisationCloner.Clone(new StructWithSinglePublicField { Name = "abc" });
 			Assert.IsType<StructWithSinglePublicField>(clone);
 			Assert.Equal("abc", clone.Name);
 		}
@@ -285,7 +285,7 @@ namespace UnitTests
 		[Fact]
 		public static void PrivateStructWithSinglePublicAutoProperty()
 		{
-			var clone = Clone(new StructWithSinglePublicAutoProperty { Name = "abc" });
+			var clone = BinarySerialisationCloner.Clone(new StructWithSinglePublicAutoProperty { Name = "abc" });
 			Assert.IsType<StructWithSinglePublicAutoProperty>(clone);
 			Assert.Equal("abc", clone.Name);
 		}
@@ -325,16 +325,8 @@ namespace UnitTests
 
 		private static void AssertCloneMatchesOriginal<T>(T value)
 		{
-			var clone = Clone(value);
+			var clone = BinarySerialisationCloner.Clone(value);
 			Assert.Equal(value, clone);
-		}
-
-		private static T Clone<T>(T value)
-		{
-			var writer = new BinaryWriter();
-			Serialiser.Instance.Serialise(value, writer);
-			var reader = new BinaryReader(writer.GetData());
-			return reader.Read<T>();
 		}
 
 		private sealed class ClassWithNoMembersAndNoInheritance { }

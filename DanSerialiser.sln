@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27428.2043
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DanSerialiser", "DanSerialiser\DanSerialiser.csproj", "{3696FA7B-8F36-4BC5-AD9B-8D82798F6F08}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DanSerialiser", "DanSerialiser\DanSerialiser.csproj", "{3696FA7B-8F36-4BC5-AD9B-8D82798F6F08}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester", "Tester\Tester.csproj", "{307D1879-965C-4C39-939F-C19D65981A22}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester", "Tester\Tester.csproj", "{307D1879-965C-4C39-939F-C19D65981A22}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTests", "UnitTests\UnitTests.csproj", "{E4E8CC17-C86F-4B93-A166-E96E0949A7F4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UnitTests", "UnitTests\UnitTests.csproj", "{E4E8CC17-C86F-4B93-A166-E96E0949A7F4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
