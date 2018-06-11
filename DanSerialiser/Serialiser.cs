@@ -17,7 +17,11 @@ namespace DanSerialiser
 			if (writer == null)
 				throw new ArgumentNullException(nameof(writer));
 
-			Serialise(value, typeof(T), writer, new object[0]);
+			// We need to know the type that we're serialising and that's why there is a generic type param, so that the caller HAS to specify one even if
+			// they're passing null. If we don't have null then take the type from the value argument, otherwise use the type param (we should prefer the
+			// value's type because it may be more specific - eg. could call this with a T of object and a value that is a string, in which case we want
+			// to process it as a string and not an object).
+			Serialise(value, value?.GetType() ?? typeof(T), writer, new object[0]);
 		}
 
 		private void Serialise(object value, Type type, IWrite writer, IEnumerable<object> parents)

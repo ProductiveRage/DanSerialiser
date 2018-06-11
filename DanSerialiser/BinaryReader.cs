@@ -19,10 +19,13 @@ namespace DanSerialiser
 
 		public T Read<T>()
 		{
-			return (T)Read(typeof(T));
+			// The original intention of the use of generic type params for the reader and writer was to reduce casting at the call sites and I had thought that the type might
+			// be required when deserialising - but it is not for the current BinaryWriter and BinaryReader implementations, so all we do with T here is try to cast the return
+			// value to it
+			return (T)Read();
 		}
 
-		private object Read(Type type)
+		private object Read()
 		{
 			if (_index >= _data.Length)
 				throw new InvalidOperationException("No data to read");
@@ -129,7 +132,14 @@ namespace DanSerialiser
 						if (typeToLookForMemberOn == null)
 							break;
 					}
-					var fieldValue = Read(field.FieldType);
+					var fieldValue = Read();
+					if (field == null)
+					{
+						// If the serialised data has content for a field that does not exist on the target type then don't try to set it - this may happen if the version of the
+						// assembly that was used when it was serialised is different to the version loaded when deserialising. Being flexible about this means that is a newer
+						// version has an additional property added to it then older code can still read it.
+						continue;
+					}
 					field.SetValue(value, fieldValue);
 				}
 				else
@@ -156,7 +166,7 @@ namespace DanSerialiser
 			}
 			var items = Array.CreateInstance(elementType, length: ReadNextInt());
 			for (var i = 0; i < items.Length; i++)
-				items.SetValue(Read(elementType), i);
+				items.SetValue(Read(), i);
 			var nextEntryType = (DataType)ReadNext();
 			if (nextEntryType != DataType.ListEnd)
 				throw new InvalidOperationException("Expected ListEnd was not encountered");
