@@ -58,6 +58,43 @@ namespace UnitTests
 		}
 
 		/// <summary>
+		/// If serialising an object to / from different versions of an assembly, if the destination type has a field that the serialised data does not have any information for
+		/// then skip it (this is intended to give some flexibility with versioning - if fields are added or remove or renamed - but it could lead to deserialised instances having
+		/// uninitialised values in unexpected places and so this approach may change soon)
+		/// </summary>
+		[Fact]
+		public static void DoNotWorryIfSerialisedDataCanNotSetAllFields()
+		{
+			const string idFieldName = "Id";
+			var sourceType = ConstructType("DynamicAssemblyFor" + GetMyName(), new Version(1, 0), "ClassWithIntId", new[] { Tuple.Create(idFieldName, typeof(int)) });
+
+			var instance = Activator.CreateInstance(sourceType);
+			var idFieldOnSource = sourceType.GetField(idFieldName);
+			idFieldOnSource.SetValue(instance, 123);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+
+			const string nameFieldName = "Name";
+			var destinationType = ConstructType(
+				"DynamicAssemblyFor" + GetMyName(),
+				new Version(1, 0),
+				"ClassWithIntId",
+				new[]
+				{
+					Tuple.Create(idFieldName, typeof(int)),
+					Tuple.Create(nameFieldName, typeof(string))
+				}
+			);
+			var clone = ResolveDynamicAssembliesWhilePerformingAction(
+				() => Deserialise(serialisedData, destinationType),
+				destinationType
+			);
+			var idFieldOnDestination = destinationType.GetField(idFieldName);
+			var nameFieldOnDestination = destinationType.GetField(nameFieldName);
+			Assert.Equal(123, idFieldOnDestination.GetValue(clone));
+			Assert.Equal((string)null, nameFieldOnDestination.GetValue(clone));
+		}
+
+		/// <summary>
 		/// Use the CallerMemberName attribute so that a method can gets its own name so that it can specify a descriptive dynamic assembly name (could have used nameof
 		/// but that would invite copy-paste errors when new methods were added - the method name need to be changed AND the reference to it within the nameof call)
 		/// </summary>
