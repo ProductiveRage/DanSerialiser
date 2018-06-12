@@ -120,12 +120,20 @@ namespace DanSerialiser
 			StringWithoutDataType(value?.GetType()?.AssemblyQualifiedName);
 		}
 
-		public void FieldName(FieldInfo field, Type serialisationTargetType)
+		public void ObjectEnd()
+		{
+			_data.Add((byte)DataType.ObjectEnd);
+		}
+
+		public bool FieldName(FieldInfo field, Type serialisationTargetType)
 		{
 			if (field == null)
 				throw new ArgumentNullException(nameof(field));
 			if (serialisationTargetType == null)
 				throw new ArgumentNullException(nameof(serialisationTargetType));
+
+			if (field.GetCustomAttribute<NonSerializedAttribute>() != null)
+				return false;
 
 			// If a field is declared multiple times in the type hierarchy (whether through overrides or use of "new") then its name will need prefixing with the type
 			// that this FieldInfo relates to
@@ -147,11 +155,7 @@ namespace DanSerialiser
 			if (fieldNameExistsMultipleTimesInHierarchy)
 				StringWithoutDataType(BinaryReaderWriterConstants.FieldTypeNamePrefix + field.DeclaringType.AssemblyQualifiedName);
 			StringWithoutDataType(field.Name);
-		}
-
-		public void ObjectEnd()
-		{
-			_data.Add((byte)DataType.ObjectEnd);
+			return true;
 		}
 
 		public byte[] GetData()

@@ -130,8 +130,8 @@ namespace DanSerialiser
 				{
 					foreach (var field in currentTypeToEnumerateMembersFor.GetFields(BinaryReaderWriterConstants.FieldRetrievalBindingFlags))
 					{
-						writer.FieldName(field, type);
-						Serialise(field.GetValue(value), field.FieldType, writer, parents.Append(value));
+						if (writer.FieldName(field, type))
+							Serialise(field.GetValue(value), field.FieldType, writer, parents.Append(value));
 					}
 					currentTypeToEnumerateMembersFor = currentTypeToEnumerateMembersFor.BaseType;
 				}

@@ -346,6 +346,14 @@ namespace UnitTests
 			Assert.Equal(2, ClassWithStaticProperty.Count);
 		}
 
+		[Fact]
+		public static void NonSerializedFieldNotSerialised()
+		{
+			var source = new SomethingWithNonSerialisableIdField { Id = 123 };
+			var clone = BinarySerialisationCloner.Clone(source);
+			Assert.Equal(0, clone.Id);
+		}
+
 		private static T AssertCloneMatchesOriginalAndReturnClone<T>(T value)
 		{
 			var clone = BinarySerialisationCloner.Clone(value);
@@ -438,6 +446,12 @@ namespace UnitTests
 		private class ClassWithStaticProperty
 		{
 			public static int Count { get; set; }
+		}
+
+		private sealed class SomethingWithNonSerialisableIdField
+		{
+			[NonSerialized]
+			public int Id;
 		}
 
 		private struct StructWithNoMembers { }

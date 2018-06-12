@@ -28,7 +28,11 @@ namespace DanSerialiser
 		void ArrayEnd();
 
 		void ObjectStart<T>(T value);
-		void FieldName(FieldInfo field, Type serialisationTargetType);
 		void ObjectEnd();
+
+		/// <summary>
+		/// This will return false if the field should be skipped
+		/// </summary>
+		bool FieldName(FieldInfo field, Type serialisationTargetType);
 	}
 }
