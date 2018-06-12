@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
@@ -73,8 +71,8 @@ namespace DanSerialiser
 				case DataType.String:
 					return ReadNextString();
 
-				case DataType.ListStart:
-					return ReadNextList();
+				case DataType.ArrayStart:
+					return ReadNextArray();
 
 				case DataType.ObjectStart:
 					return ReadNextObject();
@@ -98,10 +96,11 @@ namespace DanSerialiser
 			if (typeName == null)
 			{
 				if ((DataType)ReadNext() != DataType.ObjectEnd)
-					throw new InvalidOperationException("Expected ObjectEnd was not encountered");
+					throw new InvalidOperationException($"Expected {nameof(DataType.ObjectEnd)} was not encountered");
 				return null;
 			}
-			var value = FormatterServices.GetUninitializedObject(Type.GetType(typeName, throwOnError: true));
+			var type = Type.GetType(typeName, throwOnError: true);
+			var value = FormatterServices.GetUninitializedObject(type);
 			while (true)
 			{
 				var nextEntryType = (DataType)ReadNext();
@@ -147,37 +146,24 @@ namespace DanSerialiser
 			}
 		}
 
-		private object ReadNextList()
+		private object ReadNextArray()
 		{
-			var typeName = ReadNextString();
-			if (typeName == null)
+			var elementTypeName = ReadNextString();
+			if (elementTypeName == null)
 			{
-				if ((DataType)ReadNext() != DataType.ListEnd)
-					throw new InvalidOperationException("Expected ListEnd was not encountered");
+				// If the element type was recorded as null then it means that the array itself was null (and so the next character should be an ArrayEnd)
+				if ((DataType)ReadNext() != DataType.ArrayEnd)
+					throw new InvalidOperationException($"Expected {nameof(DataType.ArrayEnd)} was not encountered");
 				return null;
 			}
-			var type = Type.GetType(typeName, throwOnError: true);
-			var elementType = type.GetElementType();
-			if (elementType == null)
-			{
-				elementType = type.TryToGetIEnumerableElementType();
-				if (elementType == null)
-					throw new InvalidOperationException("Unable to determine element type from list type: " + type.Name);
-			}
+			var elementType = Type.GetType(elementTypeName, throwOnError: true);
 			var items = Array.CreateInstance(elementType, length: ReadNextInt());
 			for (var i = 0; i < items.Length; i++)
 				items.SetValue(Read(), i);
 			var nextEntryType = (DataType)ReadNext();
-			if (nextEntryType != DataType.ListEnd)
-				throw new InvalidOperationException("Expected ListEnd was not encountered");
-			if (type.IsArray)
-				return items;
-			var constructor =
-				type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(IEnumerable<>).MakeGenericType(elementType) }, null) ??
-				type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(IEnumerable) }, null);
-			if (constructor == null)
-				throw new InvalidOperationException("Unable to identify constructor for list type: " + type.Name);
-			return constructor.Invoke(new[] { items });
+			if (nextEntryType != DataType.ArrayEnd)
+				throw new InvalidOperationException($"Expected {nameof(DataType.ArrayEnd)} was not encountered");
+			return items;
 		}
 
 		private byte ReadNext()

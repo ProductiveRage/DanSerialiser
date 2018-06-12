@@ -110,18 +110,17 @@ namespace DanSerialiser
 				return;
 			}
 
-			if (typeof(IEnumerable).IsAssignableFrom(type))
+			if (type.IsArray)
 			{
-				writer.ListStart(value);
+				var elementType = type.GetElementType();
+				writer.ArrayStart(value, elementType);
 				if (value != null)
 				{
-					var elementType = type.GetElementType() ?? type.TryToGetIEnumerableElementType();
-					if (elementType == null)
-						throw new InvalidOperationException("Unable to determine element type from list type: " + type.Name);
 					foreach (var element in (IEnumerable)value)
 						Serialise(element, elementType, writer, parents.Append(value));
 				}
-				writer.ListEnd();
+				writer.ArrayEnd();
+				return;
 			}
 
 			writer.ObjectStart(value);

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
@@ -90,23 +89,27 @@ namespace DanSerialiser
 			StringWithoutDataType(value);
 		}
 
-		public void ListStart<T>(T value)
+		public void ArrayStart(object value, Type elementType)
 		{
-			_data.Add((byte)DataType.ListStart);
-			StringWithoutDataType(value?.GetType()?.AssemblyQualifiedName);
+			if (elementType == null)
+				throw new ArgumentNullException(nameof(elementType));
+			if ((value != null) && !(value is Array))
+				throw new ArgumentException($"If {nameof(value)} is not null then it must be an array");
+
+			_data.Add((byte)DataType.ArrayStart);
 			if (value == null)
+			{
+				// If the value is null then don't store the element type since we don't need it (and the BinaryReader will understand that this represents a null value)
+				StringWithoutDataType(null);
 				return;
-			if (!(value is IEnumerable enumerableValue))
-				throw new ArgumentException("Unable to process list as value does not implement IEnumerable");
-			var count = 0;
-			foreach (var item in enumerableValue)
-				count++;
-			IntWithoutDataType(count);
+			}
+			StringWithoutDataType(elementType.AssemblyQualifiedName);
+			IntWithoutDataType(((Array)(object)value).Length);
 		}
 
-		public void ListEnd()
+		public void ArrayEnd()
 		{
-			_data.Add((byte)DataType.ListEnd);
+			_data.Add((byte)DataType.ArrayEnd);
 		}
 
 		public void ObjectStart<T>(T value)

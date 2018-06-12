@@ -25,7 +25,7 @@
 		FieldName,
 		ObjectEnd,
 
-		ListStart,
-		ListEnd
+		ArrayStart,
+		ArrayEnd
 	}
 }

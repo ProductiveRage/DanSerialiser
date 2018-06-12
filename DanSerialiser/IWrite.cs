@@ -1,4 +1,6 @@
-﻿namespace DanSerialiser
+﻿using System;
+
+namespace DanSerialiser
 {
 	public interface IWrite
 	{
@@ -21,8 +23,8 @@
 		void Char(char value);
 		void String(string value);
 
-		void ListStart<T>(T value);
-		void ListEnd();
+		void ArrayStart(object value, Type elementType);
+		void ArrayEnd();
 
 		void ObjectStart<T>(T value);
 		void FieldName(string name, string typeNameIfRequired);
