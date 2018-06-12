@@ -110,9 +110,9 @@ namespace DanSerialiser
 				{
 					var fieldOrTypeName = ReadNextString();
 					string typeNameIfRequired, fieldName;
-					if (fieldOrTypeName.StartsWith(BinaryWriter.FieldTypeNamePrefix))
+					if (fieldOrTypeName.StartsWith(BinaryReaderWriterConstants.FieldTypeNamePrefix))
 					{
-						typeNameIfRequired = fieldOrTypeName.Substring(BinaryWriter.FieldTypeNamePrefix.Length);
+						typeNameIfRequired = fieldOrTypeName.Substring(BinaryReaderWriterConstants.FieldTypeNamePrefix.Length);
 						fieldName = ReadNextString();
 					}
 					else
