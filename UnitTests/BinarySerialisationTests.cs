@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using DanSerialiser;
 using Xunit;
 
@@ -159,6 +160,28 @@ namespace UnitTests
 		public static void ListOfInt32()
 		{
 			AssertCloneMatchesOriginal(new List<int> { 32 });
+		}
+
+		[Fact]
+		public static void NullDictionaryOfInt32ToString()
+		{
+			AssertCloneMatchesOriginal((Dictionary<string, int>)null);
+		}
+
+		[Fact]
+		public static void DictionaryOfInt32ToString()
+		{
+			var clone = AssertCloneMatchesOriginalAndReturnClone(new Dictionary<string, int>() { { "One", 1 } });
+			Assert.Single(clone);
+			Assert.True(clone.ContainsKey("One"));
+		}
+
+		[Fact]
+		public static void DictionaryOfInt32ToStringWithSpecificComparer()
+		{
+			var clone = AssertCloneMatchesOriginalAndReturnClone(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { { "One", 1 } });
+			Assert.Single(clone);
+			Assert.True(clone.ContainsKey("ONE"));
 		}
 
 		[Fact]
@@ -323,10 +346,16 @@ namespace UnitTests
 			Assert.Equal(2, ClassWithStaticProperty.Count);
 		}
 
-		private static void AssertCloneMatchesOriginal<T>(T value)
+		private static T AssertCloneMatchesOriginalAndReturnClone<T>(T value)
 		{
 			var clone = BinarySerialisationCloner.Clone(value);
 			Assert.Equal(value, clone);
+			return clone;
+		}
+
+		private static void AssertCloneMatchesOriginal<T>(T value)
+		{
+			AssertCloneMatchesOriginalAndReturnClone(value);
 		}
 
 		private sealed class ClassWithNoMembersAndNoInheritance { }
