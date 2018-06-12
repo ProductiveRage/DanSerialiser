@@ -9,6 +9,9 @@ namespace DanSerialiser
 	{
 		private byte[] _data;
 		private int _index;
+
+		public BindingFlags FieldRetrievalBindingFlags { get; private set; }
+
 		public BinaryReader(byte[] data)
 		{
 			_data = data ?? throw new ArgumentNullException(nameof(data));
@@ -124,7 +127,7 @@ namespace DanSerialiser
 					FieldInfo field;
 					while (true)
 					{
-						field = typeToLookForMemberOn.GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+						field = typeToLookForMemberOn.GetField(fieldName, BinaryReaderWriterConstants.FieldRetrievalBindingFlags);
 						if ((field != null) && ((typeNameIfRequired == null) || (field.DeclaringType.AssemblyQualifiedName == typeNameIfRequired)))
 							break;
 						typeToLookForMemberOn = typeToLookForMemberOn.BaseType;

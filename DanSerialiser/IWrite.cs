@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 
 namespace DanSerialiser
 {
@@ -27,7 +28,7 @@ namespace DanSerialiser
 		void ArrayEnd();
 
 		void ObjectStart<T>(T value);
-		void FieldName(string name, string typeNameIfRequired);
+		void FieldName(FieldInfo field, Type serialisationTargetType);
 		void ObjectEnd();
 	}
 }

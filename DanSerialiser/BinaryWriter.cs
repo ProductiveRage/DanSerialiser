@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Text;
 
 namespace DanSerialiser
@@ -118,15 +120,33 @@ namespace DanSerialiser
 			StringWithoutDataType(value?.GetType()?.AssemblyQualifiedName);
 		}
 
-		public void FieldName(string name, string typeNameIfRequired)
+		public void FieldName(FieldInfo field, Type serialisationTargetType)
 		{
-			if (name == null)
-				throw new ArgumentNullException(nameof(name));
+			if (field == null)
+				throw new ArgumentNullException(nameof(field));
+			if (serialisationTargetType == null)
+				throw new ArgumentNullException(nameof(serialisationTargetType));
 
+			// If a field is declared multiple times in the type hierarchy (whether through overrides or use of "new") then its name will need prefixing with the type
+			// that this FieldInfo relates to
+			var fieldNameExistsMultipleTimesInHierarchy = false;
+			var currentType = serialisationTargetType;
+			while (currentType != null)
+			{
+				if (currentType != serialisationTargetType)
+				{
+					if (currentType.GetFields(BinaryReaderWriterConstants.FieldRetrievalBindingFlags).Any(f => f.Name == field.Name))
+					{
+						fieldNameExistsMultipleTimesInHierarchy = true;
+						break;
+					}
+				}
+				currentType = currentType.BaseType;
+			}
 			_data.Add((byte)DataType.FieldName);
-			if (typeNameIfRequired != null)
-				StringWithoutDataType(BinaryReaderWriterConstants.FieldTypeNamePrefix + typeNameIfRequired);
-			StringWithoutDataType(name);
+			if (fieldNameExistsMultipleTimesInHierarchy)
+				StringWithoutDataType(BinaryReaderWriterConstants.FieldTypeNamePrefix + field.DeclaringType.AssemblyQualifiedName);
+			StringWithoutDataType(field.Name);
 		}
 
 		public void ObjectEnd()
