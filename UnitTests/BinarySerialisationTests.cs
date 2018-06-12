@@ -354,6 +354,14 @@ namespace UnitTests
 			Assert.Equal(0, clone.Id);
 		}
 
+		[Fact]
+		public static void NonSerializedPropertydNotSerialised()
+		{
+			var source = new SomethingWithNonSerialisableIdProperty { Id = 123 };
+			var clone = BinarySerialisationCloner.Clone(source);
+			Assert.Equal(0, clone.Id);
+		}
+
 		private static T AssertCloneMatchesOriginalAndReturnClone<T>(T value)
 		{
 			var clone = BinarySerialisationCloner.Clone(value);
@@ -452,6 +460,12 @@ namespace UnitTests
 		{
 			[NonSerialized]
 			public int Id;
+		}
+
+		private sealed class SomethingWithNonSerialisableIdProperty
+		{
+			[field:NonSerialized]
+			public int Id { get; set; }
 		}
 
 		private struct StructWithNoMembers { }
