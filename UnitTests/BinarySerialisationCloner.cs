@@ -7,7 +7,7 @@ namespace UnitTests
 	{
 		public static byte[] Serialise(object value)
 		{
-			var writer = new BinaryWriter();
+			var writer = new BinarySerialisationWriter();
 			Serialiser.Instance.Serialise(value, writer);
 			return writer.GetData();
 		}
@@ -17,7 +17,7 @@ namespace UnitTests
 			if (serialisedData == null)
 				throw new ArgumentNullException(nameof(serialisedData));
 
-			var reader = new BinaryReader(serialisedData);
+			var reader = new BinarySerialisationReader(serialisedData);
 			return reader.Read<T>();
 		}
 

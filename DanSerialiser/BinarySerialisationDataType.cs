@@ -1,6 +1,6 @@
 ﻿namespace DanSerialiser
 {
-	internal enum DataType : byte
+	internal enum BinarySerialisationDataType : byte
 	{
 		Boolean,
 		Byte,

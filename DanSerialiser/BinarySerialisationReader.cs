@@ -5,14 +5,14 @@ using System.Text;
 
 namespace DanSerialiser
 {
-	public sealed class BinaryReader
+	public sealed class BinarySerialisationReader
 	{
 		private byte[] _data;
 		private int _index;
 
 		public BindingFlags FieldRetrievalBindingFlags { get; private set; }
 
-		public BinaryReader(byte[] data)
+		public BinarySerialisationReader(byte[] data)
 		{
 			_data = data ?? throw new ArgumentNullException(nameof(data));
 			_index = 0;
@@ -31,37 +31,37 @@ namespace DanSerialiser
 			if (_index >= _data.Length)
 				throw new InvalidOperationException("No data to read");
 
-			switch ((DataType)ReadNext())
+			switch ((BinarySerialisationDataType)ReadNext())
 			{
 				default:
 					throw new NotImplementedException();
 
-				case DataType.Boolean:
+				case BinarySerialisationDataType.Boolean:
 					return ReadNext() != 0;
-				case DataType.Byte:
+				case BinarySerialisationDataType.Byte:
 					return ReadNext();
-				case DataType.SByte:
+				case BinarySerialisationDataType.SByte:
 					return (sbyte)ReadNext();
 
-				case DataType.Int16:
+				case BinarySerialisationDataType.Int16:
 					return BitConverter.ToInt16(ReadNext(sizeof(Int16)), 0);
-				case DataType.Int32:
+				case BinarySerialisationDataType.Int32:
 					return ReadNextInt();
-				case DataType.Int64:
+				case BinarySerialisationDataType.Int64:
 					return BitConverter.ToInt64(ReadNext(sizeof(Int64)), 0);
 
-				case DataType.UInt16:
+				case BinarySerialisationDataType.UInt16:
 					return BitConverter.ToUInt16(ReadNext(sizeof(UInt16)), 0);
-				case DataType.UInt32:
+				case BinarySerialisationDataType.UInt32:
 					return BitConverter.ToUInt32(ReadNext(sizeof(UInt32)), 0);
-				case DataType.UInt64:
+				case BinarySerialisationDataType.UInt64:
 					return BitConverter.ToUInt64(ReadNext(sizeof(UInt64)), 0);
 
-				case DataType.Single:
+				case BinarySerialisationDataType.Single:
 					return BitConverter.ToSingle(ReadNext(sizeof(Single)), 0);
-				case DataType.Double:
+				case BinarySerialisationDataType.Double:
 					return BitConverter.ToDouble(ReadNext(sizeof(Double)), 0);
-				case DataType.Decimal:
+				case BinarySerialisationDataType.Decimal:
 					// BitConverter does not deal with decimal (there is no GetBytes overloads for it and no ToDecimal method) so BinaryWriter used decimal.GetBits, which
 					// returns four int values and so we need to do the opposite here
 					var partialValues = new int[4];
@@ -69,15 +69,15 @@ namespace DanSerialiser
 						partialValues[i] = ReadNextInt();
 					return new decimal(partialValues);
 
-				case DataType.Char:
+				case BinarySerialisationDataType.Char:
 					return BitConverter.ToChar(ReadNext(sizeof(Char)), 0);
-				case DataType.String:
+				case BinarySerialisationDataType.String:
 					return ReadNextString();
 
-				case DataType.ArrayStart:
+				case BinarySerialisationDataType.ArrayStart:
 					return ReadNextArray();
 
-				case DataType.ObjectStart:
+				case BinarySerialisationDataType.ObjectStart:
 					return ReadNextObject();
 			}
 		}
@@ -98,18 +98,18 @@ namespace DanSerialiser
 			var typeName = ReadNextString();
 			if (typeName == null)
 			{
-				if ((DataType)ReadNext() != DataType.ObjectEnd)
-					throw new InvalidOperationException($"Expected {nameof(DataType.ObjectEnd)} was not encountered");
+				if ((BinarySerialisationDataType)ReadNext() != BinarySerialisationDataType.ObjectEnd)
+					throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered");
 				return null;
 			}
 			var type = Type.GetType(typeName, throwOnError: true);
 			var value = FormatterServices.GetUninitializedObject(type);
 			while (true)
 			{
-				var nextEntryType = (DataType)ReadNext();
-				if (nextEntryType == DataType.ObjectEnd)
+				var nextEntryType = (BinarySerialisationDataType)ReadNext();
+				if (nextEntryType == BinarySerialisationDataType.ObjectEnd)
 					return value;
-				else if (nextEntryType == DataType.FieldName)
+				else if (nextEntryType == BinarySerialisationDataType.FieldName)
 				{
 					var fieldOrTypeName = ReadNextString();
 					string typeNameIfRequired, fieldName;
@@ -155,17 +155,17 @@ namespace DanSerialiser
 			if (elementTypeName == null)
 			{
 				// If the element type was recorded as null then it means that the array itself was null (and so the next character should be an ArrayEnd)
-				if ((DataType)ReadNext() != DataType.ArrayEnd)
-					throw new InvalidOperationException($"Expected {nameof(DataType.ArrayEnd)} was not encountered");
+				if ((BinarySerialisationDataType)ReadNext() != BinarySerialisationDataType.ArrayEnd)
+					throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ArrayEnd)} was not encountered");
 				return null;
 			}
 			var elementType = Type.GetType(elementTypeName, throwOnError: true);
 			var items = Array.CreateInstance(elementType, length: ReadNextInt());
 			for (var i = 0; i < items.Length; i++)
 				items.SetValue(Read(), i);
-			var nextEntryType = (DataType)ReadNext();
-			if (nextEntryType != DataType.ArrayEnd)
-				throw new InvalidOperationException($"Expected {nameof(DataType.ArrayEnd)} was not encountered");
+			var nextEntryType = (BinarySerialisationDataType)ReadNext();
+			if (nextEntryType != BinarySerialisationDataType.ArrayEnd)
+				throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ArrayEnd)} was not encountered");
 			return items;
 		}
 
