@@ -143,7 +143,7 @@ namespace DanSerialiser
 			{
 				if (currentType != serialisationTargetType)
 				{
-					if (currentType.GetFields(BinaryReaderWriterConstants.FieldRetrievalBindingFlags).Any(f => f.Name == field.Name))
+					if (currentType.GetFields(BinaryReaderWriterConstants.MemberRetrievalBindingFlags).Any(f => f.Name == field.Name))
 					{
 						fieldNameExistsMultipleTimesInHierarchy = true;
 						break;
@@ -155,6 +155,31 @@ namespace DanSerialiser
 			if (fieldNameExistsMultipleTimesInHierarchy)
 				StringWithoutDataType(BinaryReaderWriterConstants.FieldTypeNamePrefix + field.DeclaringType.AssemblyQualifiedName);
 			StringWithoutDataType(field.Name);
+			return true;
+		}
+
+		public bool PropertyName(PropertyInfo property, Type serialisationTargetType)
+		{
+			if (property == null)
+				throw new ArgumentNullException(nameof(property));
+			if (serialisationTargetType == null)
+				throw new ArgumentNullException(nameof(serialisationTargetType));
+
+			// Most of the time, we'll just serialise the backing fields because that should capture all of the data..
+			if (property.GetCustomAttribute<DeprecatedAttribute>() == null)
+				return false;
+
+			// .. however, if this is a property that has the [Deprecated] attribute on it then it is expected to exist for backwards compatibility and to be a computed property
+			// (and so have no backing field) but one that we want to include in the serialised data anyway. If V1 of a type has a string "Name" property which is replaced in V2
+			// with a "TranslatedName" property of type TranslatedString then a computed "Name" property could be added to the V2 type (annotated with [Deprecated]) whose getter
+			// returns the default language value of the TranslatedName - this value may then be included in the serialisation data so that an assembly that has loaded the V1
+			// type can deserialise and populate its Name property.
+			// - Note: We won't try to determine whether or not the type name prefix is necessary when recording the field name because the type hierarchy and the properties on
+			//   them might be different now than in the version of the types where deserialisation occurs so the type name will always be inserted before the field name to err
+			//   on the safe side
+			_data.Add((byte)DataType.FieldName);
+			StringWithoutDataType(BinaryReaderWriterConstants.FieldTypeNamePrefix + property.DeclaringType.AssemblyQualifiedName);
+			StringWithoutDataType(BackingFieldHelpers.GetBackingFieldName(property.Name));
 			return true;
 		}
 

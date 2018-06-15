@@ -127,7 +127,7 @@ namespace DanSerialiser
 					FieldInfo field;
 					while (true)
 					{
-						field = typeToLookForMemberOn.GetField(fieldName, BinaryReaderWriterConstants.FieldRetrievalBindingFlags);
+						field = typeToLookForMemberOn.GetField(fieldName, BinaryReaderWriterConstants.MemberRetrievalBindingFlags);
 						if ((field != null) && ((typeNameIfRequired == null) || (field.DeclaringType.AssemblyQualifiedName == typeNameIfRequired)))
 							break;
 						typeToLookForMemberOn = typeToLookForMemberOn.BaseType;

@@ -34,5 +34,10 @@ namespace DanSerialiser
 		/// This will return false if the field should be skipped
 		/// </summary>
 		bool FieldName(FieldInfo field, Type serialisationTargetType);
+		
+		/// <summary>
+		/// This will return false if the property should be skipped
+		/// </summary>
+		bool PropertyName(PropertyInfo field, Type serialisationTargetType);
 	}
 }
