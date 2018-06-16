@@ -14,7 +14,7 @@ namespace UnitTests
 		public static void EnsureThatDynamicallyCreatedTypesWork()
 		{
 			const string idFieldName = "Id";
-			var type = ConstructType("DynamicAssemblyFor" + GetMyName(), new Version(1, 0), "ClassWithIntId", new[] { Tuple.Create(idFieldName, typeof(int)) });
+			var type = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "ClassWithIntId", new[] { Tuple.Create(idFieldName, typeof(int)) });
 
 			var instance = Activator.CreateInstance(type);
 			var field = type.GetField(idFieldName);
@@ -34,8 +34,7 @@ namespace UnitTests
 			const string idFieldName = "Id";
 			const string nameFieldName = "Name";
 			var sourceType = ConstructType(
-				"DynamicAssemblyFor" + GetMyName(),
-				new Version(1, 0),
+				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
 				"ClassWithIntId",
 				new[]
 				{
@@ -49,7 +48,7 @@ namespace UnitTests
 			idFieldOnSource.SetValue(instance, 123);
 			var serialisedData = BinarySerialisationCloner.Serialise(instance);
 
-			var destinationType = ConstructType("DynamicAssemblyFor" + GetMyName(), new Version(1, 0), "ClassWithIntId", new[] { Tuple.Create(idFieldName, typeof(int)) });
+			var destinationType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "ClassWithIntId", new[] { Tuple.Create(idFieldName, typeof(int)) });
 			var clone = ResolveDynamicAssembliesWhilePerformingAction(
 				() => Deserialise(serialisedData, destinationType),
 				destinationType
@@ -67,7 +66,7 @@ namespace UnitTests
 		public static void DoNotWorryIfSerialisedDataCanNotSetAllFields()
 		{
 			const string idFieldName = "Id";
-			var sourceType = ConstructType("DynamicAssemblyFor" + GetMyName(), new Version(1, 0), "ClassWithIntId", new[] { Tuple.Create(idFieldName, typeof(int)) });
+			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "ClassWithIntId", new[] { Tuple.Create(idFieldName, typeof(int)) });
 
 			var instance = Activator.CreateInstance(sourceType);
 			var idFieldOnSource = sourceType.GetField(idFieldName);
@@ -76,8 +75,7 @@ namespace UnitTests
 
 			const string nameFieldName = "Name";
 			var destinationType = ConstructType(
-				"DynamicAssemblyFor" + GetMyName(),
-				new Version(1, 0),
+				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
 				"ClassWithIntId",
 				new[]
 				{
@@ -108,8 +106,7 @@ namespace UnitTests
 			const string idPropertyName = "Id";
 			const int hardCodedIdValueForDeprecatedProperty = 123;
 			var typeWithDeprecatedProperty = ConstructType(
-				"DynamicAssemblyFor" + GetMyName(),
-				new Version(1, 0),
+				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
 				"MyClass",
 				fields: new Tuple<string, Type>[0],
 				optionalFinisher: typeBuilder =>
@@ -131,8 +128,7 @@ namespace UnitTests
 			// but it wouldn't be used by this test and so it doesn't need to be created.
 			var idBackingFieldName = BackingFieldHelpers.GetBackingFieldName(idPropertyName);
 			var typeThatStillHasThePropertyOnIt = ConstructType(
-				"DynamicAssemblyFor" + GetMyName(),
-				new Version(1, 0),
+				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
 				"MyClass",
 				new[] { Tuple.Create(idBackingFieldName, typeof(int)) }
 			);
@@ -145,6 +141,61 @@ namespace UnitTests
 		}
 
 		/// <summary>
+		/// This also tests backward compatibility - if a version of a class C1 has a field 'Value' that is of type C2 and this is serialised and then deserialised somewhere
+		/// with a version of C1 that does not have the 'Value' field and does not have the type C2 available then it shouldn't matter that C2 can't be loaded because the C2
+		/// value would never be used to set anything
+		/// </summary>
+		[Fact]
+		public static void DoNotThrowWhenTryingToParseUnavailableTypeIfThereIsNoFieldThatTheTypeWouldBeUsedToSet()
+		{
+			// Declare a type that has a field that is of another type that is declared here. The destination type will be in an assembly that does not have this second type
+			// in it but the destination type also won't have the field and so the deserialiser should be able to skip over the data about the field that we don't care about.
+			var valueFieldName = "Value";
+			var sourceModule = GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0));
+			var nestedSourceType = ConstructType(sourceModule, "MyNestedClass", new Tuple<string, Type>[0]);
+			var sourceType = ConstructType(sourceModule, "MyClass", new[] { Tuple.Create(valueFieldName, nestedSourceType) });
+			var instance = Activator.CreateInstance(sourceType);
+			sourceType.GetField(valueFieldName).SetValue(instance, Activator.CreateInstance(nestedSourceType));
+			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+
+			var destinationType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
+			var deserialised = ResolveDynamicAssembliesWhilePerformingAction(
+				() => Deserialise(serialisedData, destinationType),
+				destinationType
+			);
+			Assert.IsType(destinationType, deserialised);
+		}
+
+		/// <summary>
+		/// This is a companion to DoNotThrowWhenTryingToParseUnavailableTypeIfThereIsNoFieldThatTheTypeWouldBeUsedToSet to illustrate that it is NOT ok to ignore a type
+		/// that is not available if the instance of that type would be used to populate a property
+		/// </summary>
+		[Fact]
+		public static void DeserialisationWillFailIfTypeRequiredToSetFieldValueIsNotAvailable()
+		{
+			// The source type will have a name that matches the deserialisation type but the "Value" property will have different types on the source and destination types
+			// and so the deserialisation attempt should fail
+			var valueFieldName = "Value";
+			var sourceModule = GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0));
+			var nestedSourceType = ConstructType(sourceModule, "MyNestedClass", new Tuple<string, Type>[0]);
+			var sourceType = ConstructType(sourceModule, "MyClass", new[] { Tuple.Create(valueFieldName, nestedSourceType) });
+			var instance = Activator.CreateInstance(sourceType);
+			sourceType.GetField(valueFieldName).SetValue(instance, Activator.CreateInstance(nestedSourceType));
+			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+
+			var destinationModule = GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0));
+			var destinationType = ConstructType(destinationModule, "MyClass", new[] { Tuple.Create(valueFieldName, nestedSourceType) });
+			var nestedDestinationType = ConstructType(destinationModule, "MyOtherNestedClass", new Tuple<string, Type>[0]);
+			Assert.Throws<TypeLoadException>(() =>
+				ResolveDynamicAssembliesWhilePerformingAction(
+					() => Deserialise(serialisedData, destinationType),
+					destinationType,
+					nestedDestinationType
+				)
+			);
+		}
+
+		/// <summary>
 		/// Use the CallerMemberName attribute so that a method can gets its own name so that it can specify a descriptive dynamic assembly name (could have used nameof
 		/// but that would invite copy-paste errors when new methods were added - the method name need to be changed AND the reference to it within the nameof call)
 		/// </summary>
@@ -153,13 +204,17 @@ namespace UnitTests
 			return callerName;
 		}
 
-		private static Type ConstructType(string assemblyName, Version assemblyVersion, string typeNameWithNamespace, IEnumerable<Tuple<string, Type>> fields, Action<TypeBuilder> optionalFinisher = null)
+		private static ModuleBuilder GetModuleBuilder(string assemblyName, Version assemblyVersion)
 		{
 			var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(
 				new AssemblyName { Name = assemblyName, Version = assemblyVersion },
 				AssemblyBuilderAccess.Run
 			);
-			var module = assemblyBuilder.DefineDynamicModule(assemblyBuilder.GetName().Name);
+			return assemblyBuilder.DefineDynamicModule(assemblyBuilder.GetName().Name);
+		}
+
+		private static Type ConstructType(ModuleBuilder module, string typeNameWithNamespace, IEnumerable<Tuple<string, Type>> fields, Action<TypeBuilder> optionalFinisher = null)
+		{
 			var typeBuilder = module.DefineType(typeNameWithNamespace);
 			foreach (var field in fields)
 				typeBuilder.DefineField(field.Item1, field.Item2, FieldAttributes.Public);
@@ -172,7 +227,20 @@ namespace UnitTests
 		/// </summary>
 		private static object Deserialise(byte[] serialisedData, Type type)
 		{
-			return typeof(BinarySerialisationCloner).GetMethod(nameof(Deserialise), new[] { typeof(byte[]) }).MakeGenericMethod(type).Invoke(null, new[] { serialisedData });
+			var genericDeserialiseMethod = typeof(BinarySerialisationCloner).GetMethod(nameof(Deserialise), new[] { typeof(byte[]) }).MakeGenericMethod(type);
+			try
+			{
+				return genericDeserialiseMethod.Invoke(null, new[] { serialisedData });
+			}
+			catch (TargetInvocationException e)
+			{
+				// If an exception is thrown within the "Invoke" call then it will be wrapped in a TargetInvocationException - this isn't very helpful, the tests above
+				// that expect exceptions should be able to specify what exception should occur and not worry about unwrapping it from the TargetInvocationException.
+				// To avoid that, the unwrapping is done here.
+				if (e.InnerException != null)
+					throw e.InnerException;
+				throw;
+			}
 		}
 
 		private static T CloneAndSupportDynamicAssemblies<T>(T value, params Type[] dynamicTypes)

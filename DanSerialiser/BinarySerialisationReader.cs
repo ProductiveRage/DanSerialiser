@@ -23,10 +23,13 @@ namespace DanSerialiser
 			// The original intention of the use of generic type params for the reader and writer was to reduce casting at the call sites and I had thought that the type might
 			// be required when deserialising - but it is not for the current BinaryWriter and BinaryReader implementations, so all we do with T here is try to cast the return
 			// value to it
-			return (T)Read();
+			// Note: As this is the top level "Read" call, if it is an object being deserialised and the type of that object is not available then the deserialisation attempt
+			// should fail, which is why ignoreAnyInvalidTypes is passed as false (that option only applies in cases where a nested object is being deserialised but the field
+			// that it would be used to set does not exist on the parent object - if there is no field to set, who cares if the value is of a type that is not available)
+			return (T)Read(ignoreAnyInvalidTypes: false);
 		}
 
-		private object Read()
+		private object Read(bool ignoreAnyInvalidTypes)
 		{
 			if (_index >= _data.Length)
 				throw new InvalidOperationException("No data to read");
@@ -75,10 +78,10 @@ namespace DanSerialiser
 					return ReadNextString();
 
 				case BinarySerialisationDataType.ArrayStart:
-					return ReadNextArray();
+					return ReadNextArray(ignoreAnyInvalidTypes);
 
 				case BinarySerialisationDataType.ObjectStart:
-					return ReadNextObject();
+					return ReadNextObject(ignoreAnyInvalidTypes);
 			}
 		}
 
@@ -93,7 +96,7 @@ namespace DanSerialiser
 			return (length == -1) ? null : Encoding.UTF8.GetString(ReadNext(length));
 		}
 
-		private object ReadNextObject()
+		private object ReadNextObject(bool ignoreAnyInvalidTypes)
 		{
 			var typeName = ReadNextString();
 			if (typeName == null)
@@ -102,13 +105,16 @@ namespace DanSerialiser
 					throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered");
 				return null;
 			}
-			var type = Type.GetType(typeName, throwOnError: true);
-			var value = FormatterServices.GetUninitializedObject(type);
+
+			// Try to get a reference to the type that we should be deserialising to. If ignoreAnyInvalidTypes is true then don't worry if Type.GetType can't find the type that is
+			// specified because we don't care about the return value from this method, we're just parsing the data to progress to the next data that we DO care about.
+			var typeIfAvailable = Type.GetType(typeName, throwOnError: !ignoreAnyInvalidTypes);
+			var valueIfTypeIsAvailable = (typeIfAvailable == null) ? null : FormatterServices.GetUninitializedObject(typeIfAvailable);
 			while (true)
 			{
 				var nextEntryType = (BinarySerialisationDataType)ReadNext();
 				if (nextEntryType == BinarySerialisationDataType.ObjectEnd)
-					return value;
+					return valueIfTypeIsAvailable;
 				else if (nextEntryType == BinarySerialisationDataType.FieldName)
 				{
 					var fieldOrTypeName = ReadNextString();
@@ -123,18 +129,29 @@ namespace DanSerialiser
 						typeNameIfRequired = null;
 						fieldName = fieldOrTypeName;
 					}
-					var typeToLookForMemberOn = value.GetType();
+
+					// Try to get a reference to the field on the target type.. if there is one (if valueIfTypeIsAvailable is null then no-one cases about this data and we're just
+					// parsing it to skip over it)
 					FieldInfo field;
-					while (true)
+					if (valueIfTypeIsAvailable == null)
+						field = null;
+					else
 					{
-						field = typeToLookForMemberOn.GetField(fieldName, BinaryReaderWriterConstants.MemberRetrievalBindingFlags);
-						if ((field != null) && ((typeNameIfRequired == null) || (field.DeclaringType.AssemblyQualifiedName == typeNameIfRequired)))
-							break;
-						typeToLookForMemberOn = typeToLookForMemberOn.BaseType;
-						if (typeToLookForMemberOn == null)
-							break;
+						var typeToLookForMemberOn = valueIfTypeIsAvailable.GetType();
+						while (true)
+						{
+							field = typeToLookForMemberOn.GetField(fieldName, BinaryReaderWriterConstants.MemberRetrievalBindingFlags);
+							if ((field != null) && ((typeNameIfRequired == null) || (field.DeclaringType.AssemblyQualifiedName == typeNameIfRequired)))
+								break;
+							typeToLookForMemberOn = typeToLookForMemberOn.BaseType;
+							if (typeToLookForMemberOn == null)
+								break;
+						}
 					}
-					var fieldValue = Read();
+
+					// If the field doesn't exist then parse the data but don't worry about any types not being available because we're not going to set anything to the value
+					// that we get back from the "Read" call (but we still need to parse that data to advance the reader to the next field or the end of the current object)
+					var fieldValue = Read(ignoreAnyInvalidTypes: (field == null));
 					if (field == null)
 					{
 						// If the serialised data has content for a field that does not exist on the target type then don't try to set it - this may happen if the version of the
@@ -142,14 +159,14 @@ namespace DanSerialiser
 						// version has an additional property added to it then older code can still read it.
 						continue;
 					}
-					field.SetValue(value, fieldValue);
+					field.SetValue(valueIfTypeIsAvailable, fieldValue);
 				}
 				else
 					throw new InvalidOperationException("Unexpected data type encountered while enumerating object properties: " + nextEntryType);
 			}
 		}
 
-		private object ReadNextArray()
+		private object ReadNextArray(bool ignoreAnyInvalidTypes)
 		{
 			var elementTypeName = ReadNextString();
 			if (elementTypeName == null)
@@ -162,7 +179,7 @@ namespace DanSerialiser
 			var elementType = Type.GetType(elementTypeName, throwOnError: true);
 			var items = Array.CreateInstance(elementType, length: ReadNextInt());
 			for (var i = 0; i < items.Length; i++)
-				items.SetValue(Read(), i);
+				items.SetValue(Read(ignoreAnyInvalidTypes), i);
 			var nextEntryType = (BinarySerialisationDataType)ReadNext();
 			if (nextEntryType != BinarySerialisationDataType.ArrayEnd)
 				throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ArrayEnd)} was not encountered");
