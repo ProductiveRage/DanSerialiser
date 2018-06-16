@@ -88,7 +88,7 @@ namespace UnitTests
 		/// deserialisation has failed but if that field has the [OptionalWhenDeserialising] on it then that means that it's ok
 		/// </summary>
 		[Fact]
-		public static void AllDeserialisationIfFieldCanNotBeSetIfFieldIsMarkedAsOptionalForDeserialisation()
+		public static void AllowDeserialisationIfFieldCanNotBeSetIfFieldIsMarkedAsOptionalForDeserialisation()
 		{
 			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
 			var instance = Activator.CreateInstance(sourceType);
@@ -119,7 +119,7 @@ namespace UnitTests
 		/// the [OptionalWhenDeserialising] attribute on it
 		/// </summary>
 		[Fact]
-		public static void AllDeserialisationIfFieldCanNotBeSetIfFieldIsForAutoPropertyThatIsMarkedAsOptionalForDeserialisation()
+		public static void AllowDeserialisationIfFieldCanNotBeSetIfFieldIsForAutoPropertyThatIsMarkedAsOptionalForDeserialisation()
 		{
 			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
 			var instance = Activator.CreateInstance(sourceType);
