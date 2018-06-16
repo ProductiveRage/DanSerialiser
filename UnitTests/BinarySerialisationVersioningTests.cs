@@ -66,6 +66,22 @@ namespace UnitTests
 		[Fact]
 		public static void IfFieldCanNotBeSetDuringDeserialisationThenThrow()
 		{
+			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
+			var instance = Activator.CreateInstance(sourceType);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+
+			var destinationType = ConstructType(
+				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
+				"MyClass",
+				new[] { Tuple.Create("Id", typeof(int)) }
+			);
+			Assert.Throws<FieldNotPresentInSerialisedDataException>(() =>
+				ResolveDynamicAssembliesWhilePerformingAction(
+					() => Deserialise(serialisedData, destinationType),
+					destinationType
+				)
+			);
+		}
 			const string idFieldName = "Id";
 			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "ClassWithIntId", new[] { Tuple.Create(idFieldName, typeof(int)) });
 
