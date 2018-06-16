@@ -124,7 +124,10 @@ namespace DanSerialiser
 						{
 							foreach (var field in currentType.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags))
 							{
-								if (!BinaryReaderWriterShared.IgnoreField(field) && !fieldsSet.Contains(Tuple.Create(field.DeclaringType, field.Name)))
+								if (!BinaryReaderWriterShared.IgnoreField(field)
+								&& (field.GetCustomAttribute<OptionalWhenDeserialisingAttribute>() == null)
+								&& (BackingFieldHelpers.TryToGetPropertyRelatingToBackingField(field)?.GetCustomAttribute<OptionalWhenDeserialisingAttribute>() == null)
+								&& !fieldsSet.Contains(Tuple.Create(field.DeclaringType, field.Name)))
 									throw new FieldNotPresentInSerialisedDataException(field.DeclaringType.AssemblyQualifiedName, field.Name);
 							}
 							currentType = currentType.BaseType;

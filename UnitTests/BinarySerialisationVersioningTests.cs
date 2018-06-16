@@ -82,30 +82,75 @@ namespace UnitTests
 				)
 			);
 		}
-			const string idFieldName = "Id";
-			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "ClassWithIntId", new[] { Tuple.Create(idFieldName, typeof(int)) });
 
+		/// <summary>
+		/// This relates to IfFieldCanNotBeSetDuringDeserialisationThenThrow - ordinarily, if the serialisation data can't set a value on a field then that should mean that the
+		/// deserialisation has failed but if that field has the [OptionalWhenDeserialising] on it then that means that it's ok
+		/// </summary>
+		[Fact]
+		public static void AllDeserialisationIfFieldCanNotBeSetIfFieldIsMarkedAsOptionalForDeserialisation()
+		{
+			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
 			var instance = Activator.CreateInstance(sourceType);
-			var idFieldOnSource = sourceType.GetField(idFieldName);
-			idFieldOnSource.SetValue(instance, 123);
 			var serialisedData = BinarySerialisationCloner.Serialise(instance);
 
 			const string nameFieldName = "Name";
 			var destinationType = ConstructType(
 				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
-				"ClassWithIntId",
-				new[]
+				"MyClass",
+				fields: new Tuple<string, Type>[0],
+				optionalFinisher: typeBuilder =>
 				{
-					Tuple.Create(idFieldName, typeof(int)),
-					Tuple.Create(nameFieldName, typeof(string))
+					// Need to define the field using this lambda rather than specifying it through the fields argument because we need to set the custom attribute on it
+					var fieldBuilder = typeBuilder.DefineField(nameFieldName, typeof(string), FieldAttributes.Public);
+					fieldBuilder.SetCustomAttribute(new CustomAttributeBuilder(typeof(OptionalWhenDeserialisingAttribute).GetConstructor(Type.EmptyTypes), new object[0]));
 				}
 			);
-			Assert.Throws<FieldNotPresentInSerialisedDataException>(() =>
-				ResolveDynamicAssembliesWhilePerformingAction(
-					() => Deserialise(serialisedData, destinationType),
-					destinationType
-				)
+			var clone = ResolveDynamicAssembliesWhilePerformingAction(
+				() => Deserialise(serialisedData, destinationType),
+				destinationType
 			);
+			var nameFieldOnDestination = destinationType.GetField(nameFieldName);
+			Assert.Null(nameFieldOnDestination.GetValue(clone));
+		}
+
+		/// <summary>
+		/// This is the same principle as AllDeserialisationIfFieldCanNotBeSetIfFieldIsMarkedAsOptionalForDeserialisation but for the case where there is an auto-property that has
+		/// the [OptionalWhenDeserialising] attribute on it
+		/// </summary>
+		[Fact]
+		public static void AllDeserialisationIfFieldCanNotBeSetIfFieldIsForAutoPropertyThatIsMarkedAsOptionalForDeserialisation()
+		{
+			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
+			var instance = Activator.CreateInstance(sourceType);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+
+			const string namePropertyName = "Name";
+			var destinationType = ConstructType(
+				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
+				"MyClass",
+				fields: new Tuple<string, Type>[0],
+				optionalFinisher: typeBuilder =>
+				{
+					// Need to define the field using this lambda rather than specifying it through the fields argument because we need the reference for use in the property getter
+					var fieldBuilder = typeBuilder.DefineField(BackingFieldHelpers.GetBackingFieldName(namePropertyName), typeof(string), FieldAttributes.Private);
+					var propertyBuilder = typeBuilder.DefineProperty(namePropertyName, PropertyAttributes.None, typeof(string), parameterTypes: Type.EmptyTypes);
+					propertyBuilder.SetCustomAttribute(new CustomAttributeBuilder(typeof(DeprecatedAttribute).GetConstructor(Type.EmptyTypes), new object[0]));
+					var getterBuilder = typeBuilder.DefineMethod("get_" + namePropertyName, MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig, typeof(string), parameterTypes: Type.EmptyTypes);
+					var ilGenerator = getterBuilder.GetILGenerator();
+					ilGenerator.Emit(OpCodes.Ldarg_0);
+					ilGenerator.Emit(OpCodes.Ldfld, fieldBuilder);
+					ilGenerator.Emit(OpCodes.Ret);
+					propertyBuilder.SetGetMethod(getterBuilder);
+					propertyBuilder.SetCustomAttribute(new CustomAttributeBuilder(typeof(OptionalWhenDeserialisingAttribute).GetConstructor(Type.EmptyTypes), new object[0]));
+				}
+			);
+			var clone = ResolveDynamicAssembliesWhilePerformingAction(
+				() => Deserialise(serialisedData, destinationType),
+				destinationType
+			);
+			var namePropertyOnDestination = destinationType.GetProperty(namePropertyName);
+			Assert.Null(namePropertyOnDestination.GetValue(clone));
 		}
 
 		/// <summary>
