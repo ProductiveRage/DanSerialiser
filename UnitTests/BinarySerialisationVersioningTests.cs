@@ -192,7 +192,7 @@ namespace UnitTests
 			}
 			finally
 			{
-				AppDomain.CurrentDomain.AssemblyResolve += AssemblyResolve;
+				AppDomain.CurrentDomain.AssemblyResolve -= AssemblyResolve;
 			}
 
 			Assembly AssemblyResolve(object sender, ResolveEventArgs args)
