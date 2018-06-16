@@ -132,20 +132,13 @@ namespace DanSerialiser
 			if (serialisationTargetType == null)
 				throw new ArgumentNullException(nameof(serialisationTargetType));
 
-			if (field.GetCustomAttribute<NonSerializedAttribute>() != null)
+			if (BinaryReaderWriterShared.IgnoreField(field))
 				return false;
 
 			// Serialisation of pointer fields will fail - I don't know how they would be supportable anyway but they fail with a stack overflow if attempted, so catch it
 			// first and raise as a more useful exception
 			if (field.FieldType.IsPointer || (field.FieldType == typeof(IntPtr)) || (field.FieldType == typeof(UIntPtr)))
-			{
-				// If the pointer is a field on an Exception then ignore the field - the rest of the exception information should make it through and be useful but there
-				// should be an understanding that not everything within an exception can be captured when serialised
-				if (field.DeclaringType == typeof(Exception))
-					return false;
-
 				throw new NotSupportedException($"Can not serialise pointer fields: {field.Name} on {field.DeclaringType.Name}");
-			}
 
 			// If a field is declared multiple times in the type hierarchy (whether through overrides or use of "new") then its name will need prefixing with the type
 			// that this FieldInfo relates to
@@ -155,7 +148,7 @@ namespace DanSerialiser
 			{
 				if (currentType != serialisationTargetType)
 				{
-					if (currentType.GetFields(BinaryReaderWriterConstants.MemberRetrievalBindingFlags).Any(f => f.Name == field.Name))
+					if (currentType.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags).Any(f => f.Name == field.Name))
 					{
 						fieldNameExistsMultipleTimesInHierarchy = true;
 						break;
@@ -165,7 +158,7 @@ namespace DanSerialiser
 			}
 			_data.Add((byte)BinarySerialisationDataType.FieldName);
 			if (fieldNameExistsMultipleTimesInHierarchy)
-				StringWithoutDataType(BinaryReaderWriterConstants.FieldTypeNamePrefix + field.DeclaringType.AssemblyQualifiedName);
+				StringWithoutDataType(BinaryReaderWriterShared.FieldTypeNamePrefix + field.DeclaringType.AssemblyQualifiedName);
 			StringWithoutDataType(field.Name);
 			return true;
 		}
@@ -190,7 +183,7 @@ namespace DanSerialiser
 			//   them might be different now than in the version of the types where deserialisation occurs so the type name will always be inserted before the field name to err
 			//   on the safe side
 			_data.Add((byte)BinarySerialisationDataType.FieldName);
-			StringWithoutDataType(BinaryReaderWriterConstants.FieldTypeNamePrefix + property.DeclaringType.AssemblyQualifiedName);
+			StringWithoutDataType(BinaryReaderWriterShared.FieldTypeNamePrefix + property.DeclaringType.AssemblyQualifiedName);
 			StringWithoutDataType(BackingFieldHelpers.GetBackingFieldName(property.Name));
 			return true;
 		}

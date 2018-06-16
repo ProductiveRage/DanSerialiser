@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
@@ -110,18 +111,34 @@ namespace DanSerialiser
 			// specified because we don't care about the return value from this method, we're just parsing the data to progress to the next data that we DO care about.
 			var typeIfAvailable = Type.GetType(typeName, throwOnError: !ignoreAnyInvalidTypes);
 			var valueIfTypeIsAvailable = (typeIfAvailable == null) ? null : FormatterServices.GetUninitializedObject(typeIfAvailable);
+			var fieldsSet = new HashSet<Tuple<Type, string>>();
 			while (true)
 			{
 				var nextEntryType = (BinarySerialisationDataType)ReadNext();
 				if (nextEntryType == BinarySerialisationDataType.ObjectEnd)
+				{
+					if (typeIfAvailable != null)
+					{
+						var currentType = typeIfAvailable;
+						while (currentType != null)
+						{
+							foreach (var field in currentType.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags))
+							{
+								if (!BinaryReaderWriterShared.IgnoreField(field) && !fieldsSet.Contains(Tuple.Create(field.DeclaringType, field.Name)))
+									throw new FieldNotPresentInSerialisedDataException(field.DeclaringType.AssemblyQualifiedName, field.Name);
+							}
+							currentType = currentType.BaseType;
+						}
+					}
 					return valueIfTypeIsAvailable;
+				}
 				else if (nextEntryType == BinarySerialisationDataType.FieldName)
 				{
 					var fieldOrTypeName = ReadNextString();
 					string typeNameIfRequired, fieldName;
-					if (fieldOrTypeName.StartsWith(BinaryReaderWriterConstants.FieldTypeNamePrefix))
+					if (fieldOrTypeName.StartsWith(BinaryReaderWriterShared.FieldTypeNamePrefix))
 					{
-						typeNameIfRequired = fieldOrTypeName.Substring(BinaryReaderWriterConstants.FieldTypeNamePrefix.Length);
+						typeNameIfRequired = fieldOrTypeName.Substring(BinaryReaderWriterShared.FieldTypeNamePrefix.Length);
 						fieldName = ReadNextString();
 					}
 					else
@@ -140,7 +157,7 @@ namespace DanSerialiser
 						var typeToLookForMemberOn = valueIfTypeIsAvailable.GetType();
 						while (true)
 						{
-							field = typeToLookForMemberOn.GetField(fieldName, BinaryReaderWriterConstants.MemberRetrievalBindingFlags);
+							field = typeToLookForMemberOn.GetField(fieldName, BinaryReaderWriterShared.MemberRetrievalBindingFlags);
 							if ((field != null) && ((typeNameIfRequired == null) || (field.DeclaringType.AssemblyQualifiedName == typeNameIfRequired)))
 								break;
 							typeToLookForMemberOn = typeToLookForMemberOn.BaseType;
@@ -160,6 +177,7 @@ namespace DanSerialiser
 						continue;
 					}
 					field.SetValue(valueIfTypeIsAvailable, fieldValue);
+					fieldsSet.Add(Tuple.Create(field.DeclaringType, field.Name));
 				}
 				else
 					throw new InvalidOperationException("Unexpected data type encountered while enumerating object properties: " + nextEntryType);

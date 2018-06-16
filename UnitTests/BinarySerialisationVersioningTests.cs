@@ -58,12 +58,13 @@ namespace UnitTests
 		}
 
 		/// <summary>
-		/// If serialising an object to / from different versions of an assembly, if the destination type has a field that the serialised data does not have any information for
-		/// then skip it (this is intended to give some flexibility with versioning - if fields are added or remove or renamed - but it could lead to deserialised instances having
-		/// uninitialised values in unexpected places and so this approach may change soon)
+		/// If deserialising data where an older version of the type was serialised and the new version that is being deserialised to has a field that the old one did not have then
+		/// throw an exception. For a type to be deserialised and for some of its fields not to be set could result in confusing errors in some cases - for example, if the type has
+		/// a constructor that sets all fields to non-null values then consumers of that class could reasonably expect to never have to deal with a null value on any of that type's
+		/// properties but if the deserialisation process is allowed to leave some of those fields null then those expectations will not be met and null reference exceptions could
 		/// </summary>
 		[Fact]
-		public static void DoNotWorryIfSerialisedDataCanNotSetAllFields()
+		public static void IfFieldCanNotBeSetDuringDeserialisationThenThrow()
 		{
 			const string idFieldName = "Id";
 			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "ClassWithIntId", new[] { Tuple.Create(idFieldName, typeof(int)) });
@@ -83,14 +84,12 @@ namespace UnitTests
 					Tuple.Create(nameFieldName, typeof(string))
 				}
 			);
-			var clone = ResolveDynamicAssembliesWhilePerformingAction(
-				() => Deserialise(serialisedData, destinationType),
-				destinationType
+			Assert.Throws<FieldNotPresentInSerialisedDataException>(() =>
+				ResolveDynamicAssembliesWhilePerformingAction(
+					() => Deserialise(serialisedData, destinationType),
+					destinationType
+				)
 			);
-			var idFieldOnDestination = destinationType.GetField(idFieldName);
-			var nameFieldOnDestination = destinationType.GetField(nameFieldName);
-			Assert.Equal(123, idFieldOnDestination.GetValue(clone));
-			Assert.Equal((string)null, nameFieldOnDestination.GetValue(clone));
 		}
 
 		/// <summary>
@@ -191,6 +190,32 @@ namespace UnitTests
 					() => Deserialise(serialisedData, destinationType),
 					destinationType,
 					nestedDestinationType
+				)
+			);
+		}
+
+		/// <summary>
+		/// If an older version of a type is serialised and then deserialised when a newer version of that type is loaded, if the newer version has any fields that do not
+		/// have data in the serialised data then deserialisation should fail. Otherwise, if there was an immutable type that is normally initialised via a constructor that
+		/// sets all properties to non-null properties them consumers of that type may reasonably expect all of the properties to be non-null but this would not be the case
+		/// if deserialising from data that does not have information for some of those fields.
+		/// </summary>
+		[Fact]
+		public static void DeserialisationWillFailIfAnyFieldsHaveNoData()
+		{
+			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
+			var instance = Activator.CreateInstance(sourceType);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+
+			var destinationType = ConstructType(
+				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
+				"MyClass",
+				new[] { Tuple.Create("Id", typeof(int)) }
+			);
+			Assert.Throws<FieldNotPresentInSerialisedDataException>(() =>
+				ResolveDynamicAssembliesWhilePerformingAction(
+					() => Deserialise(serialisedData, destinationType),
+					destinationType
 				)
 			);
 		}

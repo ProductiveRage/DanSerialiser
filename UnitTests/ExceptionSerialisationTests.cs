@@ -25,6 +25,24 @@ namespace UnitTests
 			Assert.IsType<CircularReferenceException>(BinarySerialisationCloner.Clone(new CircularReferenceException()));
 		}
 
+		[Fact]
+		public static void FieldNotPresentInSerialisedDataExceptionCanBeSerialisedWithBinaryFormatter()
+		{
+			var clone = CloneWithBinaryFormatter(new FieldNotPresentInSerialisedDataException("MyType", "MyField"));
+			Assert.IsType<FieldNotPresentInSerialisedDataException>(clone);
+			Assert.Equal("MyType", clone.TypeName);
+			Assert.Equal("MyField", clone.FieldName);
+		}
+
+		[Fact]
+		public static void FieldNotPresentInSerialisedDataExceptionCanBeSerialisedWithDanSerialiser()
+		{
+			var clone = BinarySerialisationCloner.Clone(new FieldNotPresentInSerialisedDataException("MyType", "MyField"));
+			Assert.IsType<FieldNotPresentInSerialisedDataException>(clone);
+			Assert.Equal("MyType", clone.TypeName);
+			Assert.Equal("MyField", clone.FieldName);
+		}
+
 		/// <summary>
 		/// XML Serialisation doesn't like Exceptions - it doesn't work with the Base Exception and so it's not my fault that it's not working with my custom exceptions
 		/// </summary>
@@ -40,7 +58,7 @@ namespace UnitTests
 			byte[] serialisedException;
 			using (var stream = new MemoryStream())
 			{
-				formatter.Serialize(stream, new CircularReferenceException());
+				formatter.Serialize(stream, value);
 				serialisedException = stream.ToArray();
 			}
 			using (var stream = new MemoryStream(serialisedException))
