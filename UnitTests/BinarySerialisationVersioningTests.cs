@@ -282,6 +282,39 @@ namespace UnitTests
 		}
 
 		/// <summary>
+		/// If a type is serialised with a 'Name' field and then deserialised to a version of that type where 'Name' has [NonSerialized] on it then the 'Name' field should
+		/// not be set when its desereialised, even though it's present in the serialised data
+		/// </summary>
+		[Fact]
+		public static void DoNotSetFieldInDeserialisationIfItHasNonSerializedAttributeEvenIfItIsPresentInSerialisedData()
+		{
+			const string nameFieldName = "Name";
+			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new[] { Tuple.Create(nameFieldName, typeof(string)) });
+			var instance = Activator.CreateInstance(sourceType);
+			var nameFieldOnSource = sourceType.GetField(nameFieldName);
+			nameFieldOnSource.SetValue(instance, "Test");
+			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+
+			var destinationType = ConstructType(
+				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
+				"MyClass",
+				fields: new Tuple<string, Type>[0],
+				optionalFinisher: typeBuilder =>
+				{
+					// Need to define the field using this lambda rather than specifying it through the fields argument because we need to set the custom attribute on it
+					var fieldBuilder = typeBuilder.DefineField(nameFieldName, typeof(string), FieldAttributes.Public);
+					fieldBuilder.SetCustomAttribute(new CustomAttributeBuilder(typeof(NonSerializedAttribute).GetConstructor(Type.EmptyTypes), new object[0]));
+				}
+			);
+			var clone = ResolveDynamicAssembliesWhilePerformingAction(
+				() => Deserialise(serialisedData, destinationType),
+				destinationType
+			);
+			var nameFieldOnDestination = destinationType.GetField(nameFieldName);
+			Assert.Null(nameFieldOnDestination.GetValue(clone));
+		}
+
+		/// <summary>
 		/// Use the CallerMemberName attribute so that a method can gets its own name so that it can specify a descriptive dynamic assembly name (could have used nameof
 		/// but that would invite copy-paste errors when new methods were added - the method name need to be changed AND the reference to it within the nameof call)
 		/// </summary>

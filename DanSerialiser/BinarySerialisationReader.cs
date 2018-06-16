@@ -172,7 +172,7 @@ namespace DanSerialiser
 					// If the field doesn't exist then parse the data but don't worry about any types not being available because we're not going to set anything to the value
 					// that we get back from the "Read" call (but we still need to parse that data to advance the reader to the next field or the end of the current object)
 					var fieldValue = Read(ignoreAnyInvalidTypes: (field == null));
-					if (field == null)
+					if ((field == null) || BinaryReaderWriterShared.IgnoreField(field))
 					{
 						// If the serialised data has content for a field that does not exist on the target type then don't try to set it - this may happen if the version of the
 						// assembly that was used when it was serialised is different to the version loaded when deserialising. Being flexible about this means that is a newer
