@@ -29,7 +29,7 @@ namespace UnitTests
 		/// XML Serialisation doesn't like Exceptions - it doesn't work with the Base Exception and so it's not my fault that it's not working with my custom exceptions
 		/// </summary>
 		[Fact]
-		public static void CircularReferenceExceptionCanBeSerialisedWithXmlSerialiser()
+		public static void ExceptionsCanNotBeSerialisedWithXmlSerialiser()
 		{
 			Assert.Throws<InvalidOperationException>(() => CloneWithXmlSerializer(new Exception("Example Exception")));
 		}
