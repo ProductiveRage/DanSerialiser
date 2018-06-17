@@ -64,6 +64,8 @@ I don't want versioning flexibility such that data serialised from an old versio
 
 \* *(I don't want to be able to define an immutable type that is initialised by a constructor that ensures that every property is set to a non-null value and for the deserialiser to be able to side step that and create an instance that has properties with null values because that will lead to confusion at some point down the road)*
 
+For the simplest cases, I don't want to have to add any special attributes or interfaces or to have to compromise on how types are structured. If I want to serialise / deserialise a POCO using this, then I should be able to. If I want to serialise / deserialise an immutable type using this, then I should be able to. If I want to support backwards / forwards compatibility across versions of types when serialising / deserialising then some additional annotations will be acceptable (such as the "Deprecated" attribute in the example above) but they shouldn't be necessary otherwise.
+
 ## Bonus points
 
 This should result in a NuGet package that works with .NET Framework and with .NET Standard / Core.
