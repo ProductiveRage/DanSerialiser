@@ -135,7 +135,7 @@ namespace UnitTests
 					// Need to define the field using this lambda rather than specifying it through the fields argument because we need the reference for use in the property getter
 					var fieldBuilder = typeBuilder.DefineField(BackingFieldHelpers.GetBackingFieldName(namePropertyName), typeof(string), FieldAttributes.Private);
 					var propertyBuilder = typeBuilder.DefineProperty(namePropertyName, PropertyAttributes.None, typeof(string), parameterTypes: Type.EmptyTypes);
-					propertyBuilder.SetCustomAttribute(new CustomAttributeBuilder(typeof(DeprecatedAttribute).GetConstructor(Type.EmptyTypes), new object[0]));
+					propertyBuilder.SetCustomAttribute(new CustomAttributeBuilder(typeof(DeprecatedAttribute).GetConstructor(new[] { typeof(string) }), new object[] { null }));
 					var getterBuilder = typeBuilder.DefineMethod("get_" + namePropertyName, MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig, typeof(string), parameterTypes: Type.EmptyTypes);
 					var ilGenerator = getterBuilder.GetILGenerator();
 					ilGenerator.Emit(OpCodes.Ldarg_0);
@@ -172,7 +172,7 @@ namespace UnitTests
 				optionalFinisher: typeBuilder =>
 				{
 					var propertyBuilder = typeBuilder.DefineProperty(idPropertyName, PropertyAttributes.None, typeof(int), parameterTypes: Type.EmptyTypes);
-					propertyBuilder.SetCustomAttribute(new CustomAttributeBuilder(typeof(DeprecatedAttribute).GetConstructor(Type.EmptyTypes), new object[0]));
+					propertyBuilder.SetCustomAttribute(new CustomAttributeBuilder(typeof(DeprecatedAttribute).GetConstructor(new[] { typeof(string) }), new object[] { null }));
 					var getterBuilder = typeBuilder.DefineMethod("get_" + idPropertyName, MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig, typeof(int), parameterTypes: Type.EmptyTypes);
 					var ilGenerator = getterBuilder.GetILGenerator();
 					ilGenerator.Emit(OpCodes.Ldc_I4, hardCodedIdValueForDeprecatedProperty);
@@ -312,6 +312,58 @@ namespace UnitTests
 			);
 			var nameFieldOnDestination = destinationType.GetField(nameFieldName);
 			Assert.Null(nameFieldOnDestination.GetValue(clone));
+		}
+
+		/// <summary>
+		/// If deserialising data generated from an older version of a type that has a field that has been renamed, this would normally fail as it would not be possible to set a value on the
+		/// renamed field in the newer version of the type. However, if the newer version has a property whose name and type match the old field and whose getter returns the value of the new
+		/// field and whose setter sets the value of the new field and that property has a Deprecated attribute on it with a ReplacedBy value matching the name of the new field then the new
+		/// type can be fully initialised and the new field will be set using the old field's data (though it will be set indirectly, via property setter).
+		/// </summary>
+		[Fact]
+		public static void AllowDeserialisationOfOldDataTypeIfDeprecatedFieldsAreMappedOnToTheirReplacements()
+		{
+			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new[] { Tuple.Create("NameOld", typeof(string)) });
+			var instance = Activator.CreateInstance(sourceType);
+			var nameFieldOnSource = sourceType.GetField("NameOld");
+			nameFieldOnSource.SetValue(instance, "Test");
+			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+
+			var destinationType = ConstructType(
+				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
+				"MyClass",
+				fields: new Tuple<string, Type>[0],
+				optionalFinisher: typeBuilder =>
+				{
+					// Need to define the field using this lambda rather than specifying it through the fields argument because we need the reference to build the property
+					var nameNewfieldBuilder = typeBuilder.DefineField("NameNew", typeof(string), FieldAttributes.Public);
+
+					// The destinationType has a field "NameNew" that replaces the "NameOld" field on the sourceType. To communicate this to the serialiser, the destinationType also has
+					// a "NameOld property whose getter returns the "NameNew" value and whose setter sets the "NameNew" value and the property has [Deprecated(ReplacedBy: "NameNew")] on
+					// it. When data serialised from the sourceType is deserialised as the destinationType, the "NameOld" value in the serialised data will be used to set the "NameNew"
+					// property and the destinationType will be successfully initialised (even though the "NameNew" field was not set directly).
+					var propertyBuilder = typeBuilder.DefineProperty("NameOld", PropertyAttributes.None, typeof(string), parameterTypes: Type.EmptyTypes);
+					var getterBuilder = typeBuilder.DefineMethod("get_NameOld", MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig, typeof(string), parameterTypes: Type.EmptyTypes);
+					var ilGeneratorForGetter = getterBuilder.GetILGenerator();
+					ilGeneratorForGetter.Emit(OpCodes.Ldarg_0);
+					ilGeneratorForGetter.Emit(OpCodes.Ldfld, nameNewfieldBuilder);
+					ilGeneratorForGetter.Emit(OpCodes.Ret);
+					propertyBuilder.SetGetMethod(getterBuilder);
+					var setterBuilder = typeBuilder.DefineMethod("set_NameOld", MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig, typeof(void), parameterTypes: new[] { typeof(string) });
+					var ilGeneratorForSetter = setterBuilder.GetILGenerator();
+					ilGeneratorForSetter.Emit(OpCodes.Ldarg_0);
+					ilGeneratorForSetter.Emit(OpCodes.Ldarg_1);
+					ilGeneratorForSetter.Emit(OpCodes.Stfld, nameNewfieldBuilder);
+					ilGeneratorForSetter.Emit(OpCodes.Ret);
+					propertyBuilder.SetSetMethod(setterBuilder);
+					propertyBuilder.SetCustomAttribute(new CustomAttributeBuilder(typeof(DeprecatedAttribute).GetConstructor(new[] { typeof(string) }), new[] { "NameNew" }));
+				}
+			);
+			var clone = ResolveDynamicAssembliesWhilePerformingAction(
+				() => Deserialise(serialisedData, destinationType),
+				destinationType
+			);
+			Assert.Equal("Test", destinationType.GetField("NameNew").GetValue(clone));
 		}
 
 		/// <summary>

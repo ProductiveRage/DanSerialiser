@@ -32,11 +32,25 @@ namespace DanSerialiser
 			if (field == null)
 				throw new ArgumentNullException(nameof(field));
 
-			if (!field.Name.StartsWith(PREFIX) || !field.Name.EndsWith(SUFFIX))
+			var propertyName = TryToGetNameOfPropertyRelatingToBackingField(field.Name);
+			if (propertyName == null)
 				return null;
 
-			var propertyName = field.Name.Substring(PREFIX.Length, field.Name.Length - (PREFIX.Length + SUFFIX.Length));
 			return field.DeclaringType.GetProperty(propertyName, BinaryReaderWriterShared.MemberRetrievalBindingFlags, null, field.FieldType, Type.EmptyTypes, null);
+		}
+
+		/// <summary>
+		/// If a field name matches the format of a backing field for an auto-property then return the name of the property that the field would correspond to (otherwise return null)
+		/// </summary>
+		public static string TryToGetNameOfPropertyRelatingToBackingField(string fieldName)
+		{
+			if (string.IsNullOrWhiteSpace(fieldName))
+				throw new ArgumentException($"Null/blank {nameof(fieldName)} specified");
+
+			if (!fieldName.StartsWith(PREFIX) || !fieldName.EndsWith(SUFFIX))
+				return null;
+
+			return fieldName.Substring(PREFIX.Length, fieldName.Length - (PREFIX.Length + SUFFIX.Length));
 		}
 	}
 }

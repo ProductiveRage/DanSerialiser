@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
@@ -10,7 +11,6 @@ namespace DanSerialiser
 	{
 		private byte[] _data;
 		private int _index;
-
 		public BinarySerialisationReader(byte[] data)
 		{
 			_data = data ?? throw new ArgumentNullException(nameof(data));
@@ -167,18 +167,74 @@ namespace DanSerialiser
 						}
 					}
 
-					// If the field doesn't exist then parse the data but don't worry about any types not being available because we're not going to set anything to the value
+					// Note: If the field doesn't exist then parse the data but don't worry about any types not being available because we're not going to set anything to the value
 					// that we get back from the "Read" call (but we still need to parse that data to advance the reader to the next field or the end of the current object)
 					var fieldValue = Read(ignoreAnyInvalidTypes: (field == null));
-					if ((field == null) || BinaryReaderWriterShared.IgnoreField(field))
+
+					// Now that we have the value to set the field to IF IT EXISTS, try to set the field.. if it's a field that we've already identified on the type then it's easy.
+					// However, it may also have been a field on an older version of the type when it was serialised and now that it's deserialised, we'll need to check for any
+					// properties marked with [Deprecated] that we can set with the value that then set the fields that replaced the deprecated field (if this is the case then
+					// field will currently be null but valueIfTypeIsAvailable will not be null).
+					if (field != null)
 					{
-						// If the serialised data has content for a field that does not exist on the target type then don't try to set it - this may happen if the version of the
-						// assembly that was used when it was serialised is different to the version loaded when deserialising. Being flexible about this means that is a newer
-						// version has an additional property added to it then older code can still read it.
-						continue;
+						if (!BinaryReaderWriterShared.IgnoreField(field))
+						{
+							field.SetValue(valueIfTypeIsAvailable, fieldValue);
+							fieldsSet.Add(Tuple.Create(field.DeclaringType, field.Name));
+						}
 					}
-					field.SetValue(valueIfTypeIsAvailable, fieldValue);
-					fieldsSet.Add(Tuple.Create(field.DeclaringType, field.Name));
+					else if (valueIfTypeIsAvailable != null)
+					{
+						// We successfully deserialised a value but couldn't directly set a field to it - before giving up, there's something else to check.. if an older version
+						// of a type was serialised that did have the field that we've got a value for and the target type is a newer version of that type that has a [Deprecated]
+						// property that can map the old field onto a new field / property then we should try to set the [Deprecated] property's value to the value that we have.
+						// That [Deprecated] property's setter should then set a property / field on the new version of the type. If that is the case, then we can add that new
+						// property / field to the have-successfully-set list.
+						var propertyName = BackingFieldHelpers.TryToGetNameOfPropertyRelatingToBackingField(fieldName) ?? fieldName;
+						var typeToLookForPropertyOn = valueIfTypeIsAvailable.GetType();
+						while (typeToLookForPropertyOn != null)
+						{
+							if ((typeNameIfRequired == null) || (typeToLookForPropertyOn.AssemblyQualifiedName == typeNameIfRequired))
+							{
+								var deprecatedProperty = typeToLookForPropertyOn.GetProperties(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
+									.Where(p => (p.Name == propertyName) && (p.DeclaringType == typeToLookForPropertyOn) && (p.GetIndexParameters().Length == 0) && p.PropertyType.IsAssignableFrom(fieldValue.GetType()))
+									.Select(p => new { Property = p, ReplaceBy = p.GetCustomAttribute<DeprecatedAttribute>()?.ReplacedBy })
+									.FirstOrDefault(p => p.ReplaceBy != null);
+								if (deprecatedProperty != null)
+								{
+									// Try to find a field that the "ReplacedBy" value relates to (if we find it then we'll consider it to have been set because setting the
+									// deprecated property should set it))
+									deprecatedProperty.Property.SetValue(valueIfTypeIsAvailable, fieldValue);
+									field = typeToLookForPropertyOn.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
+										.Where(f => (f.Name == deprecatedProperty.ReplaceBy) && (f.DeclaringType == typeToLookForPropertyOn))
+										.FirstOrDefault();
+									if (field == null)
+									{
+										// If the "ReplacedBy" value didn't directly match a field then try to find a property that it matches and then see if there is a
+										// backing field for that property that we can set (if we find this then we'll consider to have been set because setting the deprecated
+										// property should set it)
+										var property = typeToLookForPropertyOn.GetProperties(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
+											.Where(p => (p.Name == deprecatedProperty.ReplaceBy) && (p.DeclaringType == typeToLookForPropertyOn) && (p.GetIndexParameters().Length == 0))
+											.FirstOrDefault();
+										if (property != null)
+										{
+											var nameOfPotentialBackingFieldForProperty = BackingFieldHelpers.GetBackingFieldName(property.Name);
+											field = typeToLookForPropertyOn.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
+												.Where(f => (f.Name == nameOfPotentialBackingFieldForProperty) && (f.DeclaringType == typeToLookForPropertyOn))
+												.FirstOrDefault();
+										}
+									}
+									if (field != null)
+									{
+										// Although the field hasn't directly been set, it should have been set indirectly by setting the property value above (unless the [Deprecated]
+										// "ReplaceBy" value was lying)
+										fieldsSet.Add(Tuple.Create(field.DeclaringType, field.Name));
+									}
+								}
+							}
+							typeToLookForPropertyOn = typeToLookForPropertyOn.BaseType;
+						}
+					}
 				}
 				else
 					throw new InvalidOperationException("Unexpected data type encountered while enumerating object properties: " + nextEntryType);

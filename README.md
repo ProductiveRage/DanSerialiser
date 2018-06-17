@@ -37,7 +37,7 @@ If I have a server and a client with different versions of an assembly such that
 		
 		public TranslatedString TranslatedName { get; private set; }
 		
-		[Deprecated(replacedByProperty: nameof(TranslatedName))]
+		[Deprecated(replacedBy: nameof(TranslatedName))]
 		public string Name
 		{
 		    get { return TranslatedName.DefaultValue; }
