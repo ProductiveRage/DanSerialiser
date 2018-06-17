@@ -11,8 +11,6 @@ namespace DanSerialiser
 		private byte[] _data;
 		private int _index;
 
-		public BindingFlags FieldRetrievalBindingFlags { get; private set; }
-
 		public BinarySerialisationReader(byte[] data)
 		{
 			_data = data ?? throw new ArgumentNullException(nameof(data));
