@@ -199,7 +199,7 @@ namespace DanSerialiser
 								var deprecatedProperty = typeToLookForPropertyOn.GetProperties(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
 									.Where(p => (p.Name == propertyName) && (p.DeclaringType == typeToLookForPropertyOn) && (p.GetIndexParameters().Length == 0) && p.PropertyType.IsAssignableFrom(fieldValue.GetType()))
 									.Select(p => new { Property = p, ReplaceBy = p.GetCustomAttribute<DeprecatedAttribute>()?.ReplacedBy })
-									.FirstOrDefault(p => p.ReplaceBy != null);
+									.FirstOrDefault(p => p.ReplaceBy != null); // Safe to use FirstOrDefault because there can't be multiple [Deprecated] as AllowMultiple is not set to true on the attribute class
 								if (deprecatedProperty != null)
 								{
 									// Try to find a field that the "ReplacedBy" value relates to (if we find it then we'll consider it to have been set because setting the
