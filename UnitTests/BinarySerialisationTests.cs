@@ -127,6 +127,20 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public static void Guid()
+		{
+			AssertCloneMatchesOriginal(GenerateSeededGuid(0));
+		}
+
+		private static Guid GenerateSeededGuid(int seed) // Courtesy of https://stackoverflow.com/a/13188409/3813189
+		{
+			var r = new Random(seed);
+			var guid = new byte[16];
+			r.NextBytes(guid);
+			return new Guid(guid);
+		}
+
+		[Fact]
 		public static void NullArrayOfInt32()
 		{
 			AssertCloneMatchesOriginal((int[])null);
