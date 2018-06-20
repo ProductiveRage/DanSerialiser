@@ -11,10 +11,10 @@ namespace Tester
 
 			var serialiser = Serialiser.Instance;
 
-			var writer = new BinaryWriter();
+			var writer = new BinarySerialisationWriter();
 			serialiser.Serialise(value, writer);
 
-			var reader = new BinaryReader(writer.GetData());
+			var reader = new BinarySerialisationReader(writer.GetData());
 			var clone = reader.Read<int>();
 
 			Console.ReadLine();
