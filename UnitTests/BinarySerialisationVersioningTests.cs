@@ -46,7 +46,7 @@ namespace UnitTests
 			var instance = Activator.CreateInstance(sourceType);
 			var idFieldOnSource = sourceType.GetField(idFieldName);
 			idFieldOnSource.SetValue(instance, 123);
-			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance, supportCircularReferences: false);
 
 			var destinationType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "ClassWithIntId", new[] { Tuple.Create(idFieldName, typeof(int)) });
 			var clone = ResolveDynamicAssembliesWhilePerformingAction(
@@ -68,7 +68,7 @@ namespace UnitTests
 		{
 			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
 			var instance = Activator.CreateInstance(sourceType);
-			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance, supportCircularReferences: false);
 
 			var destinationType = ConstructType(
 				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
@@ -92,7 +92,7 @@ namespace UnitTests
 		{
 			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
 			var instance = Activator.CreateInstance(sourceType);
-			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance, supportCircularReferences: false);
 
 			const string nameFieldName = "Name";
 			var destinationType = ConstructType(
@@ -123,7 +123,7 @@ namespace UnitTests
 		{
 			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
 			var instance = Activator.CreateInstance(sourceType);
-			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance, supportCircularReferences: false);
 
 			const string namePropertyName = "Name";
 			var destinationType = ConstructType(
@@ -181,7 +181,7 @@ namespace UnitTests
 				}
 			);
 			var instance = Activator.CreateInstance(typeWithDeprecatedProperty);
-			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance, supportCircularReferences: false);
 
 			// For the sake of this test, the type that will be deserialised to only needs to have a backing field for an auto property (the field that we're expecting to
 			// get set) and so that's all that is being configured. It would be closer to a real use case if there was a property with a getter that used this backing field
@@ -216,7 +216,7 @@ namespace UnitTests
 			var sourceType = ConstructType(sourceModule, "MyClass", new[] { Tuple.Create(valueFieldName, nestedSourceType) });
 			var instance = Activator.CreateInstance(sourceType);
 			sourceType.GetField(valueFieldName).SetValue(instance, Activator.CreateInstance(nestedSourceType));
-			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance, supportCircularReferences: false);
 
 			var destinationType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
 			var deserialised = ResolveDynamicAssembliesWhilePerformingAction(
@@ -241,7 +241,7 @@ namespace UnitTests
 			var sourceType = ConstructType(sourceModule, "MyClass", new[] { Tuple.Create(valueFieldName, nestedSourceType) });
 			var instance = Activator.CreateInstance(sourceType);
 			sourceType.GetField(valueFieldName).SetValue(instance, Activator.CreateInstance(nestedSourceType));
-			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance, supportCircularReferences: false);
 
 			var destinationModule = GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0));
 			var destinationType = ConstructType(destinationModule, "MyClass", new[] { Tuple.Create(valueFieldName, nestedSourceType) });
@@ -266,7 +266,7 @@ namespace UnitTests
 		{
 			var sourceType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
 			var instance = Activator.CreateInstance(sourceType);
-			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance, supportCircularReferences: false);
 
 			var destinationType = ConstructType(
 				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
@@ -293,7 +293,7 @@ namespace UnitTests
 			var instance = Activator.CreateInstance(sourceType);
 			var nameFieldOnSource = sourceType.GetField(nameFieldName);
 			nameFieldOnSource.SetValue(instance, "Test");
-			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance, supportCircularReferences: false);
 
 			var destinationType = ConstructType(
 				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
@@ -327,7 +327,7 @@ namespace UnitTests
 			var instance = Activator.CreateInstance(sourceType);
 			var nameFieldOnSource = sourceType.GetField("NameOld");
 			nameFieldOnSource.SetValue(instance, "Test");
-			var serialisedData = BinarySerialisationCloner.Serialise(instance);
+			var serialisedData = BinarySerialisationCloner.Serialise(instance, supportCircularReferences: false);
 
 			var destinationType = ConstructType(
 				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
@@ -417,7 +417,7 @@ namespace UnitTests
 		private static T CloneAndSupportDynamicAssemblies<T>(T value, params Type[] dynamicTypes)
 		{
 			return ResolveDynamicAssembliesWhilePerformingAction<T>(
-				() => BinarySerialisationCloner.Clone(value),
+				() => BinarySerialisationCloner.Clone(value, supportCircularReferences: false),
 				dynamicTypes
 			);
 		}

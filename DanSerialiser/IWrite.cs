@@ -29,6 +29,7 @@ namespace DanSerialiser
 
 		void ObjectStart<T>(T value);
 		void ObjectEnd();
+		void ReferenceId(int value);
 
 		/// <summary>
 		/// This will return false if the field should be skipped

@@ -5,10 +5,10 @@ namespace UnitTests
 {
 	public static class BinarySerialisationCloner
 	{
-		public static byte[] Serialise(object value)
+		public static byte[] Serialise(object value, bool supportCircularReferences)
 		{
 			var writer = new BinarySerialisationWriter();
-			Serialiser.Instance.Serialise(value, writer);
+			Serialiser.Instance.Serialise(value, writer, supportCircularReferences);
 			return writer.GetData();
 		}
 
@@ -21,9 +21,9 @@ namespace UnitTests
 			return reader.Read<T>();
 		}
 
-		public static T Clone<T>(T value)
+		public static T Clone<T>(T value, bool supportCircularReferences)
 		{
-			return Deserialise<T>(Serialise(value));
+			return Deserialise<T>(Serialise(value, supportCircularReferences));
 		}
 	}
 }

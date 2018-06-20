@@ -25,15 +25,15 @@ namespace DanSerialiser
 			// Note: As this is the top level "Read" call, if it is an object being deserialised and the type of that object is not available then the deserialisation attempt
 			// should fail, which is why ignoreAnyInvalidTypes is passed as false (that option only applies in cases where a nested object is being deserialised but the field
 			// that it would be used to set does not exist on the parent object - if there is no field to set, who cares if the value is of a type that is not available)
-			return (T)Read(ignoreAnyInvalidTypes: false);
+			return (T)Read(new Dictionary<int, object>(), ignoreAnyInvalidTypes: false);
 		}
 
-		private object Read(bool ignoreAnyInvalidTypes)
+		private object Read(Dictionary<int, object> objectHistory, bool ignoreAnyInvalidTypes)
 		{
 			if (_index >= _data.Length)
 				throw new InvalidOperationException("No data to read");
 
-			switch ((BinarySerialisationDataType)ReadNext())
+			switch (ReadNextDataType())
 			{
 				default:
 					throw new NotImplementedException();
@@ -77,10 +77,10 @@ namespace DanSerialiser
 					return ReadNextString();
 
 				case BinarySerialisationDataType.ArrayStart:
-					return ReadNextArray(ignoreAnyInvalidTypes);
+					return ReadNextArray(objectHistory, ignoreAnyInvalidTypes);
 
 				case BinarySerialisationDataType.ObjectStart:
-					return ReadNextObject(ignoreAnyInvalidTypes);
+					return ReadNextObject(objectHistory, ignoreAnyInvalidTypes);
 			}
 		}
 
@@ -95,24 +95,41 @@ namespace DanSerialiser
 			return (length == -1) ? null : Encoding.UTF8.GetString(ReadNext(length));
 		}
 
-		private object ReadNextObject(bool ignoreAnyInvalidTypes)
+		private object ReadNextObject(Dictionary<int, object> objectHistory, bool ignoreAnyInvalidTypes)
 		{
 			var typeName = ReadNextString();
 			if (typeName == null)
 			{
-				if ((BinarySerialisationDataType)ReadNext() != BinarySerialisationDataType.ObjectEnd)
-					throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered");
+				if (ReadNextDataType() != BinarySerialisationDataType.ObjectEnd)
+					throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered after null value");
 				return null;
 			}
+
+			// If the next value is a Reference ID 
+			int? referenceID;
+			if (IsNextDataType(BinarySerialisationDataType.ReferenceID))
+			{
+				referenceID = ReadNextInt();
+				if (objectHistory.TryGetValue(referenceID.Value, out var existingReference))
+				{
+					if (ReadNextDataType() != BinarySerialisationDataType.ObjectEnd)
+						throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered after reused reference");
+					return existingReference;
+				}
+			}
+			else
+				referenceID = null;
 
 			// Try to get a reference to the type that we should be deserialising to. If ignoreAnyInvalidTypes is true then don't worry if Type.GetType can't find the type that is
 			// specified because we don't care about the return value from this method, we're just parsing the data to progress to the next data that we DO care about.
 			var typeIfAvailable = Type.GetType(typeName, throwOnError: !ignoreAnyInvalidTypes);
 			var valueIfTypeIsAvailable = (typeIfAvailable == null) ? null : FormatterServices.GetUninitializedObject(typeIfAvailable);
+			if ((valueIfTypeIsAvailable != null) && (referenceID != null))
+				objectHistory[referenceID.Value] = valueIfTypeIsAvailable;
 			var fieldsSet = new HashSet<Tuple<Type, string>>();
 			while (true)
 			{
-				var nextEntryType = (BinarySerialisationDataType)ReadNext();
+				var nextEntryType = ReadNextDataType();
 				if (nextEntryType == BinarySerialisationDataType.ObjectEnd)
 				{
 					if (typeIfAvailable != null)
@@ -169,7 +186,7 @@ namespace DanSerialiser
 
 					// Note: If the field doesn't exist then parse the data but don't worry about any types not being available because we're not going to set anything to the value
 					// that we get back from the "Read" call (but we still need to parse that data to advance the reader to the next field or the end of the current object)
-					var fieldValue = Read(ignoreAnyInvalidTypes: (field == null));
+					var fieldValue = Read(objectHistory, ignoreAnyInvalidTypes: (field == null));
 
 					// Now that we have the value to set the field to IF IT EXISTS, try to set the field.. if it's a field that we've already identified on the type then it's easy.
 					// However, it may also have been a field on an older version of the type when it was serialised and now that it's deserialised, we'll need to check for any
@@ -241,24 +258,46 @@ namespace DanSerialiser
 			}
 		}
 
-		private object ReadNextArray(bool ignoreAnyInvalidTypes)
+		private object ReadNextArray(Dictionary<int, object> objectHistory, bool ignoreAnyInvalidTypes)
 		{
 			var elementTypeName = ReadNextString();
 			if (elementTypeName == null)
 			{
 				// If the element type was recorded as null then it means that the array itself was null (and so the next character should be an ArrayEnd)
-				if ((BinarySerialisationDataType)ReadNext() != BinarySerialisationDataType.ArrayEnd)
+				if (ReadNextDataType() != BinarySerialisationDataType.ArrayEnd)
 					throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ArrayEnd)} was not encountered");
 				return null;
 			}
 			var elementType = Type.GetType(elementTypeName, throwOnError: true);
 			var items = Array.CreateInstance(elementType, length: ReadNextInt());
 			for (var i = 0; i < items.Length; i++)
-				items.SetValue(Read(ignoreAnyInvalidTypes), i);
-			var nextEntryType = (BinarySerialisationDataType)ReadNext();
+				items.SetValue(Read(objectHistory, ignoreAnyInvalidTypes), i);
+			var nextEntryType = ReadNextDataType();
 			if (nextEntryType != BinarySerialisationDataType.ArrayEnd)
 				throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ArrayEnd)} was not encountered");
 			return items;
+		}
+
+		private BinarySerialisationDataType ReadNextDataType()
+		{
+			return (BinarySerialisationDataType)ReadNext();
+		}
+
+		/// <summary>
+		/// If the next content is the specified data type then the feed will be progressed one byte over the header and true will be returned, otherwise the feed
+		/// will NOT be progressed and false will be returned
+		/// </summary>
+		private bool IsNextDataType(BinarySerialisationDataType dataType)
+		{
+			if (_index >= _data.Length)
+				throw new InvalidOperationException("Insufficient data to read (presume invalid content)");
+
+			if ((BinarySerialisationDataType)_data[_index] == dataType)
+			{
+				_index++;
+				return true;
+			}
+			return false;
 		}
 
 		private byte ReadNext()

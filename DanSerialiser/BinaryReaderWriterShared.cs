@@ -9,6 +9,8 @@ namespace DanSerialiser
 
 		public static readonly BindingFlags MemberRetrievalBindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
+		public static readonly int MaxReferenceCount = int.MaxValue;
+
 		public static bool IgnoreField(FieldInfo field)
 		{
 			if (field == null)

@@ -5,330 +5,12 @@ using Xunit;
 
 namespace UnitTests
 {
-	public static class BinarySerialisationTests
+	public sealed class BinarySerialisationTests_NoCircularReferences : BinarySerialisationTests
 	{
-		[Fact]
-		public static void Bool()
-		{
-			AssertCloneMatchesOriginal(true);
-		}
+		public BinarySerialisationTests_NoCircularReferences() : base(supportCircularReferences: false) { }
 
 		[Fact]
-		public static void Byte()
-		{
-			AssertCloneMatchesOriginal(byte.MaxValue);
-		}
-
-		[Fact]
-		public static void SByte()
-		{
-			AssertCloneMatchesOriginal(sbyte.MaxValue);
-		}
-
-		[Fact]
-		public static void Int16()
-		{
-			AssertCloneMatchesOriginal(short.MaxValue);
-		}
-
-		[Fact]
-		public static void Int32()
-		{
-			AssertCloneMatchesOriginal(int.MaxValue);
-		}
-
-		[Fact]
-		public static void Int64()
-		{
-			AssertCloneMatchesOriginal(long.MaxValue);
-		}
-		[Fact]
-		public static void UInt16()
-		{
-			AssertCloneMatchesOriginal(ushort.MaxValue);
-		}
-
-		[Fact]
-		public static void UInt32()
-		{
-			AssertCloneMatchesOriginal(uint.MaxValue);
-		}
-
-		[Fact]
-		public static void UInt64()
-		{
-			AssertCloneMatchesOriginal(ulong.MaxValue);
-		}
-
-		[Fact]
-		public static void Single()
-		{
-			AssertCloneMatchesOriginal(float.MaxValue);
-		}
-
-		[Fact]
-		public static void Double()
-		{
-			AssertCloneMatchesOriginal(double.MaxValue);
-		}
-
-		[Fact]
-		public static void Decimal()
-		{
-			AssertCloneMatchesOriginal(decimal.MaxValue);
-		}
-
-		[Fact]
-		public static void Enum()
-		{
-			AssertCloneMatchesOriginal(DefaultTypeEnum.Value2);
-		}
-
-		[Fact]
-		public static void EnumWithDifferentBaseType()
-		{
-			AssertCloneMatchesOriginal(ByteEnum.Value2);
-		}
-
-		[Fact]
-		public static void NullableInt32()
-		{
-			AssertCloneMatchesOriginal((int?)32);
-		}
-
-		[Fact]
-		public static void NullableInt32WhenNull()
-		{
-			AssertCloneMatchesOriginal((int?)null);
-		}
-
-		[Fact]
-		public static void NullString()
-		{
-			AssertCloneMatchesOriginal((string)null);
-		}
-
-		[Fact]
-		public static void Char()
-		{
-			AssertCloneMatchesOriginal('é');
-		}
-
-		[Fact]
-		public static void BlankString()
-		{
-			AssertCloneMatchesOriginal("");
-		}
-
-		[Fact]
-		public static void String()
-		{
-			AssertCloneMatchesOriginal("Café");
-		}
-
-		[Fact]
-		public static void Guid()
-		{
-			AssertCloneMatchesOriginal(GenerateSeededGuid(0));
-		}
-
-		private static Guid GenerateSeededGuid(int seed) // Courtesy of https://stackoverflow.com/a/13188409/3813189
-		{
-			var r = new Random(seed);
-			var guid = new byte[16];
-			r.NextBytes(guid);
-			return new Guid(guid);
-		}
-
-		[Fact]
-		public static void NullArrayOfInt32()
-		{
-			AssertCloneMatchesOriginal((int[])null);
-		}
-
-		[Fact]
-		public static void EmptyArrayOfInt32()
-		{
-			AssertCloneMatchesOriginal(new int[0]);
-		}
-
-		[Fact]
-		public static void ArrayOfInt32()
-		{
-			AssertCloneMatchesOriginal(new[] { 32 });
-		}
-
-		[Fact]
-		public static void NullListOfInt32()
-		{
-			AssertCloneMatchesOriginal((List<int>)null);
-		}
-
-		[Fact]
-		public static void EmptyListOfInt32()
-		{
-			AssertCloneMatchesOriginal(new List<int>());
-		}
-
-		[Fact]
-		public static void ListOfInt32()
-		{
-			AssertCloneMatchesOriginal(new List<int> { 32 });
-		}
-
-		[Fact]
-		public static void NullDictionaryOfInt32ToString()
-		{
-			AssertCloneMatchesOriginal((Dictionary<string, int>)null);
-		}
-
-		[Fact]
-		public static void DictionaryOfInt32ToString()
-		{
-			var clone = AssertCloneMatchesOriginalAndReturnClone(new Dictionary<string, int>() { { "One", 1 } });
-			Assert.Single(clone);
-			Assert.True(clone.ContainsKey("One"));
-		}
-
-		[Fact]
-		public static void DictionaryOfInt32ToStringWithSpecificComparer()
-		{
-			var clone = AssertCloneMatchesOriginalAndReturnClone(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { { "One", 1 } });
-			Assert.Single(clone);
-			Assert.True(clone.ContainsKey("ONE"));
-		}
-
-		[Fact]
-		public static void NullObject()
-		{
-			AssertCloneMatchesOriginal<object>(null);
-		}
-
-		[Fact]
-		public static void PrivateSealedClassWithNoMembers()
-		{
-			var clone = BinarySerialisationCloner.Clone(new ClassWithNoMembersAndNoInheritance());
-			Assert.NotNull(clone);
-			Assert.IsType<ClassWithNoMembersAndNoInheritance>(clone);
-		}
-
-		[Fact]
-		public static void NullPrivateSealedClassWithNoMembers()
-		{
-			var clone = BinarySerialisationCloner.Clone((ClassWithNoMembersAndNoInheritance)null);
-			Assert.Null(clone);
-		}
-
-		[Fact]
-		public static void PrivateSealedClassWithSinglePublicField()
-		{
-			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicFieldAndNoInheritance { Name = "abc" });
-			Assert.NotNull(clone);
-			Assert.IsType<ClassWithSinglePublicFieldAndNoInheritance>(clone);
-			Assert.Equal("abc", clone.Name);
-		}
-
-		[Fact]
-		public static void PrivateSealedClassWithSinglePublicAutoProperty()
-		{
-			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicAutoPropertyAndNoInheritance { Name = "abc" });
-			Assert.NotNull(clone);
-			Assert.IsType<ClassWithSinglePublicAutoPropertyAndNoInheritance>(clone);
-			Assert.Equal("abc", clone.Name);
-		}
-
-		[Fact]
-		public static void PrivateSealedClassWithSinglePublicReadonlyAutoProperty()
-		{
-			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance("abc"));
-			Assert.NotNull(clone);
-			Assert.IsType<ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance>(clone);
-			Assert.Equal("abc", clone.Name);
-		}
-
-		/// <summary>
-		/// This specifies the target type as an interface but the data that will be serialised and deserialised is an implementation of that interface
-		/// </summary>
-		[Fact]
-		public static void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToInterface()
-		{
-			var clone = BinarySerialisationCloner.Clone<IHaveName>(new ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance { Name = "abc" });
-			Assert.NotNull(clone);
-			Assert.IsType<ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance>(clone);
-			Assert.Equal("abc", clone.Name);
-		}
-
-		/// <summary>
-		/// This is basically the same as above but the class implements the interface explicitly
-		/// </summary>
-		[Fact]
-		public static void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToInterfaceThatIsExplicitlyImplemented()
-		{
-			var clone = BinarySerialisationCloner.Clone<IHaveName>(new ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance { Name = "abc" });
-			Assert.NotNull(clone);
-			Assert.IsType<ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance>(clone);
-			Assert.Equal("abc", clone.Name);
-		}
-
-		/// <summary>
-		/// This specifies the target type as an abstract class but the data that will be serialised and deserialised is an implementation of that interface (this test confirms
-		/// not only will the type be maintained but that a property will be set on the base class class AND one defined on the derived type)
-		/// </summary>
-		[Fact]
-		public static void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToAbstractClass()
-		{
-			var clone = BinarySerialisationCloner.Clone<NamedItem>(new ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance { Name = "abc", OtherProperty = "xyz" });
-			Assert.NotNull(clone);
-			Assert.IsType<ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance>(clone);
-			Assert.Equal("abc", clone.Name);
-			Assert.Equal("xyz", ((ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance)clone).OtherProperty);
-		}
-
-		[Fact]
-		public static void PropertyOnBaseClassThatIsOverriddenOnDerivedClass()
-		{
-			var source = new SupervisorDetails(123, "abc");
-			var clone = BinarySerialisationCloner.Clone(new SupervisorDetails(123, "abc"));
-			Assert.IsType<SupervisorDetails>(clone);
-			Assert.Equal(123, clone.Id);
-			Assert.Equal("abc", clone.Name);
-		}
-
-		[Fact]
-		public static void PropertyOnBaseClassThatIsOverriddenWithNewOnDerivedClass()
-		{
-			var source = new ManagerDetails(123, "abc");
-			var clone = BinarySerialisationCloner.Clone(new ManagerDetails(123, "abc"));
-			Assert.IsType<ManagerDetails>(clone);
-			Assert.Equal(123, clone.Id);
-			Assert.Equal("abc", ((EmployeeDetails)clone).Name);
-		}
-
-		[Fact]
-		public static void PrivateStructWithNoMembers()
-		{
-			var clone = BinarySerialisationCloner.Clone(new StructWithNoMembers());
-			Assert.IsType<StructWithNoMembers>(clone);
-		}
-
-		[Fact]
-		public static void PrivateStructWithSinglePublicField()
-		{
-			var clone = BinarySerialisationCloner.Clone(new StructWithSinglePublicField { Name = "abc" });
-			Assert.IsType<StructWithSinglePublicField>(clone);
-			Assert.Equal("abc", clone.Name);
-		}
-
-		[Fact]
-		public static void PrivateStructWithSinglePublicAutoProperty()
-		{
-			var clone = BinarySerialisationCloner.Clone(new StructWithSinglePublicAutoProperty { Name = "abc" });
-			Assert.IsType<StructWithSinglePublicAutoProperty>(clone);
-			Assert.Equal("abc", clone.Name);
-		}
-
-		[Fact]
-		public static void CircularReferenceThrows()
+		public void CircularReferenceThrows()
 		{
 			var source = new Node();
 			source.Child = source;
@@ -339,51 +21,414 @@ namespace UnitTests
 			});
 		}
 
-		[Fact]
-		public static void StaticDataIsNotSerialised()
+		private sealed class Node
 		{
-			// Only instance fields will be serialised, which means that any static fields / properties will be unaffected by the deserialisation process. To illustrate this..
-			// - Create something to clone that has a static property and set that property to a known value
+			public Node Child { get; set; }
+		}
+	}
+
+	public sealed class BinarySerialisationTests_CircularReferences : BinarySerialisationTests
+	{
+		public BinarySerialisationTests_CircularReferences() : base(supportCircularReferences: true) { }
+
+		[Fact]
+		public void CircularReferenceSupported()
+		{
+			var source = new Node();
+			source.Child = source;
+
+			var clone = BinarySerialisationCloner.Clone(source, supportCircularReferences: true);
+			Assert.Equal(clone, clone.Child);
+		}
+
+		private sealed class Node
+		{
+			public Node Child { get; set; }
+		}
+	}
+
+	public abstract class BinarySerialisationTests
+	{
+		private readonly bool _supportCircularReferences;
+		protected BinarySerialisationTests(bool supportCircularReferences)
+		{
+			_supportCircularReferences = supportCircularReferences;
+		}
+
+		[Fact]
+		public void Bool()
+		{
+			AssertCloneMatchesOriginal(true);
+		}
+
+		[Fact]
+		public void Byte()
+		{
+			AssertCloneMatchesOriginal(byte.MaxValue);
+		}
+
+		[Fact]
+		public void SByte()
+		{
+			AssertCloneMatchesOriginal(sbyte.MaxValue);
+		}
+
+		[Fact]
+		public void Int16()
+		{
+			AssertCloneMatchesOriginal(short.MaxValue);
+		}
+
+		[Fact]
+		public void Int32()
+		{
+			AssertCloneMatchesOriginal(int.MaxValue);
+		}
+
+		[Fact]
+		public void Int64()
+		{
+			AssertCloneMatchesOriginal(long.MaxValue);
+		}
+		[Fact]
+		public void UInt16()
+		{
+			AssertCloneMatchesOriginal(ushort.MaxValue);
+		}
+
+		[Fact]
+		public void UInt32()
+		{
+			AssertCloneMatchesOriginal(uint.MaxValue);
+		}
+
+		[Fact]
+		public void UInt64()
+		{
+			AssertCloneMatchesOriginal(ulong.MaxValue);
+		}
+
+		[Fact]
+		public void Single()
+		{
+			AssertCloneMatchesOriginal(float.MaxValue);
+		}
+
+		[Fact]
+		public void Double()
+		{
+			AssertCloneMatchesOriginal(double.MaxValue);
+		}
+
+		[Fact]
+		public void Decimal()
+		{
+			AssertCloneMatchesOriginal(decimal.MaxValue);
+		}
+
+		[Fact]
+		public void Enum()
+		{
+			AssertCloneMatchesOriginal(DefaultTypeEnum.Value2);
+		}
+
+		[Fact]
+		public void EnumWithDifferentBaseType()
+		{
+			AssertCloneMatchesOriginal(ByteEnum.Value2);
+		}
+
+		[Fact]
+		public void NullableInt32()
+		{
+			AssertCloneMatchesOriginal((int?)32);
+		}
+
+		[Fact]
+		public void NullableInt32WhenNull()
+		{
+			AssertCloneMatchesOriginal((int?)null);
+		}
+
+		[Fact]
+		public void NullString()
+		{
+			AssertCloneMatchesOriginal((string)null);
+		}
+
+		[Fact]
+		public void Char()
+		{
+			AssertCloneMatchesOriginal('é');
+		}
+
+		[Fact]
+		public void BlankString()
+		{
+			AssertCloneMatchesOriginal("");
+		}
+
+		[Fact]
+		public void String()
+		{
+			AssertCloneMatchesOriginal("Café");
+		}
+
+		[Fact]
+		public void Guid()
+		{
+			AssertCloneMatchesOriginal(GenerateSeededGuid(0));
+		}
+
+		private Guid GenerateSeededGuid(int seed) // Courtesy of https://stackoverflow.com/a/13188409/3813189
+		{
+			var r = new Random(seed);
+			var guid = new byte[16];
+			r.NextBytes(guid);
+			return new Guid(guid);
+		}
+
+		[Fact]
+		public void NullArrayOfInt32()
+		{
+			AssertCloneMatchesOriginal((int[])null);
+		}
+
+		[Fact]
+		public void EmptyArrayOfInt32()
+		{
+			AssertCloneMatchesOriginal(new int[0]);
+		}
+
+		[Fact]
+		public void ArrayOfInt32()
+		{
+			AssertCloneMatchesOriginal(new[] { 32 });
+		}
+
+		[Fact]
+		public void NullListOfInt32()
+		{
+			AssertCloneMatchesOriginal((List<int>)null);
+		}
+
+		[Fact]
+		public void EmptyListOfInt32()
+		{
+			AssertCloneMatchesOriginal(new List<int>());
+		}
+
+		[Fact]
+		public void ListOfInt32()
+		{
+			AssertCloneMatchesOriginal(new List<int> { 32 });
+		}
+
+		[Fact]
+		public void NullDictionaryOfInt32ToString()
+		{
+			AssertCloneMatchesOriginal((Dictionary<string, int>)null);
+		}
+
+		[Fact]
+		public void DictionaryOfInt32ToString()
+		{
+			var clone = AssertCloneMatchesOriginalAndReturnClone(new Dictionary<string, int>() { { "One", 1 } });
+			Assert.Single(clone);
+			Assert.True(clone.ContainsKey("One"));
+		}
+
+		[Fact]
+		public void DictionaryOfInt32ToStringWithSpecificComparer()
+		{
+			var clone = AssertCloneMatchesOriginalAndReturnClone(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { { "One", 1 } });
+			Assert.Single(clone);
+			Assert.True(clone.ContainsKey("ONE"));
+		}
+
+		[Fact]
+		public void NullObject()
+		{
+			AssertCloneMatchesOriginal<object>(null);
+		}
+
+		[Fact]
+		public void PrivateSealedClassWithNoMembers()
+		{
+			var clone = BinarySerialisationCloner.Clone(new ClassWithNoMembersAndNoInheritance(), _supportCircularReferences);
+			Assert.NotNull(clone);
+			Assert.IsType<ClassWithNoMembersAndNoInheritance>(clone);
+		}
+
+		[Fact]
+		public void NullPrivateSealedClassWithNoMembers()
+		{
+			var clone = BinarySerialisationCloner.Clone((ClassWithNoMembersAndNoInheritance)null, _supportCircularReferences);
+			Assert.Null(clone);
+		}
+
+		[Fact]
+		public void PrivateSealedClassWithSinglePublicField()
+		{
+			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicFieldAndNoInheritance { Name = "abc" }, _supportCircularReferences);
+			Assert.NotNull(clone);
+			Assert.IsType<ClassWithSinglePublicFieldAndNoInheritance>(clone);
+			Assert.Equal("abc", clone.Name);
+		}
+
+		[Fact]
+		public void PrivateSealedClassWithSinglePublicAutoProperty()
+		{
+			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicAutoPropertyAndNoInheritance { Name = "abc" }, _supportCircularReferences);
+			Assert.NotNull(clone);
+			Assert.IsType<ClassWithSinglePublicAutoPropertyAndNoInheritance>(clone);
+			Assert.Equal("abc", clone.Name);
+		}
+
+		[Fact]
+		public void PrivateSealedClassWithSinglePublicReadonlyAutoProperty()
+		{
+			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance("abc"), _supportCircularReferences);
+			Assert.NotNull(clone);
+			Assert.IsType<ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance>(clone);
+			Assert.Equal("abc", clone.Name);
+		}
+
+		/// <summary>
+		/// This specifies the target type as an interface but the data that will be serialised and deserialised is an implementation of that interface
+		/// </summary>
+		[Fact]
+		public void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToInterface()
+		{
+			var clone = BinarySerialisationCloner.Clone<IHaveName>(
+				new ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance { Name = "abc" },
+				_supportCircularReferences
+			);
+			Assert.NotNull(clone);
+			Assert.IsType<ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance>(clone);
+			Assert.Equal("abc", clone.Name);
+		}
+
+		/// <summary>
+		/// This is basically the same as above but the class implements the interface explicitly
+		/// </summary>
+		[Fact]
+		public void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToInterfaceThatIsExplicitlyImplemented()
+		{
+			var clone = BinarySerialisationCloner.Clone<IHaveName>(
+				new ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance { Name = "abc" },
+				_supportCircularReferences
+			);
+			Assert.NotNull(clone);
+			Assert.IsType<ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance>(clone);
+			Assert.Equal("abc", clone.Name);
+		}
+
+		/// <summary>
+		/// This specifies the target type as an abstract class but the data that will be serialised and deserialised is an implementation of that interface (this test confirms
+		/// not only will the type be maintained but that a property will be set on the base class class AND one defined on the derived type)
+		/// </summary>
+		[Fact]
+		public void PrivateSealedClassWithSinglePublicReadonlyAutoPropertyThatIsSerialisedToAbstractClass()
+		{
+			var clone = BinarySerialisationCloner.Clone<NamedItem>(
+				new ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance { Name = "abc", OtherProperty = "xyz" },
+				_supportCircularReferences
+			);
+			Assert.NotNull(clone);
+			Assert.IsType<ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance>(clone);
+			Assert.Equal("abc", clone.Name);
+			Assert.Equal("xyz", ((ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance)clone).OtherProperty);
+		}
+
+		[Fact]
+		public void PropertyOnBaseClassThatIsOverriddenOnDerivedClass()
+		{
+			var source = new SupervisorDetails(123, "abc");
+			var clone = BinarySerialisationCloner.Clone(new SupervisorDetails(123, "abc"), _supportCircularReferences);
+			Assert.IsType<SupervisorDetails>(clone);
+			Assert.Equal(123, clone.Id);
+			Assert.Equal("abc", clone.Name);
+		}
+
+		[Fact]
+		public void PropertyOnBaseClassThatIsOverriddenWithNewOnDerivedClass()
+		{
+			var source = new ManagerDetails(123, "abc");
+			var clone = BinarySerialisationCloner.Clone(new ManagerDetails(123, "abc"), _supportCircularReferences);
+			Assert.IsType<ManagerDetails>(clone);
+			Assert.Equal(123, clone.Id);
+			Assert.Equal("abc", ((EmployeeDetails)clone).Name);
+		}
+
+		[Fact]
+		public void PrivateStructWithNoMembers()
+		{
+			var clone = BinarySerialisationCloner.Clone(new StructWithNoMembers(), _supportCircularReferences);
+			Assert.IsType<StructWithNoMembers>(clone);
+		}
+
+		[Fact]
+		public void PrivateStructWithSinglePublicField()
+		{
+			var clone = BinarySerialisationCloner.Clone(new StructWithSinglePublicField { Name = "abc" }, _supportCircularReferences);
+			Assert.IsType<StructWithSinglePublicField>(clone);
+			Assert.Equal("abc", clone.Name);
+		}
+
+		[Fact]
+		public void PrivateStructWithSinglePublicAutoProperty()
+		{
+			var clone = BinarySerialisationCloner.Clone(new StructWithSinglePublicAutoProperty { Name = "abc" }, _supportCircularReferences);
+			Assert.IsType<StructWithSinglePublicAutoProperty>(clone);
+			Assert.Equal("abc", clone.Name);
+		}
+
+		[Fact]
+		public void StaticDataIsNotSerialised()
+		{
+			// Only instance fields will be serialised, which means that any fields / properties will be unaffected by the deserialisation process. To illustrate this..
+			// - Create something to clone that has a property and set that property to a known value
 			var source = new ClassWithStaticProperty();
 			ClassWithStaticProperty.Count = 1;
-			// - Serialise that data (if static fields were going to be serialised then the value of the static field would be captured here)
+			// - Serialise that data (if fields were going to be serialised then the value of the field would be captured here)
 			var writer = new BinarySerialisationWriter();
 			Serialiser.Instance.Serialise(source, writer);
 			var serialisedData = writer.GetData();
-			// - Change the static property to a different value
+			// - Change the property to a different value
 			ClassWithStaticProperty.Count = 2;
-			// - Deserialise.. if this were to read a value for the static property from the serialised data and set it then the static property value would revert back to
+			// - Deserialise.. if this were to read a value for the property from the serialised data and set it then the property value would revert back to
 			//   the value that it had when it was serialised
 			var reader = new BinarySerialisationReader(serialisedData);
 			var clone = reader.Read<ClassWithStaticProperty>();
-			// - Confirm that the static property was NOT reverted back to the value that it had when the data was serialised
+			// - Confirm that the property was NOT reverted back to the value that it had when the data was serialised
 			Assert.Equal(2, ClassWithStaticProperty.Count);
 		}
 
 		[Fact]
-		public static void NonSerializedFieldNotSerialised()
+		public void NonSerializedFieldNotSerialised()
 		{
 			var source = new SomethingWithNonSerialisableIdField { Id = 123 };
-			var clone = BinarySerialisationCloner.Clone(source);
+			var clone = BinarySerialisationCloner.Clone(source, _supportCircularReferences);
 			Assert.Equal(0, clone.Id);
 		}
 
 		[Fact]
-		public static void NonSerializedPropertydNotSerialised()
+		public void NonSerializedPropertydNotSerialised()
 		{
 			var source = new SomethingWithNonSerialisableIdProperty { Id = 123 };
-			var clone = BinarySerialisationCloner.Clone(source);
+			var clone = BinarySerialisationCloner.Clone(source, _supportCircularReferences);
 			Assert.Equal(0, clone.Id);
 		}
 
-		private static T AssertCloneMatchesOriginalAndReturnClone<T>(T value)
+		private T AssertCloneMatchesOriginalAndReturnClone<T>(T value)
 		{
-			var clone = BinarySerialisationCloner.Clone(value);
+			var clone = BinarySerialisationCloner.Clone(value, _supportCircularReferences);
 			Assert.Equal(value, clone);
 			return clone;
 		}
 
-		private static void AssertCloneMatchesOriginal<T>(T value)
+		private void AssertCloneMatchesOriginal<T>(T value)
 		{
 			AssertCloneMatchesOriginalAndReturnClone(value);
 		}
@@ -458,11 +503,6 @@ namespace UnitTests
 			}
 			public int Id { get; }
 			public virtual string Name { get; protected set; }
-		}
-
-		private sealed class Node
-		{
-			public Node Child { get; set; }
 		}
 
 		private class ClassWithStaticProperty

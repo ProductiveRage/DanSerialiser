@@ -125,6 +125,12 @@ namespace DanSerialiser
 			_data.Add((byte)BinarySerialisationDataType.ObjectEnd);
 		}
 
+		public void ReferenceId(int value)
+		{
+			_data.Add((byte)BinarySerialisationDataType.ReferenceID);
+			IntWithoutDataType(value);
+		}
+
 		public bool FieldName(FieldInfo field, Type serialisationTargetType)
 		{
 			if (field == null)
