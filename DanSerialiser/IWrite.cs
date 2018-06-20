@@ -5,6 +5,8 @@ namespace DanSerialiser
 {
 	public interface IWrite
 	{
+		bool SupportReferenceReuse { get; }
+
 		void Boolean(bool value);
 		void Byte(byte value);
 		void SByte(sbyte value);

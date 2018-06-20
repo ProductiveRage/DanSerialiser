@@ -9,10 +9,13 @@ namespace DanSerialiser
 	public sealed class BinarySerialisationWriter : IWrite
 	{
 		private readonly List<byte> _data;
-		public BinarySerialisationWriter()
+		public BinarySerialisationWriter(bool supportReferenceReuse = false)
 		{
+			SupportReferenceReuse = supportReferenceReuse;
 			_data = new List<byte>();
 		}
+
+		public bool SupportReferenceReuse { get; }
 
 		public void Boolean(bool value)
 		{

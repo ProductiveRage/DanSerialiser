@@ -11,7 +11,7 @@ namespace DanSerialiser
 		public static Serialiser Instance { get; } = new Serialiser();
 		private Serialiser() { }
 
-		public void Serialise<T>(T value, IWrite writer, bool supportCircularReferences = false)
+		public void Serialise<T>(T value, IWrite writer)
 		{
 			if (writer == null)
 				throw new ArgumentNullException(nameof(writer));
@@ -24,14 +24,14 @@ namespace DanSerialiser
 				value,
 				value?.GetType() ?? typeof(T),
 				writer,
-				supportCircularReferences ? null : new object[0],
-				supportCircularReferences ? new Dictionary<object, int>(ReferenceEqualityComparer.Instance) : null
+				writer.SupportReferenceReuse ? null : new object[0],
+				writer.SupportReferenceReuse ? new Dictionary<object, int>(ReferenceEqualityComparer.Instance) : null
 			);
 		}
 
-		private void Serialise(object value, Type type, IWrite writer, IEnumerable<object> parentsIfCircularDisallowed, Dictionary<object, int> objectHistoryIfCircularAllowed)
+		private void Serialise(object value, Type type, IWrite writer, IEnumerable<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed)
 		{
-			if ((parentsIfCircularDisallowed != null) && parentsIfCircularDisallowed.Contains(value, ReferenceEqualityComparer.Instance))
+			if ((parentsIfReferenceReuseDisallowed != null) && parentsIfReferenceReuseDisallowed.Contains(value, ReferenceEqualityComparer.Instance))
 				throw new CircularReferenceException();
 
 			if (type == typeof(Boolean))
@@ -111,7 +111,7 @@ namespace DanSerialiser
 
 			if (type.IsEnum)
 			{
-				Serialise(value, type.GetEnumUnderlyingType(), writer, parentsIfCircularDisallowed, objectHistoryIfCircularAllowed);
+				Serialise(value, type.GetEnumUnderlyingType(), writer, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed);
 				return;
 			}
 
@@ -122,7 +122,7 @@ namespace DanSerialiser
 				if (value != null)
 				{
 					foreach (var element in (IEnumerable)value)
-						Serialise(element, elementType, writer, AppendIfNotNull(parentsIfCircularDisallowed, value), objectHistoryIfCircularAllowed);
+						Serialise(element, elementType, writer, AppendIfNotNull(parentsIfReferenceReuseDisallowed, value), objectHistoryIfReferenceReuseAllowed);
 				}
 				writer.ArrayEnd();
 				return;
@@ -133,20 +133,20 @@ namespace DanSerialiser
 			{
 				bool recordedAsOtherReference;
 				var currentTypeToEnumerateMembersFor = value.GetType();
-				if ((objectHistoryIfCircularAllowed != null) && !currentTypeToEnumerateMembersFor.IsValueType && (currentTypeToEnumerateMembersFor != typeof(string)))
+				if ((objectHistoryIfReferenceReuseAllowed != null) && !currentTypeToEnumerateMembersFor.IsValueType && (currentTypeToEnumerateMembersFor != typeof(string)))
 				{
-					if (objectHistoryIfCircularAllowed.TryGetValue(value, out int referenceID))
+					if (objectHistoryIfReferenceReuseAllowed.TryGetValue(value, out int referenceID))
 						recordedAsOtherReference = true;
 					else
 					{
-						if (objectHistoryIfCircularAllowed.Count == BinaryReaderWriterShared.MaxReferenceCount)
+						if (objectHistoryIfReferenceReuseAllowed.Count == BinaryReaderWriterShared.MaxReferenceCount)
 						{
 							// The references need to be tracked in the object history dictionary and there is a limit to how many items will fit (MaxReferenceCount will be int.MaxValue) -
 							// this probably won't ever be hit (more likely to run out of memory first) but it's better to have a descriptive exception in case it ever is encountered
 							throw new MaxObjectGraphSizeExceededException();
 						}
-						referenceID = objectHistoryIfCircularAllowed.Count;
-						objectHistoryIfCircularAllowed[value] = referenceID;
+						referenceID = objectHistoryIfReferenceReuseAllowed.Count;
+						objectHistoryIfReferenceReuseAllowed[value] = referenceID;
 						recordedAsOtherReference = false;
 					}
 					writer.ReferenceId(referenceID);
@@ -160,12 +160,12 @@ namespace DanSerialiser
 						foreach (var field in currentTypeToEnumerateMembersFor.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags))
 						{
 							if (writer.FieldName(field, type))
-								Serialise(field.GetValue(value), field.FieldType, writer, AppendIfNotNull(parentsIfCircularDisallowed, value), objectHistoryIfCircularAllowed);
+								Serialise(field.GetValue(value), field.FieldType, writer, AppendIfNotNull(parentsIfReferenceReuseDisallowed, value), objectHistoryIfReferenceReuseAllowed);
 						}
 						foreach (var property in currentTypeToEnumerateMembersFor.GetProperties(BinaryReaderWriterShared.MemberRetrievalBindingFlags))
 						{
 							if (writer.PropertyName(property, type))
-								Serialise(property.GetValue(value), property.PropertyType, writer, AppendIfNotNull(parentsIfCircularDisallowed, value), objectHistoryIfCircularAllowed);
+								Serialise(property.GetValue(value), property.PropertyType, writer, AppendIfNotNull(parentsIfReferenceReuseDisallowed, value), objectHistoryIfReferenceReuseAllowed);
 						}
 						currentTypeToEnumerateMembersFor = currentTypeToEnumerateMembersFor.BaseType;
 					}

@@ -5,9 +5,9 @@ using Xunit;
 
 namespace UnitTests
 {
-	public sealed class BinarySerialisationTests_NoCircularReferences : BinarySerialisationTests
+	public sealed class BinarySerialisationTests_DisallowReferenceReuse : BinarySerialisationTests
 	{
-		public BinarySerialisationTests_NoCircularReferences() : base(supportCircularReferences: false) { }
+		public BinarySerialisationTests_DisallowReferenceReuse() : base(supportReferenceReuse: false) { }
 
 		[Fact]
 		public void CircularReferenceThrows()
@@ -27,9 +27,9 @@ namespace UnitTests
 		}
 	}
 
-	public sealed class BinarySerialisationTests_CircularReferences : BinarySerialisationTests
+	public sealed class BinarySerialisationTests_AllowReferenceReuse : BinarySerialisationTests
 	{
-		public BinarySerialisationTests_CircularReferences() : base(supportCircularReferences: true) { }
+		public BinarySerialisationTests_AllowReferenceReuse() : base(supportReferenceReuse: true) { }
 
 		[Fact]
 		public void CircularReferenceSupported()
@@ -37,7 +37,7 @@ namespace UnitTests
 			var source = new Node();
 			source.Child = source;
 
-			var clone = BinarySerialisationCloner.Clone(source, supportCircularReferences: true);
+			var clone = BinarySerialisationCloner.Clone(source, supportReferenceReuse: true);
 			Assert.Equal(clone, clone.Child);
 		}
 
@@ -49,10 +49,10 @@ namespace UnitTests
 
 	public abstract class BinarySerialisationTests
 	{
-		private readonly bool _supportCircularReferences;
-		protected BinarySerialisationTests(bool supportCircularReferences)
+		private readonly bool _supportReferenceReuse;
+		protected BinarySerialisationTests(bool supportReferenceReuse)
 		{
-			_supportCircularReferences = supportCircularReferences;
+			_supportReferenceReuse = supportReferenceReuse;
 		}
 
 		[Fact]
@@ -255,7 +255,7 @@ namespace UnitTests
 		[Fact]
 		public void PrivateSealedClassWithNoMembers()
 		{
-			var clone = BinarySerialisationCloner.Clone(new ClassWithNoMembersAndNoInheritance(), _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone(new ClassWithNoMembersAndNoInheritance(), _supportReferenceReuse);
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithNoMembersAndNoInheritance>(clone);
 		}
@@ -263,14 +263,14 @@ namespace UnitTests
 		[Fact]
 		public void NullPrivateSealedClassWithNoMembers()
 		{
-			var clone = BinarySerialisationCloner.Clone((ClassWithNoMembersAndNoInheritance)null, _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone((ClassWithNoMembersAndNoInheritance)null, _supportReferenceReuse);
 			Assert.Null(clone);
 		}
 
 		[Fact]
 		public void PrivateSealedClassWithSinglePublicField()
 		{
-			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicFieldAndNoInheritance { Name = "abc" }, _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicFieldAndNoInheritance { Name = "abc" }, _supportReferenceReuse);
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithSinglePublicFieldAndNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
@@ -279,7 +279,7 @@ namespace UnitTests
 		[Fact]
 		public void PrivateSealedClassWithSinglePublicAutoProperty()
 		{
-			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicAutoPropertyAndNoInheritance { Name = "abc" }, _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicAutoPropertyAndNoInheritance { Name = "abc" }, _supportReferenceReuse);
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithSinglePublicAutoPropertyAndNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
@@ -288,7 +288,7 @@ namespace UnitTests
 		[Fact]
 		public void PrivateSealedClassWithSinglePublicReadonlyAutoProperty()
 		{
-			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance("abc"), _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone(new ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance("abc"), _supportReferenceReuse);
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithSinglePublicReadonlyAutoPropertyAndNoInheritance>(clone);
 			Assert.Equal("abc", clone.Name);
@@ -302,7 +302,7 @@ namespace UnitTests
 		{
 			var clone = BinarySerialisationCloner.Clone<IHaveName>(
 				new ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance { Name = "abc" },
-				_supportCircularReferences
+				_supportReferenceReuse
 			);
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithSinglePublicAutoPropertyToImplementAnInterfaceButNoInheritance>(clone);
@@ -317,7 +317,7 @@ namespace UnitTests
 		{
 			var clone = BinarySerialisationCloner.Clone<IHaveName>(
 				new ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance { Name = "abc" },
-				_supportCircularReferences
+				_supportReferenceReuse
 			);
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithSinglePublicAutoPropertyToExplicitlyImplementAnInterfaceButNoInheritance>(clone);
@@ -333,7 +333,7 @@ namespace UnitTests
 		{
 			var clone = BinarySerialisationCloner.Clone<NamedItem>(
 				new ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance { Name = "abc", OtherProperty = "xyz" },
-				_supportCircularReferences
+				_supportReferenceReuse
 			);
 			Assert.NotNull(clone);
 			Assert.IsType<ClassWithOwnPublicAutoPropertyAndPublicAutoPropertyInheritedFromAnAbstractClassButNoOtherInheritance>(clone);
@@ -345,7 +345,7 @@ namespace UnitTests
 		public void PropertyOnBaseClassThatIsOverriddenOnDerivedClass()
 		{
 			var source = new SupervisorDetails(123, "abc");
-			var clone = BinarySerialisationCloner.Clone(new SupervisorDetails(123, "abc"), _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone(new SupervisorDetails(123, "abc"), _supportReferenceReuse);
 			Assert.IsType<SupervisorDetails>(clone);
 			Assert.Equal(123, clone.Id);
 			Assert.Equal("abc", clone.Name);
@@ -355,7 +355,7 @@ namespace UnitTests
 		public void PropertyOnBaseClassThatIsOverriddenWithNewOnDerivedClass()
 		{
 			var source = new ManagerDetails(123, "abc");
-			var clone = BinarySerialisationCloner.Clone(new ManagerDetails(123, "abc"), _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone(new ManagerDetails(123, "abc"), _supportReferenceReuse);
 			Assert.IsType<ManagerDetails>(clone);
 			Assert.Equal(123, clone.Id);
 			Assert.Equal("abc", ((EmployeeDetails)clone).Name);
@@ -364,14 +364,14 @@ namespace UnitTests
 		[Fact]
 		public void PrivateStructWithNoMembers()
 		{
-			var clone = BinarySerialisationCloner.Clone(new StructWithNoMembers(), _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone(new StructWithNoMembers(), _supportReferenceReuse);
 			Assert.IsType<StructWithNoMembers>(clone);
 		}
 
 		[Fact]
 		public void PrivateStructWithSinglePublicField()
 		{
-			var clone = BinarySerialisationCloner.Clone(new StructWithSinglePublicField { Name = "abc" }, _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone(new StructWithSinglePublicField { Name = "abc" }, _supportReferenceReuse);
 			Assert.IsType<StructWithSinglePublicField>(clone);
 			Assert.Equal("abc", clone.Name);
 		}
@@ -379,7 +379,7 @@ namespace UnitTests
 		[Fact]
 		public void PrivateStructWithSinglePublicAutoProperty()
 		{
-			var clone = BinarySerialisationCloner.Clone(new StructWithSinglePublicAutoProperty { Name = "abc" }, _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone(new StructWithSinglePublicAutoProperty { Name = "abc" }, _supportReferenceReuse);
 			Assert.IsType<StructWithSinglePublicAutoProperty>(clone);
 			Assert.Equal("abc", clone.Name);
 		}
@@ -409,7 +409,7 @@ namespace UnitTests
 		public void NonSerializedFieldNotSerialised()
 		{
 			var source = new SomethingWithNonSerialisableIdField { Id = 123 };
-			var clone = BinarySerialisationCloner.Clone(source, _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone(source, _supportReferenceReuse);
 			Assert.Equal(0, clone.Id);
 		}
 
@@ -417,13 +417,13 @@ namespace UnitTests
 		public void NonSerializedPropertydNotSerialised()
 		{
 			var source = new SomethingWithNonSerialisableIdProperty { Id = 123 };
-			var clone = BinarySerialisationCloner.Clone(source, _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone(source, _supportReferenceReuse);
 			Assert.Equal(0, clone.Id);
 		}
 
 		private T AssertCloneMatchesOriginalAndReturnClone<T>(T value)
 		{
-			var clone = BinarySerialisationCloner.Clone(value, _supportCircularReferences);
+			var clone = BinarySerialisationCloner.Clone(value, _supportReferenceReuse);
 			Assert.Equal(value, clone);
 			return clone;
 		}
