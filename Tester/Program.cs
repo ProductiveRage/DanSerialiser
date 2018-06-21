@@ -20,8 +20,12 @@ namespace Tester
 				serialisedData = stream.ToArray();
 			}
 
-			var reader = new BinarySerialisationReader(serialisedData);
-			var clone = reader.Read<int>();
+			using (var stream = new MemoryStream(serialisedData))
+			{
+				var reader = new BinarySerialisationReader(stream);
+				var clone = reader.Read<int>();
+				Console.WriteLine("Cloned value: " + clone);
+			}
 
 			Console.ReadLine();
 		}

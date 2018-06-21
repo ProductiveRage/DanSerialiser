@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -9,12 +10,10 @@ namespace DanSerialiser
 {
 	public sealed class BinarySerialisationReader
 	{
-		private byte[] _data;
-		private int _index;
-		public BinarySerialisationReader(byte[] data)
+		private readonly Stream _stream;
+		public BinarySerialisationReader(Stream stream)
 		{
-			_data = data ?? throw new ArgumentNullException(nameof(data));
-			_index = 0;
+			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
 		}
 
 		public T Read<T>()
@@ -30,9 +29,6 @@ namespace DanSerialiser
 
 		private object Read(Dictionary<int, object> objectHistory, bool ignoreAnyInvalidTypes)
 		{
-			if (_index >= _data.Length)
-				throw new InvalidOperationException("No data to read");
-
 			switch (ReadNextDataType())
 			{
 				default:
@@ -107,7 +103,8 @@ namespace DanSerialiser
 
 			// If the next value is a Reference ID 
 			int? referenceID;
-			if (IsNextDataType(BinarySerialisationDataType.ReferenceID))
+			var nextEntryType = ReadNextDataType();
+			if (nextEntryType == BinarySerialisationDataType.ReferenceID)
 			{
 				referenceID = ReadNextInt();
 				if (objectHistory.TryGetValue(referenceID.Value, out var existingReference))
@@ -116,6 +113,7 @@ namespace DanSerialiser
 						throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered after reused reference");
 					return existingReference;
 				}
+				nextEntryType = ReadNextDataType();
 			}
 			else
 				referenceID = null;
@@ -129,7 +127,6 @@ namespace DanSerialiser
 			var fieldsSet = new HashSet<Tuple<Type, string>>();
 			while (true)
 			{
-				var nextEntryType = ReadNextDataType();
 				if (nextEntryType == BinarySerialisationDataType.ObjectEnd)
 				{
 					if (typeIfAvailable != null)
@@ -255,6 +252,7 @@ namespace DanSerialiser
 				}
 				else
 					throw new InvalidOperationException("Unexpected data type encountered while enumerating object properties: " + nextEntryType);
+				nextEntryType = ReadNextDataType();
 			}
 		}
 
@@ -283,36 +281,19 @@ namespace DanSerialiser
 			return (BinarySerialisationDataType)ReadNext();
 		}
 
-		/// <summary>
-		/// If the next content is the specified data type then the feed will be progressed one byte over the header and true will be returned, otherwise the feed
-		/// will NOT be progressed and false will be returned
-		/// </summary>
-		private bool IsNextDataType(BinarySerialisationDataType dataType)
-		{
-			if (_index >= _data.Length)
-				throw new InvalidOperationException("Insufficient data to read (presume invalid content)");
-
-			if ((BinarySerialisationDataType)_data[_index] == dataType)
-			{
-				_index++;
-				return true;
-			}
-			return false;
-		}
-
 		private byte ReadNext()
 		{
-			return ReadNext(1)[0];
+			var value = _stream.ReadByte(); // Returns -1 if no data or the byte cast to an int if there IS data
+			if (value == -1)
+				throw new InvalidOperationException("Insufficient data to read (presume invalid content)");
+			return (byte)value;
 		}
 
 		private byte[] ReadNext(int numberOfBytes)
 		{
-			if (_index + numberOfBytes > _data.Length)
-				throw new InvalidOperationException("Insufficient data to read (presume invalid content)");
-
 			var values = new byte[numberOfBytes];
-			Array.Copy(_data, _index, values, 0, numberOfBytes);
-			_index += numberOfBytes;
+			if (_stream.Read(values, 0, numberOfBytes) < numberOfBytes) // Returns number of bytes read (less than numberOfBytes if insufficient data)
+				throw new InvalidOperationException("Insufficient data to read (presume invalid content)");
 			return values;
 		}
 	}

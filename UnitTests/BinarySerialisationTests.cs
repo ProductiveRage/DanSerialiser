@@ -396,8 +396,7 @@ namespace UnitTests
 			ClassWithStaticProperty.Count = 2;
 			// - Deserialise.. if this were to read a value for the property from the serialised data and set it then the property value would revert back to
 			//   the value that it had when it was serialised
-			var reader = new BinarySerialisationReader(serialisedData);
-			var clone = reader.Read<ClassWithStaticProperty>();
+			var clone = BinarySerialisationCloner.Deserialise<ClassWithStaticProperty>(serialisedData);
 			// - Confirm that the property was NOT reverted back to the value that it had when the data was serialised
 			Assert.Equal(2, ClassWithStaticProperty.Count);
 		}

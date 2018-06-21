@@ -21,8 +21,11 @@ namespace UnitTests
 			if (serialisedData == null)
 				throw new ArgumentNullException(nameof(serialisedData));
 
-			var reader = new BinarySerialisationReader(serialisedData);
-			return reader.Read<T>();
+			using (var stream = new MemoryStream(serialisedData))
+			{
+				var reader = new BinarySerialisationReader(stream);
+				return reader.Read<T>();
+			}
 		}
 
 		public static T Clone<T>(T value, bool supportReferenceReuse)
