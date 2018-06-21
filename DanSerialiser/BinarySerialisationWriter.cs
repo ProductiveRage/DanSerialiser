@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -8,89 +8,89 @@ namespace DanSerialiser
 {
 	public sealed class BinarySerialisationWriter : IWrite
 	{
-		private readonly List<byte> _data;
-		public BinarySerialisationWriter(bool supportReferenceReuse = false)
+		private readonly Stream _stream;
+		public BinarySerialisationWriter(Stream stream, bool supportReferenceReuse = false)
 		{
+			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
 			SupportReferenceReuse = supportReferenceReuse;
-			_data = new List<byte>();
 		}
 
 		public bool SupportReferenceReuse { get; }
 
 		public void Boolean(bool value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.Boolean);
-			_data.Add(value ? (byte)1 : (byte)0);
+			WriteByte((byte)BinarySerialisationDataType.Boolean);
+			WriteByte(value ? (byte)1 : (byte)0);
 		}
 		public void Byte(byte value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.Byte);
-			_data.Add(value);
+			WriteByte((byte)BinarySerialisationDataType.Byte);
+			WriteByte(value);
 		}
 		public void SByte(sbyte value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.SByte);
-			_data.Add((byte)value);
+			WriteByte((byte)BinarySerialisationDataType.SByte);
+			WriteByte((byte)value);
 		}
 
 		public void Int16(short value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.Int16);
-			_data.AddRange(BitConverter.GetBytes(value));
+			WriteByte((byte)BinarySerialisationDataType.Int16);
+			WriteBytes(BitConverter.GetBytes(value));
 		}
 		public void Int32(int value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.Int32);
+			WriteByte((byte)BinarySerialisationDataType.Int32);
 			IntWithoutDataType(value);
 		}
 		public void Int64(long value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.Int64);
-			_data.AddRange(BitConverter.GetBytes(value));
+			WriteByte((byte)BinarySerialisationDataType.Int64);
+			WriteBytes(BitConverter.GetBytes(value));
 		}
 
 		public void Single(float value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.Single);
-			_data.AddRange(BitConverter.GetBytes(value));
+			WriteByte((byte)BinarySerialisationDataType.Single);
+			WriteBytes(BitConverter.GetBytes(value));
 		}
 		public void Double(double value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.Double);
-			_data.AddRange(BitConverter.GetBytes(value));
+			WriteByte((byte)BinarySerialisationDataType.Double);
+			WriteBytes(BitConverter.GetBytes(value));
 		}
 		public void Decimal(decimal value)
 		{
 			// BitConverter's "GetBytes" method doesn't support decimal so use "decimal.GetBits" that returns four int values
-			_data.Add((byte)BinarySerialisationDataType.Decimal);
+			WriteByte((byte)BinarySerialisationDataType.Decimal);
 			foreach (var partialValue in decimal.GetBits(value))
 				IntWithoutDataType(partialValue);
 		}
 
 		public void UInt16(ushort value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.UInt16);
-			_data.AddRange(BitConverter.GetBytes(value));
+			WriteByte((byte)BinarySerialisationDataType.UInt16);
+			WriteBytes(BitConverter.GetBytes(value));
 		}
 		public void UInt32(uint value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.UInt32);
-			_data.AddRange(BitConverter.GetBytes(value));
+			WriteByte((byte)BinarySerialisationDataType.UInt32);
+			WriteBytes(BitConverter.GetBytes(value));
 		}
 		public void UInt64(ulong value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.UInt64);
-			_data.AddRange(BitConverter.GetBytes(value));
+			WriteByte((byte)BinarySerialisationDataType.UInt64);
+			WriteBytes(BitConverter.GetBytes(value));
 		}
 
 		public void Char(char value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.Char);
-			_data.AddRange(BitConverter.GetBytes(value));
+			WriteByte((byte)BinarySerialisationDataType.Char);
+			WriteBytes(BitConverter.GetBytes(value));
 		}
 		public void String(string value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.String);
+			WriteByte((byte)BinarySerialisationDataType.String);
 			StringWithoutDataType(value);
 		}
 
@@ -101,7 +101,7 @@ namespace DanSerialiser
 			if ((value != null) && !(value is Array))
 				throw new ArgumentException($"If {nameof(value)} is not null then it must be an array");
 
-			_data.Add((byte)BinarySerialisationDataType.ArrayStart);
+			WriteByte((byte)BinarySerialisationDataType.ArrayStart);
 			if (value == null)
 			{
 				// If the value is null then don't store the element type since we don't need it (and the BinaryReader will understand that this represents a null value)
@@ -114,23 +114,23 @@ namespace DanSerialiser
 
 		public void ArrayEnd()
 		{
-			_data.Add((byte)BinarySerialisationDataType.ArrayEnd);
+			WriteByte((byte)BinarySerialisationDataType.ArrayEnd);
 		}
 
 		public void ObjectStart<T>(T value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.ObjectStart);
+			WriteByte((byte)BinarySerialisationDataType.ObjectStart);
 			StringWithoutDataType(value?.GetType()?.AssemblyQualifiedName);
 		}
 
 		public void ObjectEnd()
 		{
-			_data.Add((byte)BinarySerialisationDataType.ObjectEnd);
+			WriteByte((byte)BinarySerialisationDataType.ObjectEnd);
 		}
 
 		public void ReferenceId(int value)
 		{
-			_data.Add((byte)BinarySerialisationDataType.ReferenceID);
+			WriteByte((byte)BinarySerialisationDataType.ReferenceID);
 			IntWithoutDataType(value);
 		}
 
@@ -165,7 +165,7 @@ namespace DanSerialiser
 				}
 				currentType = currentType.BaseType;
 			}
-			_data.Add((byte)BinarySerialisationDataType.FieldName);
+			WriteByte((byte)BinarySerialisationDataType.FieldName);
 			if (fieldNameExistsMultipleTimesInHierarchy)
 				StringWithoutDataType(BinaryReaderWriterShared.FieldTypeNamePrefix + field.DeclaringType.AssemblyQualifiedName);
 			StringWithoutDataType(field.Name);
@@ -191,32 +191,37 @@ namespace DanSerialiser
 			// - Note: We won't try to determine whether or not the type name prefix is necessary when recording the field name because the type hierarchy and the properties on
 			//   them might be different now than in the version of the types where deserialisation occurs so the type name will always be inserted before the field name to err
 			//   on the safe side
-			_data.Add((byte)BinarySerialisationDataType.FieldName);
+			WriteByte((byte)BinarySerialisationDataType.FieldName);
 			StringWithoutDataType(BinaryReaderWriterShared.FieldTypeNamePrefix + property.DeclaringType.AssemblyQualifiedName);
 			StringWithoutDataType(BackingFieldHelpers.GetBackingFieldName(property.Name));
 			return true;
 		}
 
-		public byte[] GetData()
-		{
-			return _data.ToArray();
-		}
-
 		private void IntWithoutDataType(int value)
 		{
-			_data.AddRange(BitConverter.GetBytes(value));
+			WriteBytes(BitConverter.GetBytes(value));
 		}
 
 		private void StringWithoutDataType(string value)
 		{
 			if (value == null)
 			{
-				_data.AddRange(BitConverter.GetBytes(-1));
+				WriteBytes(BitConverter.GetBytes(-1));
 				return;
 			}
 			var bytes = Encoding.UTF8.GetBytes(value);
-			_data.AddRange(BitConverter.GetBytes(bytes.Length));
-			_data.AddRange(bytes);
+			WriteBytes(BitConverter.GetBytes(bytes.Length));
+			WriteBytes(bytes);
+		}
+
+		private void WriteByte(byte value)
+		{
+			_stream.WriteByte(value);
+		}
+
+		private void WriteBytes(byte[] value)
+		{
+			_stream.Write(value, 0, value.Length);
 		}
 	}
 }

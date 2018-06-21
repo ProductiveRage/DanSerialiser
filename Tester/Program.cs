@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using DanSerialiser;
 
 namespace Tester
@@ -11,10 +12,15 @@ namespace Tester
 
 			var serialiser = Serialiser.Instance;
 
-			var writer = new BinarySerialisationWriter();
-			serialiser.Serialise(value, writer);
+			byte[] serialisedData;
+			using (var stream = new MemoryStream())
+			{
+				var writer = new BinarySerialisationWriter(stream);
+				serialiser.Serialise(value, writer);
+				serialisedData = stream.ToArray();
+			}
 
-			var reader = new BinarySerialisationReader(writer.GetData());
+			var reader = new BinarySerialisationReader(serialisedData);
 			var clone = reader.Read<int>();
 
 			Console.ReadLine();

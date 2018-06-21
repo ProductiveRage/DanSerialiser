@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using DanSerialiser;
 
 namespace UnitTests
@@ -7,9 +8,12 @@ namespace UnitTests
 	{
 		public static byte[] Serialise(object value, bool supportReferenceReuse)
 		{
-			var writer = new BinarySerialisationWriter(supportReferenceReuse);
-			Serialiser.Instance.Serialise(value, writer);
-			return writer.GetData();
+			using (var stream = new MemoryStream())
+			{
+				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse);
+				Serialiser.Instance.Serialise(value, writer);
+				return stream.ToArray();
+			}
 		}
 
 		public static T Deserialise<T>(byte[] serialisedData)
