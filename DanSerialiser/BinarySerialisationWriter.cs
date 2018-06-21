@@ -9,7 +9,7 @@ namespace DanSerialiser
 	public sealed class BinarySerialisationWriter : IWrite
 	{
 		private readonly Stream _stream;
-		public BinarySerialisationWriter(Stream stream, bool supportReferenceReuse = false)
+		public BinarySerialisationWriter(Stream stream, bool supportReferenceReuse)
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
 			SupportReferenceReuse = supportReferenceReuse;

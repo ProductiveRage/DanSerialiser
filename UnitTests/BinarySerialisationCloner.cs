@@ -1,36 +1,12 @@
-﻿using System;
-using System.IO;
-using DanSerialiser;
+﻿using DanSerialiser;
 
 namespace UnitTests
 {
 	public static class BinarySerialisationCloner
 	{
-		public static byte[] Serialise(object value, bool supportReferenceReuse)
-		{
-			using (var stream = new MemoryStream())
-			{
-				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse);
-				Serialiser.Instance.Serialise(value, writer);
-				return stream.ToArray();
-			}
-		}
-
-		public static T Deserialise<T>(byte[] serialisedData)
-		{
-			if (serialisedData == null)
-				throw new ArgumentNullException(nameof(serialisedData));
-
-			using (var stream = new MemoryStream(serialisedData))
-			{
-				var reader = new BinarySerialisationReader(stream);
-				return reader.Read<T>();
-			}
-		}
-
 		public static T Clone<T>(T value, bool supportReferenceReuse)
 		{
-			return Deserialise<T>(Serialise(value, supportReferenceReuse));
+			return BinarySerialisation.Deserialise<T>(BinarySerialisation.Serialise(value, supportReferenceReuse));
 		}
 	}
 }

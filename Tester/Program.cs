@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using DanSerialiser;
 
 namespace Tester
@@ -8,25 +7,13 @@ namespace Tester
 	{
 		static void Main()
 		{
+			UnitTests.BinarySerialisationVersioningTests.AllowDeserialisationIfFieldCanNotBeSetIfFieldIsForAutoPropertyThatIsMarkedAsOptionalForDeserialisation();
+
 			var value = 32;
-
 			var serialiser = Serialiser.Instance;
-
-			byte[] serialisedData;
-			using (var stream = new MemoryStream())
-			{
-				var writer = new BinarySerialisationWriter(stream);
-				serialiser.Serialise(value, writer);
-				serialisedData = stream.ToArray();
-			}
-
-			using (var stream = new MemoryStream(serialisedData))
-			{
-				var reader = new BinarySerialisationReader(stream);
-				var clone = reader.Read<int>();
-				Console.WriteLine("Cloned value: " + clone);
-			}
-
+			var serialisedData = BinarySerialisation.Serialise(value);
+			var clone = BinarySerialisation.Deserialise<int>(serialisedData);
+			Console.WriteLine("Cloned value: " + clone);
 			Console.ReadLine();
 		}
 	}
