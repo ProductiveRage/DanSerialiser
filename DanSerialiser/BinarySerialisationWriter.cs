@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -9,10 +10,12 @@ namespace DanSerialiser
 	public sealed class BinarySerialisationWriter : IWrite
 	{
 		private readonly Stream _stream;
+		private readonly Dictionary<Tuple<FieldInfo, Type>, byte[]> _fieldNameCache;
 		public BinarySerialisationWriter(Stream stream, bool supportReferenceReuse)
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
 			SupportReferenceReuse = supportReferenceReuse;
+			_fieldNameCache = new Dictionary<Tuple<FieldInfo, Type>, byte[]>();
 		}
 
 		public bool SupportReferenceReuse { get; }
@@ -141,8 +144,25 @@ namespace DanSerialiser
 			if (serialisationTargetType == null)
 				throw new ArgumentNullException(nameof(serialisationTargetType));
 
-			if (BinaryReaderWriterShared.IgnoreField(field))
+			var fieldNameBytesIfShouldWrite = GetFieldNameBytesIfShouldWriteIt(field, serialisationTargetType);
+			if (fieldNameBytesIfShouldWrite == null)
 				return false;
+
+			WriteBytes(fieldNameBytesIfShouldWrite);
+			return true;
+		}
+
+		private byte[] GetFieldNameBytesIfShouldWriteIt(FieldInfo field, Type serialisationTargetType)
+		{
+			var cacheKey = Tuple.Create(field, serialisationTargetType);
+			if (_fieldNameCache.TryGetValue(cacheKey, out var cachedResult))
+				return cachedResult;
+
+			if (BinaryReaderWriterShared.IgnoreField(field))
+			{
+				_fieldNameCache[cacheKey] = null;
+				return null;
+			}
 
 			// Serialisation of pointer fields will fail - I don't know how they would be supportable anyway but they fail with a stack overflow if attempted, so catch it
 			// first and raise as a more useful exception
@@ -165,11 +185,16 @@ namespace DanSerialiser
 				}
 				currentType = currentType.BaseType;
 			}
-			WriteByte((byte)BinarySerialisationDataType.FieldName);
+			var bytes = new List<byte>
+			{
+				(byte)BinarySerialisationDataType.FieldName
+			};
 			if (fieldNameExistsMultipleTimesInHierarchy)
-				StringWithoutDataType(BinaryReaderWriterShared.FieldTypeNamePrefix + field.DeclaringType.AssemblyQualifiedName);
-			StringWithoutDataType(field.Name);
-			return true;
+				bytes.AddRange(GetStringBytes(BinaryReaderWriterShared.FieldTypeNamePrefix + field.DeclaringType.AssemblyQualifiedName));
+			bytes.AddRange(GetStringBytes(field.Name));
+			var result = bytes.ToArray();
+			_fieldNameCache[cacheKey] = result;
+			return result;
 		}
 
 		public bool PropertyName(PropertyInfo property, Type serialisationTargetType)
@@ -204,14 +229,18 @@ namespace DanSerialiser
 
 		private void StringWithoutDataType(string value)
 		{
+			WriteBytes(GetStringBytes(value));
+		}
+
+		private byte[] GetStringBytes(string value)
+		{
 			if (value == null)
-			{
-				WriteBytes(BitConverter.GetBytes(-1));
-				return;
-			}
+				return BitConverter.GetBytes(-1);
 			var bytes = Encoding.UTF8.GetBytes(value);
-			WriteBytes(BitConverter.GetBytes(bytes.Length));
-			WriteBytes(bytes);
+			var combinedContent = new byte[bytes.Length + 4];
+			Array.Copy(BitConverter.GetBytes(bytes.Length), combinedContent, length:  4);
+			Array.Copy(bytes, sourceIndex: 0, destinationArray: combinedContent, destinationIndex: 4, length: bytes.Length);
+			return combinedContent;
 		}
 
 		private void WriteByte(byte value)
