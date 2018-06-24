@@ -22,6 +22,7 @@
 		String,
 
 		ObjectStart,
+		NameReferenceID,
 		ReferenceID,
 		FieldName,
 		ObjectEnd,

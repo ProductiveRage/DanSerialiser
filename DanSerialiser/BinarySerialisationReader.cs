@@ -11,9 +11,13 @@ namespace DanSerialiser
 	public sealed class BinarySerialisationReader
 	{
 		private readonly Stream _stream;
+		private readonly Dictionary<int, string> _nameReferences;
+		private readonly Dictionary<int, object> _objectReferences;
 		public BinarySerialisationReader(Stream stream)
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
+			_nameReferences = new Dictionary<int, string>();
+			_objectReferences = new Dictionary<int, object>();
 		}
 
 		public T Read<T>()
@@ -24,10 +28,10 @@ namespace DanSerialiser
 			// Note: As this is the top level "Read" call, if it is an object being deserialised and the type of that object is not available then the deserialisation attempt
 			// should fail, which is why ignoreAnyInvalidTypes is passed as false (that option only applies in cases where a nested object is being deserialised but the field
 			// that it would be used to set does not exist on the parent object - if there is no field to set, who cares if the value is of a type that is not available)
-			return (T)Read(new Dictionary<int, object>(), ignoreAnyInvalidTypes: false);
+			return (T)Read(ignoreAnyInvalidTypes: false);
 		}
 
-		private object Read(Dictionary<int, object> objectHistory, bool ignoreAnyInvalidTypes)
+		private object Read(bool ignoreAnyInvalidTypes)
 		{
 			switch (ReadNextDataType())
 			{
@@ -73,10 +77,10 @@ namespace DanSerialiser
 					return ReadNextString();
 
 				case BinarySerialisationDataType.ArrayStart:
-					return ReadNextArray(objectHistory, ignoreAnyInvalidTypes);
+					return ReadNextArray(ignoreAnyInvalidTypes);
 
 				case BinarySerialisationDataType.ObjectStart:
-					return ReadNextObject(objectHistory, ignoreAnyInvalidTypes);
+					return ReadNextObject(ignoreAnyInvalidTypes);
 			}
 		}
 
@@ -91,12 +95,9 @@ namespace DanSerialiser
 			return (length == -1) ? null : Encoding.UTF8.GetString(ReadNext(length));
 		}
 
-		private object ReadNextObject(Dictionary<int, object> objectHistory, bool ignoreAnyInvalidTypes)
+		private object ReadNextObject(bool ignoreAnyInvalidTypes)
 		{
-			var nextEntryType = ReadNextDataType();
-			if (nextEntryType != BinarySerialisationDataType.String)
-				throw new ArgumentException("Expected string for object type name");
-			var typeName = ReadNextString();
+			var typeName = ReadNextTypeName();
 			if (typeName == null)
 			{
 				if (ReadNextDataType() != BinarySerialisationDataType.ObjectEnd)
@@ -106,11 +107,11 @@ namespace DanSerialiser
 
 			// If the next value is a Reference ID 
 			int? referenceID;
-			nextEntryType = ReadNextDataType();
+			var nextEntryType = ReadNextDataType();
 			if (nextEntryType == BinarySerialisationDataType.ReferenceID)
 			{
 				referenceID = ReadNextInt();
-				if (objectHistory.TryGetValue(referenceID.Value, out var existingReference))
+				if (_objectReferences.TryGetValue(referenceID.Value, out var existingReference))
 				{
 					if (ReadNextDataType() != BinarySerialisationDataType.ObjectEnd)
 						throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered after reused reference");
@@ -126,7 +127,7 @@ namespace DanSerialiser
 			var typeIfAvailable = Type.GetType(typeName, throwOnError: !ignoreAnyInvalidTypes);
 			var valueIfTypeIsAvailable = (typeIfAvailable == null) ? null : FormatterServices.GetUninitializedObject(typeIfAvailable);
 			if ((valueIfTypeIsAvailable != null) && (referenceID != null))
-				objectHistory[referenceID.Value] = valueIfTypeIsAvailable;
+				_objectReferences[referenceID.Value] = valueIfTypeIsAvailable;
 			var fieldsSet = new HashSet<Tuple<Type, string>>();
 			while (true)
 			{
@@ -186,7 +187,7 @@ namespace DanSerialiser
 
 					// Note: If the field doesn't exist then parse the data but don't worry about any types not being available because we're not going to set anything to the value
 					// that we get back from the "Read" call (but we still need to parse that data to advance the reader to the next field or the end of the current object)
-					var fieldValue = Read(objectHistory, ignoreAnyInvalidTypes: (field == null));
+					var fieldValue = Read(ignoreAnyInvalidTypes: (field == null));
 
 					// Now that we have the value to set the field to IF IT EXISTS, try to set the field.. if it's a field that we've already identified on the type then it's easy.
 					// However, it may also have been a field on an older version of the type when it was serialised and now that it's deserialised, we'll need to check for any
@@ -259,12 +260,9 @@ namespace DanSerialiser
 			}
 		}
 
-		private object ReadNextArray(Dictionary<int, object> objectHistory, bool ignoreAnyInvalidTypes)
+		private object ReadNextArray(bool ignoreAnyInvalidTypes)
 		{
-			var nextEntryType = ReadNextDataType();
-			if (nextEntryType != BinarySerialisationDataType.String)
-				throw new ArgumentException("Expected string for array element type name");
-			var elementTypeName = ReadNextString();
+			var elementTypeName = ReadNextTypeName();
 			if (elementTypeName == null)
 			{
 				// If the element type was recorded as null then it means that the array itself was null (and so the next character should be an ArrayEnd)
@@ -275,11 +273,34 @@ namespace DanSerialiser
 			var elementType = Type.GetType(elementTypeName, throwOnError: true);
 			var items = Array.CreateInstance(elementType, length: ReadNextInt());
 			for (var i = 0; i < items.Length; i++)
-				items.SetValue(Read(objectHistory, ignoreAnyInvalidTypes), i);
-			nextEntryType = ReadNextDataType();
+				items.SetValue(Read(ignoreAnyInvalidTypes), i);
+			var nextEntryType = ReadNextDataType();
 			if (nextEntryType != BinarySerialisationDataType.ArrayEnd)
 				throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ArrayEnd)} was not encountered");
 			return items;
+		}
+
+		private string ReadNextTypeName()
+		{
+			// If a null type name is written out then there will be no Name Reference ID but every non-null type name will either be represented by a string and then the
+			// Name Reference ID that that string should be recorded as or it just be a Name Reference ID for a reference that has already been encountered
+			var nextEntryType = ReadNextDataType();
+			if (nextEntryType == BinarySerialisationDataType.String)
+			{
+				var typeName = ReadNextString();
+				if (typeName != null)
+					_nameReferences[ReadNextInt()] = typeName;
+				return typeName;
+			}
+			else if (nextEntryType == BinarySerialisationDataType.NameReferenceID)
+			{
+				var nameReferenceID = ReadNextInt();
+				if (!_nameReferences.TryGetValue(nameReferenceID, out var typeName))
+					throw new ArgumentException("Invalid NameReferenceID: " + nameReferenceID);
+				return typeName;
+			}
+			else
+				throw new ArgumentException("Expected String or NameReferenceID for object type name");
 		}
 
 		private BinarySerialisationDataType ReadNextDataType()

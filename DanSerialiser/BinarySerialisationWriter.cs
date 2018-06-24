@@ -175,6 +175,8 @@ namespace DanSerialiser
 
 		private void WriteTypeName(Type typeIfValueIsNotNull)
 		{
+			// When recording a type name, either write a null string for it OR write a string and then the Name Reference ID that that string should be stored as OR write just
+			// the Name Reference ID (if the type name has already been recorded once and may be reused)
 			if (typeIfValueIsNotNull == null)
 			{
 				WriteByte((byte)BinarySerialisationDataType.String);
@@ -188,9 +190,18 @@ namespace DanSerialiser
 				return;
 			}
 
-			var bytes = new[] { (byte)BinarySerialisationDataType.String }.Concat(GetStringBytes(typeIfValueIsNotNull.AssemblyQualifiedName)).ToArray();
-			_typeNameCache[typeIfValueIsNotNull] = bytes;
-			WriteBytes(bytes);
+			// This is first time that the type has been encountered and so we need to write the full string and the Name Reference ID but the bytes in the cache will just be a
+			// point to a NameReferenceID (so next time the type is encountered, ONLY that ID will be written)
+			var nextReferenceID = GetNextReferenceID();
+			WriteByte((byte) BinarySerialisationDataType.String);
+			WriteBytes(GetStringBytes(typeIfValueIsNotNull.AssemblyQualifiedName));
+			IntWithoutDataType(nextReferenceID);
+			_typeNameCache[typeIfValueIsNotNull] = new[] { (byte)BinarySerialisationDataType.NameReferenceID }.Concat(BitConverter.GetBytes(nextReferenceID)).ToArray();
+		}
+
+		private int GetNextReferenceID()
+		{
+			return _typeNameCache.Count;
 		}
 
 		private byte[] GetFieldNameBytesIfShouldWriteIt(FieldInfo field, Type serialisationTargetType)
