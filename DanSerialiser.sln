@@ -15,6 +15,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DanSerialiserAnalyser.UnitT
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Analyser", "Analyser", "{5AFDE923-FD9A-453B-A547-855F9C7B61DC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Benchmarking", "Benchmarking\Benchmarking.csproj", "{CACD4872-DE0B-4EFE-B78A-4B6EF0CE1AEA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,10 @@ Global
 		{E712C8DE-DAB5-4616-9302-4D0799E779BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E712C8DE-DAB5-4616-9302-4D0799E779BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E712C8DE-DAB5-4616-9302-4D0799E779BF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CACD4872-DE0B-4EFE-B78A-4B6EF0CE1AEA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CACD4872-DE0B-4EFE-B78A-4B6EF0CE1AEA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CACD4872-DE0B-4EFE-B78A-4B6EF0CE1AEA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CACD4872-DE0B-4EFE-B78A-4B6EF0CE1AEA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

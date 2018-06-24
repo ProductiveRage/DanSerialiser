@@ -35,3 +35,4 @@ _ReSharper*/
 [Pp]ackages/
 .vs/
 BuildNuGetPackage/
+BenchmarkDotNet.Artifacts/
