@@ -109,14 +109,13 @@ namespace DanSerialiser
 				throw new ArgumentException($"If {nameof(value)} is not null then it must be an array");
 
 			WriteByte((byte)BinarySerialisationDataType.ArrayStart);
-			if (value == null)
+			WriteTypeName((value == null) ? null : elementType);
+			if (value != null)
 			{
-				// If the value is null then don't store the element type since we don't need it (and the BinaryReader will understand that this represents a null value)
-				StringWithoutDataType(null);
-				return;
+				// If the value is null then WriteTypeName will have written a representation of a null string and the BinaryReader will understand that this represents a
+				// null value (and so we don't need to write any length data here)
+				IntWithoutDataType(((Array)(object)value).Length);
 			}
-			WriteBytes(GetTypeNameBytes(elementType));
-			IntWithoutDataType(((Array)(object)value).Length);
 		}
 
 		public void ArrayEnd()
@@ -127,10 +126,7 @@ namespace DanSerialiser
 		public void ObjectStart<T>(T value)
 		{
 			WriteByte((byte)BinarySerialisationDataType.ObjectStart);
-			if (value == null)
-				StringWithoutDataType(null);
-			else
-				WriteBytes(GetTypeNameBytes(value?.GetType()));
+			WriteTypeName(value?.GetType());
 		}
 
 		public void ObjectEnd()
@@ -177,14 +173,24 @@ namespace DanSerialiser
 			return true;
 		}
 
-		private byte[] GetTypeNameBytes(Type type)
+		private void WriteTypeName(Type typeIfValueIsNotNull)
 		{
-			if (_typeNameCache.TryGetValue(type, out var cachedResult))
-				return cachedResult;
+			if (typeIfValueIsNotNull == null)
+			{
+				WriteByte((byte)BinarySerialisationDataType.String);
+				StringWithoutDataType(null);
+				return;
+			}
 
-			var bytes = GetStringBytes(type.AssemblyQualifiedName);
-			_typeNameCache[type] = bytes;
-			return bytes;
+			if (_typeNameCache.TryGetValue(typeIfValueIsNotNull, out var cachedResult))
+			{
+				WriteBytes(cachedResult);
+				return;
+			}
+
+			var bytes = new[] { (byte)BinarySerialisationDataType.String }.Concat(GetStringBytes(typeIfValueIsNotNull.AssemblyQualifiedName)).ToArray();
+			_typeNameCache[typeIfValueIsNotNull] = bytes;
+			WriteBytes(bytes);
 		}
 
 		private byte[] GetFieldNameBytesIfShouldWriteIt(FieldInfo field, Type serialisationTargetType)

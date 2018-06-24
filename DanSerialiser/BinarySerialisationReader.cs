@@ -93,6 +93,9 @@ namespace DanSerialiser
 
 		private object ReadNextObject(Dictionary<int, object> objectHistory, bool ignoreAnyInvalidTypes)
 		{
+			var nextEntryType = ReadNextDataType();
+			if (nextEntryType != BinarySerialisationDataType.String)
+				throw new ArgumentException("Expected string for object type name");
 			var typeName = ReadNextString();
 			if (typeName == null)
 			{
@@ -103,7 +106,7 @@ namespace DanSerialiser
 
 			// If the next value is a Reference ID 
 			int? referenceID;
-			var nextEntryType = ReadNextDataType();
+			nextEntryType = ReadNextDataType();
 			if (nextEntryType == BinarySerialisationDataType.ReferenceID)
 			{
 				referenceID = ReadNextInt();
@@ -258,6 +261,9 @@ namespace DanSerialiser
 
 		private object ReadNextArray(Dictionary<int, object> objectHistory, bool ignoreAnyInvalidTypes)
 		{
+			var nextEntryType = ReadNextDataType();
+			if (nextEntryType != BinarySerialisationDataType.String)
+				throw new ArgumentException("Expected string for array element type name");
 			var elementTypeName = ReadNextString();
 			if (elementTypeName == null)
 			{
@@ -270,7 +276,7 @@ namespace DanSerialiser
 			var items = Array.CreateInstance(elementType, length: ReadNextInt());
 			for (var i = 0; i < items.Length; i++)
 				items.SetValue(Read(objectHistory, ignoreAnyInvalidTypes), i);
-			var nextEntryType = ReadNextDataType();
+			nextEntryType = ReadNextDataType();
 			if (nextEntryType != BinarySerialisationDataType.ArrayEnd)
 				throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ArrayEnd)} was not encountered");
 			return items;
