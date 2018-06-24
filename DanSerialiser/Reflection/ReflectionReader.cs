@@ -23,7 +23,10 @@ namespace DanSerialiser.Reflection
 				foreach (var field in currentTypeToEnumerateMembersFor.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags))
 					fields.Add(new MemberAndReader<FieldInfo>(field, GetFieldReader(field)));
 				foreach (var property in currentTypeToEnumerateMembersFor.GetProperties(BinaryReaderWriterShared.MemberRetrievalBindingFlags))
-					properties.Add(new MemberAndReader<PropertyInfo>(property, GetPropertyReader(property)));
+				{
+					if (property.GetIndexParameters().Length == 0)
+						properties.Add(new MemberAndReader<PropertyInfo>(property, GetPropertyReader(property)));
+				}
 				currentTypeToEnumerateMembersFor = currentTypeToEnumerateMembersFor.BaseType;
 			}
 			return Tuple.Create<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>(fields, properties);
