@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace DanSerialiser.Reflection
@@ -30,25 +31,36 @@ namespace DanSerialiser.Reflection
 
 		private static Func<object, object> GetFieldReader(FieldInfo field)
 		{
-			return value =>
-			{
-				if (value == null)
-					throw new ArgumentNullException(nameof(value));
-
-				return field.GetValue(value);
-			};
+			var sourceParameter = Expression.Parameter(typeof(object), "source");
+			return
+				Expression.Lambda<Func<object, object>>(
+					Expression.Convert(
+						Expression.Field(
+							Expression.Convert(sourceParameter, field.DeclaringType),
+							field
+						),
+						typeof(object)
+					),
+					sourceParameter
+				)
+				.Compile();
 		}
 
 		private static Func<object, object> GetPropertyReader(PropertyInfo property)
 		{
-
-			return value =>
-			{
-				if (value == null)
-					throw new ArgumentNullException(nameof(value));
-
-				return property.GetValue(value);
-			};
+			var sourceParameter = Expression.Parameter(typeof(object), "source");
+			return
+				Expression.Lambda<Func<object, object>>(
+					Expression.Convert(
+						Expression.Property(
+							Expression.Convert(sourceParameter, property.DeclaringType),
+							property
+						),
+						typeof(object)
+					),
+					sourceParameter
+				)
+				.Compile();
 		}
 	}
 }
