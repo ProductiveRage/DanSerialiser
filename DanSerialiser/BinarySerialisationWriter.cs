@@ -10,12 +10,16 @@ namespace DanSerialiser
 	public sealed class BinarySerialisationWriter : IWrite
 	{
 		private readonly Stream _stream;
+		private readonly Dictionary<Type, byte[]> _typeNameCache;
 		private readonly Dictionary<Tuple<FieldInfo, Type>, byte[]> _fieldNameCache;
+		private readonly Dictionary<PropertyInfo, byte[]> _propertyNameCache;
 		public BinarySerialisationWriter(Stream stream, bool supportReferenceReuse)
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
 			SupportReferenceReuse = supportReferenceReuse;
+			_typeNameCache = new Dictionary<Type, byte[]>();
 			_fieldNameCache = new Dictionary<Tuple<FieldInfo, Type>, byte[]>();
+			_propertyNameCache = new Dictionary<PropertyInfo, byte[]>();
 		}
 
 		public bool SupportReferenceReuse { get; }
@@ -111,7 +115,7 @@ namespace DanSerialiser
 				StringWithoutDataType(null);
 				return;
 			}
-			StringWithoutDataType(elementType.AssemblyQualifiedName);
+			WriteBytes(GetTypeNameBytes(elementType));
 			IntWithoutDataType(((Array)(object)value).Length);
 		}
 
@@ -123,7 +127,10 @@ namespace DanSerialiser
 		public void ObjectStart<T>(T value)
 		{
 			WriteByte((byte)BinarySerialisationDataType.ObjectStart);
-			StringWithoutDataType(value?.GetType()?.AssemblyQualifiedName);
+			if (value == null)
+				StringWithoutDataType(null);
+			else
+				WriteBytes(GetTypeNameBytes(value?.GetType()));
 		}
 
 		public void ObjectEnd()
@@ -148,8 +155,36 @@ namespace DanSerialiser
 			if (fieldNameBytesIfShouldWrite == null)
 				return false;
 
+			WriteByte((byte)BinarySerialisationDataType.FieldName);
 			WriteBytes(fieldNameBytesIfShouldWrite);
 			return true;
+		}
+
+		public bool PropertyName(PropertyInfo property, Type serialisationTargetType)
+		{
+			if (property == null)
+				throw new ArgumentNullException(nameof(property));
+			if (serialisationTargetType == null)
+				throw new ArgumentNullException(nameof(serialisationTargetType));
+
+			var propertyNameBytesIfShouldWrite = GetPropertyNameBytesIfShouldWriteIt(property);
+			if (propertyNameBytesIfShouldWrite == null)
+				return false;
+
+			// Note: Even though this is a property, the data is written away as if it is a field and so this is recorded as a FieldName data type entry
+			WriteByte((byte)BinarySerialisationDataType.FieldName);
+			WriteBytes(propertyNameBytesIfShouldWrite);
+			return true;
+		}
+
+		private byte[] GetTypeNameBytes(Type type)
+		{
+			if (_typeNameCache.TryGetValue(type, out var cachedResult))
+				return cachedResult;
+
+			var bytes = GetStringBytes(type.AssemblyQualifiedName);
+			_typeNameCache[type] = bytes;
+			return bytes;
 		}
 
 		private byte[] GetFieldNameBytesIfShouldWriteIt(FieldInfo field, Type serialisationTargetType)
@@ -185,10 +220,7 @@ namespace DanSerialiser
 				}
 				currentType = currentType.BaseType;
 			}
-			var bytes = new List<byte>
-			{
-				(byte)BinarySerialisationDataType.FieldName
-			};
+			var bytes = new List<byte>();
 			if (fieldNameExistsMultipleTimesInHierarchy)
 				bytes.AddRange(GetStringBytes(BinaryReaderWriterShared.FieldTypeNamePrefix + field.DeclaringType.AssemblyQualifiedName));
 			bytes.AddRange(GetStringBytes(field.Name));
@@ -197,16 +229,20 @@ namespace DanSerialiser
 			return result;
 		}
 
-		public bool PropertyName(PropertyInfo property, Type serialisationTargetType)
+		private byte[] GetPropertyNameBytesIfShouldWriteIt(PropertyInfo property)
 		{
-			if (property == null)
-				throw new ArgumentNullException(nameof(property));
-			if (serialisationTargetType == null)
-				throw new ArgumentNullException(nameof(serialisationTargetType));
+			if (_propertyNameCache.TryGetValue(property, out var cachedResult))
+				return cachedResult;
 
 			// Most of the time, we'll just serialise the backing fields because that should capture all of the data..
 			if (property.GetCustomAttribute<DeprecatedAttribute>() == null)
-				return false;
+			{
+				_propertyNameCache[property] = null;
+				return null;
+			}
+
+			if (property.PropertyType.IsPointer || (property.PropertyType == typeof(IntPtr)) || (property.PropertyType == typeof(UIntPtr)))
+				throw new NotSupportedException($"Can not serialise pointer properties: {property.Name} on {property.DeclaringType.Name}");
 
 			// .. however, if this is a property that has the [Deprecated] attribute on it then it is expected to exist for backwards compatibility and to be a computed property
 			// (and so have no backing field) but one that we want to include in the serialised data anyway. If V1 of a type has a string "Name" property which is replaced in V2
@@ -216,10 +252,12 @@ namespace DanSerialiser
 			// - Note: We won't try to determine whether or not the type name prefix is necessary when recording the field name because the type hierarchy and the properties on
 			//   them might be different now than in the version of the types where deserialisation occurs so the type name will always be inserted before the field name to err
 			//   on the safe side
-			WriteByte((byte)BinarySerialisationDataType.FieldName);
-			StringWithoutDataType(BinaryReaderWriterShared.FieldTypeNamePrefix + property.DeclaringType.AssemblyQualifiedName);
-			StringWithoutDataType(BackingFieldHelpers.GetBackingFieldName(property.Name));
-			return true;
+			var bytes = new List<byte>();
+			bytes.AddRange(GetStringBytes(BinaryReaderWriterShared.FieldTypeNamePrefix + property.DeclaringType.AssemblyQualifiedName));
+			bytes.AddRange(GetStringBytes(BackingFieldHelpers.GetBackingFieldName(property.Name)));
+			var result = bytes.ToArray();
+			_propertyNameCache[property] = result;
+			return result;
 		}
 
 		private void IntWithoutDataType(int value)
@@ -254,3 +292,4 @@ namespace DanSerialiser
 		}
 	}
 }
+ 
