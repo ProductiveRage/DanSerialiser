@@ -13,11 +13,13 @@ namespace DanSerialiser
 		private readonly Stream _stream;
 		private readonly Dictionary<int, string> _nameReferences;
 		private readonly Dictionary<int, object> _objectReferences;
+		private readonly Dictionary<Type, FieldInfo[]> _requiredFieldCache;
 		public BinarySerialisationReader(Stream stream)
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
 			_nameReferences = new Dictionary<int, string>();
 			_objectReferences = new Dictionary<int, object>();
+			_requiredFieldCache = new Dictionary<Type, FieldInfo[]>();
 		}
 
 		public T Read<T>()
@@ -135,18 +137,10 @@ namespace DanSerialiser
 				{
 					if (typeIfAvailable != null)
 					{
-						var currentType = typeIfAvailable;
-						while (currentType != null)
+						foreach (var field in GetAllFieldsThatShouldBeSet(typeIfAvailable))
 						{
-							foreach (var field in currentType.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags))
-							{
-								if (!BinaryReaderWriterShared.IgnoreField(field)
-								&& (field.GetCustomAttribute<OptionalWhenDeserialisingAttribute>() == null)
-								&& (BackingFieldHelpers.TryToGetPropertyRelatingToBackingField(field)?.GetCustomAttribute<OptionalWhenDeserialisingAttribute>() == null)
-								&& !fieldsSet.Contains(Tuple.Create(field.DeclaringType, field.Name)))
-									throw new FieldNotPresentInSerialisedDataException(field.DeclaringType.AssemblyQualifiedName, field.Name);
-							}
-							currentType = currentType.BaseType;
+							if (!fieldsSet.Contains(Tuple.Create(field.DeclaringType, field.Name)))
+								throw new FieldNotPresentInSerialisedDataException(field.DeclaringType.AssemblyQualifiedName, field.Name);
 						}
 					}
 					return valueIfTypeIsAvailable;
@@ -258,6 +252,29 @@ namespace DanSerialiser
 					throw new InvalidOperationException("Unexpected data type encountered while enumerating object properties: " + nextEntryType);
 				nextEntryType = ReadNextDataType();
 			}
+		}
+
+		private FieldInfo[] GetAllFieldsThatShouldBeSet(Type type)
+		{
+			if (_requiredFieldCache.TryGetValue(type, out var cachedResult))
+				return cachedResult;
+
+			var fields = new List<FieldInfo>();
+			var currentType = type;
+			while (currentType != null)
+			{
+				foreach (var field in currentType.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags))
+				{
+					if (!BinaryReaderWriterShared.IgnoreField(field)
+					&& (field.GetCustomAttribute<OptionalWhenDeserialisingAttribute>() == null)
+					&& (BackingFieldHelpers.TryToGetPropertyRelatingToBackingField(field)?.GetCustomAttribute<OptionalWhenDeserialisingAttribute>() == null))
+						fields.Add(field);
+				}
+				currentType = currentType.BaseType;
+			}
+			var result = fields.ToArray();
+			_requiredFieldCache[type] = result;
+			return result;
 		}
 
 		private object ReadNextArray(bool ignoreAnyInvalidTypes)
