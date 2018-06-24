@@ -1,0 +1,51 @@
+Total time: 00:08:41 (521.75 sec)
+
+// * Summary *
+
+BenchmarkDotNet=v0.10.14, OS=Windows 8.1 (6.3.9600.0)
+AMD FX(tm)-8350 Eight-Core Processor, 1 CPU, 8 logical and 4 physical cores
+Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
+.NET Core SDK=2.1.300
+  [Host] : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+  Clr    : .NET Framework 4.6.1 (CLR 4.0.30319.42000), 64bit RyuJIT-v4.7.2650.0
+  Core   : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+
+
+                     Method |  Job | Runtime |         Mean |        Error |       StdDev |
+--------------------------- |----- |-------- |-------------:|-------------:|-------------:|
+           JsonNetSerialise |  Clr |     Clr |  16,016.9 us |   240.137 us |   224.624 us |
+         JsonNetDeserialise |  Clr |     Clr |  13,144.7 us |   220.326 us |   183.982 us |
+   BinaryFormatterSerialise |  Clr |     Clr |   8,914.8 us |   170.361 us |   196.188 us |
+ BinaryFormatterDeserialise |  Clr |     Clr |   7,672.7 us |    68.321 us |    63.908 us |
+          ProtoBufSerialise |  Clr |     Clr |     503.4 us |     3.624 us |     3.390 us |
+        ProtoBufDeserialise |  Clr |     Clr |     752.1 us |     5.513 us |     4.887 us |
+     DanSerialiserSerialise |  Clr |     Clr | 117,690.6 us | 1,101.753 us |   920.014 us |
+   DanSerialiserDeserialise |  Clr |     Clr | 243,330.4 us | 1,458.238 us | 1,217.694 us |
+           JsonNetSerialise | Core |    Core |   8,892.1 us |    70.194 us |    65.659 us |
+         JsonNetDeserialise | Core |    Core |  12,576.5 us |    96.591 us |    85.626 us |
+   BinaryFormatterSerialise | Core |    Core |  10,536.7 us |   113.782 us |   106.431 us |
+ BinaryFormatterDeserialise | Core |    Core |   9,995.6 us |   105.336 us |    87.960 us |
+          ProtoBufSerialise | Core |    Core |     530.7 us |    10.430 us |    10.711 us |
+        ProtoBufDeserialise | Core |    Core |     858.5 us |     9.959 us |     8.829 us |
+     DanSerialiserSerialise | Core |    Core | 103,218.4 us |   752.487 us |   667.060 us |
+   DanSerialiserDeserialise | Core |    Core | 189,534.7 us | 1,269.117 us | 1,125.039 us |
+
+// * Hints *
+Outliers
+  SerialisationPerformance.JsonNetDeserialise: Clr          -> 2 outliers were removed
+  SerialisationPerformance.BinaryFormatterSerialise: Clr    -> 1 outlier  was  removed
+  SerialisationPerformance.ProtoBufDeserialise: Clr         -> 1 outlier  was  removed
+  SerialisationPerformance.DanSerialiserSerialise: Clr      -> 2 outliers were removed
+  SerialisationPerformance.DanSerialiserDeserialise: Clr    -> 2 outliers were removed
+  SerialisationPerformance.JsonNetDeserialise: Core         -> 1 outlier  was  removed
+  SerialisationPerformance.BinaryFormatterDeserialise: Core -> 2 outliers were removed
+  SerialisationPerformance.ProtoBufSerialise: Core          -> 1 outlier  was  removed
+  SerialisationPerformance.ProtoBufDeserialise: Core        -> 1 outlier  was  removed
+  SerialisationPerformance.DanSerialiserSerialise: Core     -> 1 outlier  was  removed
+  SerialisationPerformance.DanSerialiserDeserialise: Core   -> 1 outlier  was  removed
+
+// * Legends *
+  Mean   : Arithmetic mean of all measurements
+  Error  : Half of 99.9% confidence interval
+  StdDev : Standard deviation of all measurements
+  1 us   : 1 Microsecond (0.000001 sec)
