@@ -3,19 +3,19 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.CompilerServices;
+using DanSerialiser.Reflection;
 
 namespace DanSerialiser
 {
 	public sealed class Serialiser
 	{
-		public static Serialiser Instance { get; } = new Serialiser();
+		public static Serialiser Instance { get; } = new Serialiser(new ThreadSafeCachingReader(ReflectionReader.Instance));
 
-		private ImmutableDictionary<Type, Tuple<IEnumerable<FieldInfo>, IEnumerable<PropertyInfo>>> _memberCache;
-		private Serialiser()
+		private readonly IReadValues _reader;
+		internal Serialiser(IReadValues reader) // internal constructor is intended for unit testing only
 		{
-			_memberCache = ImmutableDictionary<Type, Tuple<IEnumerable<FieldInfo>, IEnumerable<PropertyInfo>>>.Empty;
+			_reader = reader ?? throw new ArgumentNullException(nameof(reader));
 		}
 
 		public void Serialise<T>(T value, IWrite writer)
@@ -167,36 +167,17 @@ namespace DanSerialiser
 
 		private void SerialiseObjectFieldsAndProperties(object value, Type type, IEnumerable<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed, IWrite writer)
 		{
-			var (fields, properties) = GetFieldsAndProperties(value.GetType());
+			var (fields, properties) = _reader.GetFieldsAndProperties(value.GetType());
 			foreach (var field in fields)
 			{
-				if (writer.FieldName(field, type))
-					Serialise(field.GetValue(value), field.FieldType, writer, AppendIfNotNull(parentsIfReferenceReuseDisallowed, value), objectHistoryIfReferenceReuseAllowed);
+				if (writer.FieldName(field.Member, type))
+					Serialise(field.Reader(value), field.Member.FieldType, writer, AppendIfNotNull(parentsIfReferenceReuseDisallowed, value), objectHistoryIfReferenceReuseAllowed);
 			}
 			foreach (var property in properties)
 			{
-				if (writer.PropertyName(property, type))
-					Serialise(property.GetValue(value), property.PropertyType, writer, AppendIfNotNull(parentsIfReferenceReuseDisallowed, value), objectHistoryIfReferenceReuseAllowed);
+				if (writer.PropertyName(property.Member, type))
+					Serialise(property.Reader(value), property.Member.PropertyType, writer, AppendIfNotNull(parentsIfReferenceReuseDisallowed, value), objectHistoryIfReferenceReuseAllowed);
 			}
-		}
-
-		private Tuple<IEnumerable<FieldInfo>, IEnumerable<PropertyInfo>> GetFieldsAndProperties(Type type)
-		{
-			if (_memberCache.TryGetValue(type, out var cachedResult))
-				return cachedResult;
-
-			var fields = new List<FieldInfo>();
-			var properties = new List<PropertyInfo>();
-			var currentTypeToEnumerateMembersFor = type;
-			while (currentTypeToEnumerateMembersFor != null)
-			{
-				fields.AddRange(currentTypeToEnumerateMembersFor.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags));
-				properties.AddRange(currentTypeToEnumerateMembersFor.GetProperties(BinaryReaderWriterShared.MemberRetrievalBindingFlags));
-				currentTypeToEnumerateMembersFor = currentTypeToEnumerateMembersFor.BaseType;
-			}
-			var result = Tuple.Create<IEnumerable<FieldInfo>, IEnumerable<PropertyInfo>>(fields, properties);
-			_memberCache = _memberCache.SetItem(type, result);
-			return result;
 		}
 
 		private static IEnumerable<object> AppendIfNotNull(IEnumerable<object> valuesIfAny, object value)
