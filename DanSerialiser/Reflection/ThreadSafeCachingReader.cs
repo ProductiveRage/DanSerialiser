@@ -1,6 +1,6 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Reflection;
 
 namespace DanSerialiser.Reflection
@@ -8,11 +8,11 @@ namespace DanSerialiser.Reflection
 	internal sealed class ThreadSafeCachingReader : IReadValues
 	{
 		private readonly IReadValues _reader;
-		private ImmutableDictionary<Type, Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>> _fieldAndPropertyCache;
+		private readonly ConcurrentDictionary<Type, Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>> _fieldAndPropertyCache;
 		public ThreadSafeCachingReader(IReadValues reader)
 		{
 			_reader = reader ?? throw new ArgumentNullException(nameof(reader));
-			_fieldAndPropertyCache = ImmutableDictionary<Type, Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>>.Empty;
+			_fieldAndPropertyCache = new ConcurrentDictionary<Type, Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>>();
 		}
 
 		public Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>> GetFieldsAndProperties(Type type)
@@ -24,7 +24,7 @@ namespace DanSerialiser.Reflection
 				return cachedResult;
 
 			var result = _reader.GetFieldsAndProperties(type);
-			_fieldAndPropertyCache = _fieldAndPropertyCache.SetItem(type, result);
+			_fieldAndPropertyCache.TryAdd(type, result);
 			return result;
 		}
 	}
