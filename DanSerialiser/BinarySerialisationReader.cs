@@ -5,17 +5,21 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
+using DanSerialiser.Reflection;
 
 namespace DanSerialiser
 {
 	public sealed class BinarySerialisationReader
 	{
 		private readonly Stream _stream;
+		private readonly IAnalyseTypesForSerialisation _typeAnalyser;
 		private readonly Dictionary<int, string> _nameReferences;
 		private readonly Dictionary<int, object> _objectReferences;
-		public BinarySerialisationReader(Stream stream)
+		public BinarySerialisationReader(Stream stream) : this(stream, DefaultTypeAnalyser.Instance) { }
+		internal BinarySerialisationReader(Stream stream, IAnalyseTypesForSerialisation typeAnalyser) // internal constructor may be used by unit tests
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
+			_typeAnalyser = typeAnalyser ?? throw new ArgumentNullException(nameof(typeAnalyser));
 			_nameReferences = new Dictionary<int, string>();
 			_objectReferences = new Dictionary<int, object>();
 		}
@@ -135,7 +139,7 @@ namespace DanSerialiser
 				{
 					if (typeIfAvailable != null)
 					{
-						foreach (var field in GetAllFieldsThatShouldBeSet(typeIfAvailable))
+						foreach (var field in _typeAnalyser.GetAllFieldsThatShouldBeSet(typeIfAvailable))
 						{
 							if (!fieldsSet.Contains(Tuple.Create(field.DeclaringType, field.Name)))
 								throw new FieldNotPresentInSerialisedDataException(field.DeclaringType.AssemblyQualifiedName, field.Name);

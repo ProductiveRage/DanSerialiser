@@ -9,7 +9,7 @@ namespace DanSerialiser
 {
 	public sealed class Serialiser
 	{
-		public static Serialiser Instance { get; } = new Serialiser(new CachingTypeAnalyser( ReflectionTypeAnalyser.Instance));
+		public static Serialiser Instance { get; } = new Serialiser(DefaultTypeAnalyser.Instance);
 
 		private readonly IAnalyseTypesForSerialisation _typeAnalyser;
 		internal Serialiser(IAnalyseTypesForSerialisation typeAnalyser) // internal constructor is intended for unit testing only
