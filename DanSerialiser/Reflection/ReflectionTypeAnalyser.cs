@@ -5,10 +5,10 @@ using System.Reflection;
 
 namespace DanSerialiser.Reflection
 {
-	internal sealed class ReflectionReader : IReadValues
+	internal sealed class ReflectionTypeAnalyser : IAnalyseTypesForSerialisation
 	{
-		public static ReflectionReader Instance { get; } = new ReflectionReader();
-		private ReflectionReader() { }
+		public static ReflectionTypeAnalyser Instance { get; } = new ReflectionTypeAnalyser();
+		private ReflectionTypeAnalyser() { }
 
 		public Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>> GetFieldsAndProperties(Type type)
 		{

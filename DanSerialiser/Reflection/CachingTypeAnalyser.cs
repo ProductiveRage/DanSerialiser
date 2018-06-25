@@ -5,11 +5,11 @@ using System.Reflection;
 
 namespace DanSerialiser.Reflection
 {
-	internal sealed class ThreadSafeCachingReader : IReadValues
+	internal sealed class CachingTypeAnalyser : IAnalyseTypesForSerialisation
 	{
-		private readonly IReadValues _reader;
+		private readonly IAnalyseTypesForSerialisation _reader;
 		private readonly ConcurrentDictionary<Type, Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>> _fieldAndPropertyCache;
-		public ThreadSafeCachingReader(IReadValues reader)
+		public CachingTypeAnalyser(IAnalyseTypesForSerialisation reader)
 		{
 			_reader = reader ?? throw new ArgumentNullException(nameof(reader));
 			_fieldAndPropertyCache = new ConcurrentDictionary<Type, Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>>();

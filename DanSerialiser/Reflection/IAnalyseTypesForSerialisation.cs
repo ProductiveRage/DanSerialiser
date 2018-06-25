@@ -4,7 +4,7 @@ using System.Reflection;
 
 namespace DanSerialiser.Reflection
 {
-	internal interface IReadValues
+	internal interface IAnalyseTypesForSerialisation
 	{
 		Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>> GetFieldsAndProperties(Type type);
 	}
