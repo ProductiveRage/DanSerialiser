@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
 using DanSerialiser.Reflection;
@@ -168,22 +166,7 @@ namespace DanSerialiser
 
 					// Try to get a reference to the field on the target type.. if there is one (if valueIfTypeIsAvailable is null then no-one cases about this data and we're just
 					// parsing it to skip over it)
-					FieldInfo field;
-					if (valueIfTypeIsAvailable == null)
-						field = null;
-					else
-					{
-						var typeToLookForMemberOn = valueIfTypeIsAvailable.GetType();
-						while (true)
-						{
-							field = typeToLookForMemberOn.GetField(fieldName, BinaryReaderWriterShared.MemberRetrievalBindingFlags);
-							if ((field != null) && ((typeNameIfRequired == null) || (field.DeclaringType.AssemblyQualifiedName == typeNameIfRequired)))
-								break;
-							typeToLookForMemberOn = typeToLookForMemberOn.BaseType;
-							if (typeToLookForMemberOn == null)
-								break;
-						}
-					}
+					var field = (valueIfTypeIsAvailable == null) ? null : _typeAnalyser.TryToFindField(typeIfAvailable, fieldName, typeNameIfRequired);
 
 					// Note: If the field doesn't exist then parse the data but don't worry about any types not being available because we're not going to set anything to the value
 					// that we get back from the "Read" call (but we still need to parse that data to advance the reader to the next field or the end of the current object)
@@ -208,50 +191,11 @@ namespace DanSerialiser
 						// property that can map the old field onto a new field / property then we should try to set the [Deprecated] property's value to the value that we have.
 						// That [Deprecated] property's setter should then set a property / field on the new version of the type. If that is the case, then we can add that new
 						// property / field to the have-successfully-set list.
-						var propertyName = BackingFieldHelpers.TryToGetNameOfPropertyRelatingToBackingField(fieldName) ?? fieldName;
-						var typeToLookForPropertyOn = valueIfTypeIsAvailable.GetType();
-						while (typeToLookForPropertyOn != null)
-						{
-							if ((typeNameIfRequired == null) || (typeToLookForPropertyOn.AssemblyQualifiedName == typeNameIfRequired))
-							{
-								var deprecatedProperty = typeToLookForPropertyOn.GetProperties(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
-									.Where(p => (p.Name == propertyName) && (p.DeclaringType == typeToLookForPropertyOn) && (p.GetIndexParameters().Length == 0) && p.PropertyType.IsAssignableFrom(fieldValue.GetType()))
-									.Select(p => new { Property = p, ReplaceBy = p.GetCustomAttribute<DeprecatedAttribute>()?.ReplacedBy })
-									.FirstOrDefault(p => p.ReplaceBy != null); // Safe to use FirstOrDefault because there can't be multiple [Deprecated] as AllowMultiple is not set to true on the attribute class
-								if (deprecatedProperty != null)
-								{
-									// Try to find a field that the "ReplacedBy" value relates to (if we find it then we'll consider it to have been set because setting the
-									// deprecated property should set it))
-									deprecatedProperty.Property.SetValue(valueIfTypeIsAvailable, fieldValue);
-									field = typeToLookForPropertyOn.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
-										.Where(f => (f.Name == deprecatedProperty.ReplaceBy) && (f.DeclaringType == typeToLookForPropertyOn))
-										.FirstOrDefault();
-									if (field == null)
-									{
-										// If the "ReplacedBy" value didn't directly match a field then try to find a property that it matches and then see if there is a
-										// backing field for that property that we can set (if we find this then we'll consider to have been set because setting the deprecated
-										// property should set it)
-										var property = typeToLookForPropertyOn.GetProperties(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
-											.Where(p => (p.Name == deprecatedProperty.ReplaceBy) && (p.DeclaringType == typeToLookForPropertyOn) && (p.GetIndexParameters().Length == 0))
-											.FirstOrDefault();
-										if (property != null)
-										{
-											var nameOfPotentialBackingFieldForProperty = BackingFieldHelpers.GetBackingFieldName(property.Name);
-											field = typeToLookForPropertyOn.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
-												.Where(f => (f.Name == nameOfPotentialBackingFieldForProperty) && (f.DeclaringType == typeToLookForPropertyOn))
-												.FirstOrDefault();
-										}
-									}
-									if (field != null)
-									{
-										// Although the field hasn't directly been set, it should have been set indirectly by setting the property value above (unless the [Deprecated]
-										// "ReplaceBy" value was lying)
-										fieldsSet.Add(Tuple.Create(field.DeclaringType, field.Name));
-									}
-								}
-							}
-							typeToLookForPropertyOn = typeToLookForPropertyOn.BaseType;
-						}
+						var (propertySetters, fieldsThatHaveBeenSet) = _typeAnalyser.GetPropertySettersAndFieldsToConsiderToHaveBeenSet(typeIfAvailable, fieldName, typeNameIfRequired, fieldValue?.GetType());
+						foreach (var propertySetter in propertySetters)
+							propertySetter(valueIfTypeIsAvailable, fieldValue);
+						foreach (var fieldThatHasBeenSet in fieldsThatHaveBeenSet)
+							fieldsSet.Add(Tuple.Create(fieldThatHasBeenSet.DeclaringType, fieldThatHasBeenSet.Name));
 					}
 				}
 				else

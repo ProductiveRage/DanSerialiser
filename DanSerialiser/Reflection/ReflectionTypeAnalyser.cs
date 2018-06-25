@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -53,6 +54,84 @@ namespace DanSerialiser.Reflection
 			return fields.ToArray();
 		}
 
+		public FieldInfo TryToFindField(Type type, string fieldName, string specificTypeNameIfRequired)
+		{
+			if (type == null)
+				throw new ArgumentNullException(nameof(type));
+			if (string.IsNullOrWhiteSpace(fieldName))
+				throw new ArgumentException($"Null/blank {nameof(fieldName)} specified");
+
+			while (type != null)
+			{
+				var field = type.GetField(fieldName, BinaryReaderWriterShared.MemberRetrievalBindingFlags);
+				if ((field != null) && ((specificTypeNameIfRequired == null) || (field.DeclaringType.AssemblyQualifiedName == specificTypeNameIfRequired)))
+					return field;
+				type = type.BaseType;
+			}
+			return null;
+		}
+
+		public (Action<object, object>[], FieldInfo[]) GetPropertySettersAndFieldsToConsiderToHaveBeenSet(Type typeToLookForPropertyOn, string fieldName, string typeNameIfRequired, Type fieldValueTypeIfAvailable)
+		{
+			if (typeToLookForPropertyOn == null)
+				throw new ArgumentNullException(nameof(typeToLookForPropertyOn));
+			if (string.IsNullOrWhiteSpace(fieldName))
+				throw new ArgumentException($"Null/blank {nameof(fieldName)} specified");
+
+			var fieldsToConsiderToHaveBeenSet = new List<FieldInfo>();
+			var propertySetters = new List<Action<object, object>>();
+			var propertyName = BackingFieldHelpers.TryToGetNameOfPropertyRelatingToBackingField(fieldName) ?? fieldName;
+			while (typeToLookForPropertyOn != null)
+			{
+				if ((typeNameIfRequired == null) || (typeToLookForPropertyOn.AssemblyQualifiedName == typeNameIfRequired))
+				{
+					// TODO: Not sure about this fieldValueTypeIfAvailable business!
+					var deprecatedProperty = typeToLookForPropertyOn.GetProperties(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
+						.Where(p =>
+							(p.Name == propertyName) &&
+							(p.DeclaringType == typeToLookForPropertyOn) &&
+							(p.GetIndexParameters().Length == 0) &&
+							(((fieldValueTypeIfAvailable == null) && !p.PropertyType.IsValueType) || ((fieldValueTypeIfAvailable != null) && p.PropertyType.IsAssignableFrom(fieldValueTypeIfAvailable)))
+						)
+						.Select(p => new { Property = p, ReplaceBy = p.GetCustomAttribute<DeprecatedAttribute>()?.ReplacedBy })
+						.FirstOrDefault(p => p.ReplaceBy != null); // Safe to use FirstOrDefault because there can't be multiple [Deprecated] as AllowMultiple is not set to true on the attribute class
+					if (deprecatedProperty != null)
+					{
+						// Try to find a field that the "ReplacedBy" value relates to (if we find it then we'll consider it to have been set because setting the
+						// deprecated property should set it))
+						propertySetters.Add(GetPropertyWriter(deprecatedProperty.Property));
+						var field = typeToLookForPropertyOn.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
+							.Where(f => (f.Name == deprecatedProperty.ReplaceBy) && (f.DeclaringType == typeToLookForPropertyOn))
+							.FirstOrDefault();
+						if (field == null)
+						{
+							// If the "ReplacedBy" value didn't directly match a field then try to find a property that it matches and then see if there is a
+							// backing field for that property that we can set (if we find this then we'll consider to have been set because setting the deprecated
+							// property should set it)
+							var property = typeToLookForPropertyOn.GetProperties(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
+								.Where(p => (p.Name == deprecatedProperty.ReplaceBy) && (p.DeclaringType == typeToLookForPropertyOn) && (p.GetIndexParameters().Length == 0))
+								.FirstOrDefault();
+							if (property != null)
+							{
+								var nameOfPotentialBackingFieldForProperty = BackingFieldHelpers.GetBackingFieldName(property.Name);
+								field = typeToLookForPropertyOn.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
+									.Where(f => (f.Name == nameOfPotentialBackingFieldForProperty) && (f.DeclaringType == typeToLookForPropertyOn))
+									.FirstOrDefault();
+							}
+						}
+						if (field != null)
+						{
+							// Although the field hasn't directly been set, it should have been set indirectly by setting the property value above (unless the [Deprecated]
+							// "ReplaceBy" value was lying)
+							fieldsToConsiderToHaveBeenSet.Add(field);
+						}
+					}
+				}
+				typeToLookForPropertyOn = typeToLookForPropertyOn.BaseType;
+			}
+			return (propertySetters.ToArray(), fieldsToConsiderToHaveBeenSet.ToArray());
+		}
+
 		private static Func<object, object> GetFieldReader(FieldInfo field)
 		{
 			var sourceParameter = Expression.Parameter(typeof(object), "source");
@@ -83,6 +162,25 @@ namespace DanSerialiser.Reflection
 						typeof(object)
 					),
 					sourceParameter
+				)
+				.Compile();
+		}
+
+		private static Action<object, object> GetPropertyWriter(PropertyInfo property)
+		{
+			var sourceParameter = Expression.Parameter(typeof(object), "source");
+			var valueParameter = Expression.Parameter(typeof(object), "value");
+			return
+				Expression.Lambda<Action<object, object>>(
+					Expression.Assign(
+						Expression.MakeMemberAccess(
+							Expression.Convert(sourceParameter, property.DeclaringType),
+							property
+						),
+						Expression.Convert(valueParameter, property.PropertyType)
+					),
+					sourceParameter,
+					valueParameter
 				)
 				.Compile();
 		}
