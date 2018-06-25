@@ -149,18 +149,22 @@ namespace DanSerialiser
 				}
 				else if (nextEntryType == BinarySerialisationDataType.FieldName)
 				{
-					var fieldOrTypeName = ReadNextString();
-					string typeNameIfRequired, fieldName;
-					if (fieldOrTypeName.StartsWith(BinaryReaderWriterShared.FieldTypeNamePrefix))
+					nextEntryType = ReadNextDataType();
+					string rawFieldNameInformation;
+					if (nextEntryType == BinarySerialisationDataType.String)
 					{
-						typeNameIfRequired = fieldOrTypeName.Substring(BinaryReaderWriterShared.FieldTypeNamePrefix.Length);
-						fieldName = ReadNextString();
+						rawFieldNameInformation = ReadNextString();
+						_nameReferences[ReadNextInt()] = rawFieldNameInformation;
+					}
+					else if (nextEntryType == BinarySerialisationDataType.NameReferenceID)
+					{
+						var nameReferenceID = ReadNextInt();
+						if (!_nameReferences.TryGetValue(nameReferenceID, out rawFieldNameInformation))
+							throw new ArgumentException("Invalid NameReferenceID: " + nameReferenceID);
 					}
 					else
-					{
-						typeNameIfRequired = null;
-						fieldName = fieldOrTypeName;
-					}
+						throw new ArgumentException("Unexpected " + nextEntryType + " after FieldName");
+					BinaryReaderWriterShared.SplitCombinedTypeAndFieldName(rawFieldNameInformation, out var typeNameIfRequired, out var fieldName);
 
 					// Try to get a reference to the field on the target type.. if there is one (if valueIfTypeIsAvailable is null then no-one cases about this data and we're just
 					// parsing it to skip over it)

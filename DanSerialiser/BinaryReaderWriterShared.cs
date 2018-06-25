@@ -5,7 +5,6 @@ namespace DanSerialiser
 {
 	internal static class BinaryReaderWriterShared
 	{
-		public const string FieldTypeNamePrefix = "#type#";
 
 		public static readonly BindingFlags MemberRetrievalBindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
@@ -28,6 +27,30 @@ namespace DanSerialiser
 			}
 
 			return false;
+		}
+
+		public static string CombineTypeAndFieldName(string typeNameIfRequired, string fieldName)
+		{
+			if (fieldName == null)
+				throw new ArgumentNullException(nameof(fieldName));
+
+			return ((typeNameIfRequired == null) ? "" : (typeNameIfRequired + "\n")) + fieldName;
+		}
+
+		public static void SplitCombinedTypeAndFieldName(string value, out string typeNameIfRequired, out string fieldName)
+		{
+			if (value == null)
+				throw new ArgumentNullException(nameof(value));
+
+			var splitAt = value.IndexOf('\n');
+			if (splitAt == -1)
+			{
+				typeNameIfRequired = null;
+				fieldName = value;
+				return;
+			}
+			typeNameIfRequired = value.Substring(0, splitAt);
+			fieldName = value.Substring(splitAt + 1);
 		}
 	}
 }
