@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using DanSerialiser.Reflection;
 
@@ -132,17 +133,21 @@ namespace DanSerialiser
 			if ((valueIfTypeIsAvailable != null) && (referenceID != null))
 				_objectReferences[referenceID.Value] = valueIfTypeIsAvailable;
 			var typeIfAvailable = valueIfTypeIsAvailable?.GetType();
-			var fieldsSet = new HashSet<Tuple<Type, string>>();
+			var fieldsThatHaveBeenSet = new List<FieldInfo>();
 			while (true)
 			{
 				if (nextEntryType == BinarySerialisationDataType.ObjectEnd)
 				{
 					if (valueIfTypeIsAvailable != null)
 					{
-						foreach (var field in _typeAnalyser.GetAllFieldsThatShouldBeSet(typeIfAvailable))
+						var fieldsThatShouldHaveBeenSet = _typeAnalyser.GetAllFieldsThatShouldBeSet(typeIfAvailable);
+						if (fieldsThatHaveBeenSet.Count != fieldsThatShouldHaveBeenSet.Length)
 						{
-							if (!fieldsSet.Contains(Tuple.Create(field.DeclaringType, field.Name)))
-								throw new FieldNotPresentInSerialisedDataException(field.DeclaringType.AssemblyQualifiedName, field.Name);
+							foreach (var mandatoryField in fieldsThatShouldHaveBeenSet)
+							{
+								if (fieldsThatHaveBeenSet.Find(fieldThatHasBeenSet => (fieldThatHasBeenSet.DeclaringType == mandatoryField.DeclaringType) && (fieldThatHasBeenSet.Name == mandatoryField.Name)) == null)
+									throw new FieldNotPresentInSerialisedDataException(mandatoryField.DeclaringType.AssemblyQualifiedName, mandatoryField.Name);
+							}
 						}
 					}
 					return valueIfTypeIsAvailable;
@@ -183,7 +188,7 @@ namespace DanSerialiser
 						if (field.WriterUnlessFieldShouldBeIgnored != null)
 						{
 							field.WriterUnlessFieldShouldBeIgnored(valueIfTypeIsAvailable, fieldValue);
-							fieldsSet.Add(Tuple.Create(field.Member.DeclaringType, field.Member.Name));
+							fieldsThatHaveBeenSet.Add(field.Member);
 						}
 					}
 					else if (valueIfTypeIsAvailable != null)
@@ -193,11 +198,10 @@ namespace DanSerialiser
 						// property that can map the old field onto a new field / property then we should try to set the [Deprecated] property's value to the value that we have.
 						// That [Deprecated] property's setter should then set a property / field on the new version of the type. If that is the case, then we can add that new
 						// property / field to the have-successfully-set list.
-						var (propertySetters, fieldsThatHaveBeenSet) = _typeAnalyser.GetPropertySettersAndFieldsToConsiderToHaveBeenSet(typeIfAvailable, fieldName, typeNameIfRequired, fieldValue?.GetType());
+						var (propertySetters, relatedFieldsThatHaveBeenSet) = _typeAnalyser.GetPropertySettersAndFieldsToConsiderToHaveBeenSet(typeIfAvailable, fieldName, typeNameIfRequired, fieldValue?.GetType());
 						foreach (var propertySetter in propertySetters)
 							propertySetter(valueIfTypeIsAvailable, fieldValue);
-						foreach (var fieldThatHasBeenSet in fieldsThatHaveBeenSet)
-							fieldsSet.Add(Tuple.Create(fieldThatHasBeenSet.DeclaringType, fieldThatHasBeenSet.Name));
+						fieldsThatHaveBeenSet.AddRange(relatedFieldsThatHaveBeenSet);
 					}
 				}
 				else
