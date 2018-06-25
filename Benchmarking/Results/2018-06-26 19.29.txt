@@ -1,0 +1,21 @@
+// * Summary *
+
+BenchmarkDotNet=v0.10.14, OS=Windows 8.1 (6.3.9600.0)
+AMD FX(tm)-8350 Eight-Core Processor, 1 CPU, 8 logical and 4 physical cores
+Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
+.NET Core SDK=2.1.300
+  [Host] : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+  Clr    : .NET Framework 4.6.1 (CLR 4.0.30319.42000), 64bit RyuJIT-v4.7.2650.0
+  Core   : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+
+
+                   Method |  Job | Runtime |        Mean |      Error |     StdDev |
+------------------------- |----- |-------- |------------:|-----------:|-----------:|
+        ProtoBufSerialise |  Clr |     Clr |    500.3 us |   9.926 us |   9.285 us |
+      ProtoBufDeserialise |  Clr |     Clr |    721.9 us |   4.692 us |   4.389 us |
+   DanSerialiserSerialise |  Clr |     Clr | 12,250.2 us |  58.212 us |  51.604 us |
+ DanSerialiserDeserialise |  Clr |     Clr | 39,689.4 us | 216.178 us | 202.213 us |
+        ProtoBufSerialise | Core |    Core |    531.9 us |   6.478 us |   5.743 us |
+      ProtoBufDeserialise | Core |    Core |    793.8 us |   4.130 us |   3.863 us |
+   DanSerialiserSerialise | Core |    Core | 15,754.9 us | 139.482 us | 123.647 us |
+ DanSerialiserDeserialise | Core |    Core | 42,976.4 us | 232.266 us | 217.262 us |

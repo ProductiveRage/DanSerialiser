@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -130,8 +129,10 @@ namespace DanSerialiser
 				writer.ArrayStart(value, elementType);
 				if (value != null)
 				{
-					foreach (var element in (IEnumerable)value) // TODO: Array instead of IEnumerable?
+					var array = (Array)value;
+					for (var i = 0; i < array.Length; i++) // TODO: Need to ensure that de/serialising arrays with multiple dimensions works!
 					{
+						var element = array.GetValue(i);
 						if (parentsIfReferenceReuseDisallowed != null)
 							parentsIfReferenceReuseDisallowed.Push(value);
 						Serialise(element, elementType, writer, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed);
