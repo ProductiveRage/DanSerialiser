@@ -22,6 +22,18 @@ namespace DanSerialiser.Reflection
 			if (typeIfAvailable == null)
 				return null;
 
+			// https://rogerjohansson.blog/2016/08/16/wire-writing-one-of-the-fastest-net-serializers/ suggested that calling a parameterless constructor will be faster
+			// than GetUninitializedObject. I've found it to be MARGINALLY faster but it's an interesting enough optimisation to leave in for now!
+			var parameterLessConstructor = typeIfAvailable.GetConstructor(BinaryReaderWriterShared.MemberRetrievalBindingFlags, null, Type.EmptyTypes, null);
+			if (parameterLessConstructor != null)
+			{
+				// Try to guess whether this is an empty constructor or not (we don't want to call one that wil cause side effects - it could even throw an exception,
+				// potentially). This trick is also from that URL above. This guesswork does feel a touch hairy and the performance improvement is not as large as I'd
+				// hoped, so it may get binned off one day if it starts causing any trouble.
+				if (parameterLessConstructor.GetMethodBody().GetILAsByteArray().Length <= 8)
+					return Expression.Lambda<Func<object>>(Expression.New(parameterLessConstructor)).Compile();
+			}
+
 			return () => FormatterServices.GetUninitializedObject(typeIfAvailable);
 		}
 
