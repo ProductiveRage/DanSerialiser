@@ -7,6 +7,9 @@ using DanSerialiser.Reflection;
 
 namespace DanSerialiser
 {
+	// TODO: Consider moving objectHistoryIfReferenceReuseAllowed to the writer (and having the writer expose a SupportCircularReferences property instead?)
+	// - This will make the interface a bit more complicated because it will have to communicate back that it has reused a references and that the properties
+	//   do not need to be enumerated and recorded
 	public sealed class Serialiser
 	{
 		public static Serialiser Instance { get; } = new Serialiser(DefaultTypeAnalyser.Instance);
@@ -30,12 +33,12 @@ namespace DanSerialiser
 				value,
 				value?.GetType() ?? typeof(T),
 				writer,
-				writer.SupportReferenceReuse ? null : new object[0],
+				writer.SupportReferenceReuse ? null : new Stack<object>(),
 				writer.SupportReferenceReuse ? new Dictionary<object, int>(ReferenceEqualityComparer.Instance) : null
 			);
 		}
 
-		private void Serialise(object value, Type type, IWrite writer, IEnumerable<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed)
+		private void Serialise(object value, Type type, IWrite writer, Stack<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed)
 		{
 			if ((parentsIfReferenceReuseDisallowed != null) && parentsIfReferenceReuseDisallowed.Contains(value, ReferenceEqualityComparer.Instance))
 				throw new CircularReferenceException();
@@ -127,8 +130,14 @@ namespace DanSerialiser
 				writer.ArrayStart(value, elementType);
 				if (value != null)
 				{
-					foreach (var element in (IEnumerable)value)
-						Serialise(element, elementType, writer, AppendIfNotNull(parentsIfReferenceReuseDisallowed, value), objectHistoryIfReferenceReuseAllowed);
+					foreach (var element in (IEnumerable)value) // TODO: Array instead of IEnumerable?
+					{
+						if (parentsIfReferenceReuseDisallowed != null)
+							parentsIfReferenceReuseDisallowed.Push(value);
+						Serialise(element, elementType, writer, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed);
+						if (parentsIfReferenceReuseDisallowed != null)
+							parentsIfReferenceReuseDisallowed.Pop();
+					}
 				}
 				writer.ArrayEnd();
 				return;
@@ -164,27 +173,31 @@ namespace DanSerialiser
 			writer.ObjectEnd();
 		}
 
-		private void SerialiseObjectFieldsAndProperties(object value, Type type, IEnumerable<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed, IWrite writer)
+		private void SerialiseObjectFieldsAndProperties(object value, Type type, Stack<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed, IWrite writer)
 		{
 			var (fields, properties) = _typeAnalyser.GetFieldsAndProperties(value.GetType());
 			foreach (var field in fields)
 			{
 				if (writer.FieldName(field.Member, type))
-					Serialise(field.Reader(value), field.Member.FieldType, writer, AppendIfNotNull(parentsIfReferenceReuseDisallowed, value), objectHistoryIfReferenceReuseAllowed);
+				{
+					if (parentsIfReferenceReuseDisallowed != null)
+						parentsIfReferenceReuseDisallowed.Push(value);
+					Serialise(field.Reader(value), field.Member.FieldType, writer, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed);
+					if (parentsIfReferenceReuseDisallowed != null)
+						parentsIfReferenceReuseDisallowed.Pop();
+				}
 			}
 			foreach (var property in properties)
 			{
 				if (writer.PropertyName(property.Member, type))
-					Serialise(property.Reader(value), property.Member.PropertyType, writer, AppendIfNotNull(parentsIfReferenceReuseDisallowed, value), objectHistoryIfReferenceReuseAllowed);
+				{
+					if (parentsIfReferenceReuseDisallowed != null)
+						parentsIfReferenceReuseDisallowed.Push(value);
+					Serialise(property.Reader(value), property.Member.PropertyType, writer, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed);
+					if (parentsIfReferenceReuseDisallowed != null)
+						parentsIfReferenceReuseDisallowed.Pop();
+				}
 			}
-		}
-
-		private static IEnumerable<object> AppendIfNotNull(IEnumerable<object> valuesIfAny, object value)
-		{
-			if (valuesIfAny == null)
-				return null;
-
-			return valuesIfAny.Append(value);
 		}
 
 		// Courtesy of https://stackoverflow.com/a/41169463/3813189
