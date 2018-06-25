@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.Serialization;
 using System.Text;
 using DanSerialiser.Reflection;
 
@@ -124,18 +123,21 @@ namespace DanSerialiser
 			else
 				referenceID = null;
 
-			// Try to get a reference to the type that we should be deserialising to. If ignoreAnyInvalidTypes is true then don't worry if Type.GetType can't find the type that is
+			// Try to get a type builder for the type that we should be deserialising to. If ignoreAnyInvalidTypes is true then don't worry if we can't find the type that is
 			// specified because we don't care about the return value from this method, we're just parsing the data to progress to the next data that we DO care about.
-			var typeIfAvailable = Type.GetType(typeName, throwOnError: !ignoreAnyInvalidTypes);
-			var valueIfTypeIsAvailable = (typeIfAvailable == null) ? null : FormatterServices.GetUninitializedObject(typeIfAvailable);
+			var typeBuilderIfAvailable = _typeAnalyser.TryToGetUninitialisedInstanceBuilder(typeName);
+			if ((typeBuilderIfAvailable == null) && !ignoreAnyInvalidTypes)
+				throw new TypeLoadException("Unable to load type " + typeName);
+			var valueIfTypeIsAvailable = (typeBuilderIfAvailable == null) ? null : typeBuilderIfAvailable();
 			if ((valueIfTypeIsAvailable != null) && (referenceID != null))
 				_objectReferences[referenceID.Value] = valueIfTypeIsAvailable;
+			var typeIfAvailable = valueIfTypeIsAvailable?.GetType();
 			var fieldsSet = new HashSet<Tuple<Type, string>>();
 			while (true)
 			{
 				if (nextEntryType == BinarySerialisationDataType.ObjectEnd)
 				{
-					if (typeIfAvailable != null)
+					if (valueIfTypeIsAvailable != null)
 					{
 						foreach (var field in _typeAnalyser.GetAllFieldsThatShouldBeSet(typeIfAvailable))
 						{
