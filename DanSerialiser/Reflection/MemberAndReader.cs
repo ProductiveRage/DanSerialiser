@@ -7,7 +7,7 @@ namespace DanSerialiser.Reflection
 	{
 		public MemberAndReader(T member, Func<object, object> reader)
 		{
-			Member = member;
+			Member = member ?? throw new ArgumentNullException(nameof(member));
 			Reader = reader ?? throw new ArgumentNullException(nameof(reader));
 		}
 

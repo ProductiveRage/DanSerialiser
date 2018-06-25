@@ -178,10 +178,10 @@ namespace DanSerialiser
 					// field will currently be null but valueIfTypeIsAvailable will not be null).
 					if (field != null)
 					{
-						if (!BinaryReaderWriterShared.IgnoreField(field))
+						if (field.WriterUnlessFieldShouldBeIgnored != null)
 						{
-							field.SetValue(valueIfTypeIsAvailable, fieldValue);
-							fieldsSet.Add(Tuple.Create(field.DeclaringType, field.Name));
+							field.WriterUnlessFieldShouldBeIgnored(valueIfTypeIsAvailable, fieldValue);
+							fieldsSet.Add(Tuple.Create(field.Member.DeclaringType, field.Member.Name));
 						}
 					}
 					else if (valueIfTypeIsAvailable != null)

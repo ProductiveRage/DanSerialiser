@@ -8,7 +8,7 @@ namespace DanSerialiser.Reflection
 	{
 		Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>> GetFieldsAndProperties(Type type);
 		FieldInfo[] GetAllFieldsThatShouldBeSet(Type type);
-		FieldInfo TryToFindField(Type type, string fieldName, string specificTypeNameIfRequired);
+		MemberAndWriter<FieldInfo> TryToFindField(Type type, string fieldName, string specificTypeNameIfRequired);
 		(Action<object, object>[], FieldInfo[]) GetPropertySettersAndFieldsToConsiderToHaveBeenSet(Type typeToLookForPropertyOn, string fieldName, string typeNameIfRequired, Type fieldValueTypeIfAvailable);
 	}
 }

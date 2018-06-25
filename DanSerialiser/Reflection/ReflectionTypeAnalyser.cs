@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Reflection.Emit;
 
 namespace DanSerialiser.Reflection
 {
@@ -54,7 +55,7 @@ namespace DanSerialiser.Reflection
 			return fields.ToArray();
 		}
 
-		public FieldInfo TryToFindField(Type type, string fieldName, string specificTypeNameIfRequired)
+		public MemberAndWriter<FieldInfo> TryToFindField(Type type, string fieldName, string specificTypeNameIfRequired)
 		{
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
@@ -65,7 +66,7 @@ namespace DanSerialiser.Reflection
 			{
 				var field = type.GetField(fieldName, BinaryReaderWriterShared.MemberRetrievalBindingFlags);
 				if ((field != null) && ((specificTypeNameIfRequired == null) || (field.DeclaringType.AssemblyQualifiedName == specificTypeNameIfRequired)))
-					return field;
+					return new MemberAndWriter<FieldInfo>(field, BinaryReaderWriterShared.IgnoreField(field) ? null : GetFieldWriter(field));
 				type = type.BaseType;
 			}
 			return null;
@@ -147,6 +148,32 @@ namespace DanSerialiser.Reflection
 					sourceParameter
 				)
 				.Compile();
+		}
+
+		private static Action<object, object> GetFieldWriter(FieldInfo field)
+		{
+			if (field.DeclaringType.IsValueType)
+				return (source, value) => field.SetValue(source, value); // TODO: The below needs some tweaking to work with structs
+
+			// Can't set readonly fields using LINQ Expressions, need  to resort to emitting IL
+			var method = new DynamicMethod(
+				name: "Set" + field.Name,
+				returnType: null,
+				parameterTypes: new[] { typeof(object), typeof(object) },
+				m: field.DeclaringType.Module,
+				skipVisibility: true
+			);
+			var gen = method.GetILGenerator();
+			gen.Emit(OpCodes.Ldarg_0);
+			gen.Emit(OpCodes.Castclass, field.DeclaringType);
+			gen.Emit(OpCodes.Ldarg_1);
+			if (field.FieldType.IsValueType)
+				gen.Emit(OpCodes.Unbox_Any, field.FieldType);
+			else
+				gen.Emit(OpCodes.Castclass, field.FieldType);
+			gen.Emit(OpCodes.Stfld, field);
+			gen.Emit(OpCodes.Ret);
+			return (Action<object, object>)method.CreateDelegate(typeof(Action<object, object>));
 		}
 
 		private static Func<object, object> GetPropertyReader(PropertyInfo property)

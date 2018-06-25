@@ -10,14 +10,14 @@ namespace DanSerialiser.Reflection
 		private readonly IAnalyseTypesForSerialisation _reader;
 		private readonly ConcurrentDictionary<Type, Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>> _fieldAndPropertyCache;
 		private readonly ConcurrentDictionary<Type, FieldInfo[]> _requiredFieldCache;
-		private readonly ConcurrentDictionary<Tuple<Type, string, string>, FieldInfo> _fieldNameCache;
+		private readonly ConcurrentDictionary<Tuple<Type, string, string>, MemberAndWriter<FieldInfo>> _fieldNameCache;
 		private readonly ConcurrentDictionary<Tuple<Type, string, string, Type>, (Action<object, object>[], FieldInfo[])> _deprecatedPropertyCache;
 		public CachingTypeAnalyser(IAnalyseTypesForSerialisation reader)
 		{
 			_reader = reader ?? throw new ArgumentNullException(nameof(reader));
 			_fieldAndPropertyCache = new ConcurrentDictionary<Type, Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>>();
 			_requiredFieldCache = new ConcurrentDictionary<Type, FieldInfo[]>();
-			_fieldNameCache = new ConcurrentDictionary<Tuple<Type, string, string>, FieldInfo>();
+			_fieldNameCache = new ConcurrentDictionary<Tuple<Type, string, string>, MemberAndWriter<FieldInfo>>();
 			_deprecatedPropertyCache = new ConcurrentDictionary<Tuple<Type, string, string, Type>, (Action<object, object>[], FieldInfo[])>();
 		}
 
@@ -47,7 +47,7 @@ namespace DanSerialiser.Reflection
 			return result;
 		}
 
-		public FieldInfo TryToFindField(Type type, string fieldName, string specificTypeNameIfRequired)
+		public MemberAndWriter<FieldInfo> TryToFindField(Type type, string fieldName, string specificTypeNameIfRequired)
 		{
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
