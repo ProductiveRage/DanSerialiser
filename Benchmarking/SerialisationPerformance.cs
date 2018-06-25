@@ -30,6 +30,7 @@ namespace Benchmarking
 		private Product _product;
 		private string _jsonNetSerialisedData;
 		private byte[] _binaryFormatterSerialisedData, _protoBufSerialisedData, _danSerialiserSerialisedData;
+		private Product _warmUpDeserialisedProductFromBinaryFormatter, _warmUpDeserialisedProductFromProtoBuf, _warmUpDeserialisedProductFromDanSerialiser;
 
 		[GlobalSetup]
 		public void Setup()
@@ -41,8 +42,11 @@ namespace Benchmarking
 			_jsonNetSerialisedData = JsonNetSerialise();
 			RegisterTypesWithProtoBufThatShareAssemblyAndNamespaceWith(typeof(Product));
 			_binaryFormatterSerialisedData = BinaryFormatterSerialise();
+			_warmUpDeserialisedProductFromBinaryFormatter = BinaryFormatterDeserialise();
 			_protoBufSerialisedData = ProtoBufSerialise();
+			_warmUpDeserialisedProductFromProtoBuf = ProtoBufDeserialise();
 			_danSerialiserSerialisedData = DanSerialiserSerialise();
+			_warmUpDeserialisedProductFromDanSerialiser = DanSerialiserDeserialise();
 		}
 
 		[Benchmark]
