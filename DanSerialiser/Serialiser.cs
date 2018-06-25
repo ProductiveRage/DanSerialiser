@@ -42,76 +42,76 @@ namespace DanSerialiser
 			if ((parentsIfReferenceReuseDisallowed != null) && parentsIfReferenceReuseDisallowed.Contains(value, ReferenceEqualityComparer.Instance))
 				throw new CircularReferenceException();
 
-			if (type == typeof(Boolean))
+			if (type == TypeOfBoolean)
 			{
 				writer.Boolean((Boolean)value);
 				return;
 			}
-			if (type == typeof(Byte))
+			if (type == TypeOfByte)
 			{
 				writer.Byte((Byte)value);
 				return;
 			}
-			if (type == typeof(SByte))
+			if (type == TypeOfSByte)
 			{
 				writer.SByte((SByte)value);
 				return;
 			}
 
-			if (type == typeof(Int16))
+			if (type == TypeOfInt16)
 			{
 				writer.Int16((Int16)value);
 				return;
 			}
-			if (type == typeof(Int32))
+			if (type == TypeOfInt32)
 			{
 				writer.Int32((Int32)value);
 				return;
 			}
-			if (type == typeof(Int64))
+			if (type == TypeOfInt64)
 			{
 				writer.Int64((Int64)value);
 				return;
 			}
 
-			if (type == typeof(UInt16))
+			if (type == TypeOfUInt16)
 			{
 				writer.UInt16((UInt16)value);
 				return;
 			}
-			if (type == typeof(UInt32))
+			if (type == TypeOfUInt32)
 			{
 				writer.UInt32((UInt32)value);
 				return;
 			}
-			if (type == typeof(UInt64))
+			if (type == TypeOfUInt64)
 			{
 				writer.UInt64((UInt64)value);
 				return;
 			}
 
-			if (type == typeof(Single))
+			if (type == TypeOfSingle)
 			{
 				writer.Single((Single)value);
 				return;
 			}
-			if (type == typeof(Double))
+			if (type == TypeOfDouble)
 			{
 				writer.Double((Double)value);
 				return;
 			}
-			if (type == typeof(Decimal))
+			if (type == TypeOfDecimal)
 			{
 				writer.Decimal((Decimal)value);
 				return;
 			}
 
-			if (type == typeof(Char))
+			if (type == TypeOfChar)
 			{
 				writer.Char((Char)value);
 				return;
 			}
-			if (type == typeof(String))
+			if (type == TypeOfString)
 			{
 				writer.String((String)value);
 				return;
@@ -148,7 +148,7 @@ namespace DanSerialiser
 			if (value != null)
 			{
 				bool recordedAsOtherReference;
-				if ((objectHistoryIfReferenceReuseAllowed != null) && !type.IsValueType && (type != typeof(string)))
+				if ((objectHistoryIfReferenceReuseAllowed != null) && !type.IsValueType && (type != TypeOfString))
 				{
 					if (objectHistoryIfReferenceReuseAllowed.TryGetValue(value, out int referenceID))
 						recordedAsOtherReference = true;
@@ -200,6 +200,24 @@ namespace DanSerialiser
 				}
 			}
 		}
+
+		// Caching these typeof(..) calls may help performance in some cases, as suggested here:
+		//  https://rogerjohansson.blog/2016/08/16/wire-writing-one-of-the-fastest-net-serializers/
+		// I saw negligible difference but makes intuitive sense, so I'll leave it in (if only to avoid thinking about it in the future)
+		private static readonly Type TypeOfBoolean = typeof(Boolean);
+		private static readonly Type TypeOfByte = typeof(Byte);
+		private static readonly Type TypeOfSByte = typeof(SByte);
+		private static readonly Type TypeOfInt16 = typeof(Int16);
+		private static readonly Type TypeOfInt32 = typeof(Int32);
+		private static readonly Type TypeOfInt64 = typeof(Int64);
+		private static readonly Type TypeOfUInt16 = typeof(UInt16);
+		private static readonly Type TypeOfUInt32 = typeof(UInt32);
+		private static readonly Type TypeOfUInt64 = typeof(UInt64);
+		private static readonly Type TypeOfSingle = typeof(Single);
+		private static readonly Type TypeOfDouble = typeof(Double);
+		private static readonly Type TypeOfDecimal = typeof(Decimal);
+		private static readonly Type TypeOfChar = typeof(Char);
+		private static readonly Type TypeOfString = typeof(String);
 
 		// Courtesy of https://stackoverflow.com/a/41169463/3813189
 		private sealed class ReferenceEqualityComparer : IEqualityComparer<object>
