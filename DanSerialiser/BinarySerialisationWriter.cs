@@ -267,7 +267,7 @@ namespace DanSerialiser
 			//   times get a NameReferenceID instead
 			var nextReferenceID = GetNextReferenceID();
 			WriteByte((byte)BinarySerialisationDataType.FieldName); // Even though it's a property, we're stashing it using the backing field name
-			String(BinaryReaderWriterShared.CombineTypeAndFieldName(property.DeclaringType.AssemblyQualifiedName,BackingFieldHelpers.GetBackingFieldName(property.Name)));
+			String(BinaryReaderWriterShared.CombineTypeAndFieldName(property.DeclaringType.AssemblyQualifiedName, BackingFieldHelpers.GetBackingFieldName(property.Name)));
 			IntWithoutDataType(nextReferenceID);
 			_propertyNameCache[property] = new[] { (byte)BinarySerialisationDataType.FieldName, (byte)BinarySerialisationDataType.NameReferenceID }.Concat(BitConverter.GetBytes(nextReferenceID)).ToArray();
 			return true;
