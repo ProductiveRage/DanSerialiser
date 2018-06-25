@@ -32,6 +32,27 @@ namespace DanSerialiser.Reflection
 			return Tuple.Create<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>(fields, properties);
 		}
 
+		public FieldInfo[] GetAllFieldsThatShouldBeSet(Type type)
+		{
+			if (type == null)
+				throw new ArgumentNullException(nameof(type));
+
+			var fields = new List<FieldInfo>();
+			var currentType = type;
+			while (currentType != null)
+			{
+				foreach (var field in currentType.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags))
+				{
+					if (!BinaryReaderWriterShared.IgnoreField(field)
+					&& (field.GetCustomAttribute<OptionalWhenDeserialisingAttribute>() == null)
+					&& (BackingFieldHelpers.TryToGetPropertyRelatingToBackingField(field)?.GetCustomAttribute<OptionalWhenDeserialisingAttribute>() == null))
+						fields.Add(field);
+				}
+				currentType = currentType.BaseType;
+			}
+			return fields.ToArray();
+		}
+
 		private static Func<object, object> GetFieldReader(FieldInfo field)
 		{
 			var sourceParameter = Expression.Parameter(typeof(object), "source");
