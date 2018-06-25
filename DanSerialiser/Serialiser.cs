@@ -9,12 +9,12 @@ namespace DanSerialiser
 {
 	public sealed class Serialiser
 	{
-		public static Serialiser Instance { get; } = new Serialiser(new ThreadSafeCachingReader(ReflectionReader.Instance));
+		public static Serialiser Instance { get; } = new Serialiser(new CachingTypeAnalyser( ReflectionTypeAnalyser.Instance));
 
-		private readonly IReadValues _reader;
-		internal Serialiser(IReadValues reader) // internal constructor is intended for unit testing only
+		private readonly IAnalyseTypesForSerialisation _typeAnalyser;
+		internal Serialiser(IAnalyseTypesForSerialisation typeAnalyser) // internal constructor is intended for unit testing only
 		{
-			_reader = reader ?? throw new ArgumentNullException(nameof(reader));
+			_typeAnalyser = typeAnalyser ?? throw new ArgumentNullException(nameof(typeAnalyser));
 		}
 
 		public void Serialise<T>(T value, IWrite writer)
@@ -166,7 +166,7 @@ namespace DanSerialiser
 
 		private void SerialiseObjectFieldsAndProperties(object value, Type type, IEnumerable<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed, IWrite writer)
 		{
-			var (fields, properties) = _reader.GetFieldsAndProperties(value.GetType());
+			var (fields, properties) = _typeAnalyser.GetFieldsAndProperties(value.GetType());
 			foreach (var field in fields)
 			{
 				if (writer.FieldName(field.Member, type))
