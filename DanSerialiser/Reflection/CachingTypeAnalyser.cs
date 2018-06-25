@@ -8,6 +8,7 @@ namespace DanSerialiser.Reflection
 	internal sealed class CachingTypeAnalyser : IAnalyseTypesForSerialisation
 	{
 		private readonly IAnalyseTypesForSerialisation _reader;
+		private readonly ConcurrentDictionary<string, Func<object>> _typeBuilderCache;
 		private readonly ConcurrentDictionary<Type, Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>> _fieldAndPropertyCache;
 		private readonly ConcurrentDictionary<Type, FieldInfo[]> _requiredFieldCache;
 		private readonly ConcurrentDictionary<Tuple<Type, string, string>, MemberAndWriter<FieldInfo>> _fieldNameCache;
@@ -15,10 +16,24 @@ namespace DanSerialiser.Reflection
 		public CachingTypeAnalyser(IAnalyseTypesForSerialisation reader)
 		{
 			_reader = reader ?? throw new ArgumentNullException(nameof(reader));
+			_typeBuilderCache = new ConcurrentDictionary<string, Func<object>>();
 			_fieldAndPropertyCache = new ConcurrentDictionary<Type, Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>>();
 			_requiredFieldCache = new ConcurrentDictionary<Type, FieldInfo[]>();
 			_fieldNameCache = new ConcurrentDictionary<Tuple<Type, string, string>, MemberAndWriter<FieldInfo>>();
 			_deprecatedPropertyCache = new ConcurrentDictionary<Tuple<Type, string, string, Type>, (Action<object, object>[], FieldInfo[])>();
+		}
+
+		public Func<object> TryToGetUninitialisedInstanceBuilder(string typeName)
+		{
+			if (string.IsNullOrWhiteSpace(typeName))
+				throw new ArgumentException($"Null/blank {nameof(typeName)} specified");
+
+			if (_typeBuilderCache.TryGetValue(typeName, out var cachedResult))
+				return cachedResult;
+
+			var result = _reader.TryToGetUninitialisedInstanceBuilder(typeName);
+			_typeBuilderCache.TryAdd(typeName, result);
+			return result;
 		}
 
 		public Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>> GetFieldsAndProperties(Type type)

@@ -6,6 +6,7 @@ namespace DanSerialiser.Reflection
 {
 	internal interface IAnalyseTypesForSerialisation
 	{
+		Func<object> TryToGetUninitialisedInstanceBuilder(string typeName);
 		Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>> GetFieldsAndProperties(Type type);
 		FieldInfo[] GetAllFieldsThatShouldBeSet(Type type);
 		MemberAndWriter<FieldInfo> TryToFindField(Type type, string fieldName, string specificTypeNameIfRequired);

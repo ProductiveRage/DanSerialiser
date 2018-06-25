@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.Serialization;
 
 namespace DanSerialiser.Reflection
 {
@@ -11,6 +12,18 @@ namespace DanSerialiser.Reflection
 	{
 		public static ReflectionTypeAnalyser Instance { get; } = new ReflectionTypeAnalyser();
 		private ReflectionTypeAnalyser() { }
+
+		public Func<object> TryToGetUninitialisedInstanceBuilder(string typeName)
+		{
+			if (string.IsNullOrWhiteSpace(typeName))
+				throw new ArgumentException($"Null/blank {nameof(typeName)} specified");
+
+			var typeIfAvailable = Type.GetType(typeName, throwOnError: false);
+			if (typeIfAvailable == null)
+				return null;
+
+			return () => FormatterServices.GetUninitializedObject(typeIfAvailable);
+		}
 
 		public Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>> GetFieldsAndProperties(Type type)
 		{
