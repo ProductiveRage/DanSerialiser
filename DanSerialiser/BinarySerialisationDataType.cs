@@ -8,6 +8,8 @@
 
 		Int16,
 		Int32,
+		Int32_Byte,
+		Int32_Int16,
 		Int64,
 
 		UInt16,

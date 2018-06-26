@@ -51,9 +51,13 @@ namespace DanSerialiser
 					return (sbyte)ReadNext();
 
 				case BinarySerialisationDataType.Int16:
-					return BitConverter.ToInt16(ReadNext(sizeof(Int16)), 0);
+					return ReadNextInt16();
 				case BinarySerialisationDataType.Int32:
 					return ReadNextInt();
+				case BinarySerialisationDataType.Int32_Byte:
+					return (int)ReadNext();
+				case BinarySerialisationDataType.Int32_Int16:
+					return (int)ReadNextInt16();
 				case BinarySerialisationDataType.Int64:
 					return BitConverter.ToInt64(ReadNext(sizeof(Int64)), 0);
 
@@ -92,6 +96,11 @@ namespace DanSerialiser
 		private int ReadNextInt()
 		{
 			return (ReadNext() << 24) + (ReadNext() << 16) + (ReadNext() << 8) + ReadNext();
+		}
+
+		private short ReadNextInt16()
+		{
+			return (short)((ReadNext() << 8) + ReadNext());
 		}
 
 		private string ReadNextString()
