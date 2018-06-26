@@ -190,7 +190,7 @@ namespace DanSerialiser
 			WriteByte((byte)BinarySerialisationDataType.String);
 			StringWithoutDataType(typeIfValueIsNotNull.AssemblyQualifiedName);
 			IntWithoutDataType(nextReferenceID);
-			_typeNameCache[typeIfValueIsNotNull] = new[] { (byte)BinarySerialisationDataType.NameReferenceID }.Concat(BitConverter.GetBytes(nextReferenceID)).ToArray();
+			_typeNameCache[typeIfValueIsNotNull] = new[] { (byte)BinarySerialisationDataType.NameReferenceID }.Concat(GetBytesForIntWithoutDataType(nextReferenceID)).ToArray();
 		}
 
 		private bool WriteFieldNameBytesIfWantoSerialiseField(FieldInfo field, Type serialisationTargetType)
@@ -239,7 +239,7 @@ namespace DanSerialiser
 			WriteByte((byte)BinarySerialisationDataType.FieldName);
 			String(BinaryReaderWriterShared.CombineTypeAndFieldName(fieldNameExistsMultipleTimesInHierarchy ? field.DeclaringType.AssemblyQualifiedName : null, field.Name));
 			IntWithoutDataType(nextReferenceID);
-			_fieldNameCache[cacheKey] = new[] { (byte)BinarySerialisationDataType.FieldName, (byte)BinarySerialisationDataType.NameReferenceID }.Concat(BitConverter.GetBytes(nextReferenceID)).ToArray();
+			_fieldNameCache[cacheKey] = new[] { (byte)BinarySerialisationDataType.FieldName, (byte)BinarySerialisationDataType.NameReferenceID }.Concat(GetBytesForIntWithoutDataType(nextReferenceID)).ToArray();
 			return true;
 		}
 
@@ -278,29 +278,39 @@ namespace DanSerialiser
 			WriteByte((byte)BinarySerialisationDataType.FieldName); // Even though it's a property, we're stashing it using the backing field name
 			String(BinaryReaderWriterShared.CombineTypeAndFieldName(property.DeclaringType.AssemblyQualifiedName, BackingFieldHelpers.GetBackingFieldName(property.Name)));
 			IntWithoutDataType(nextReferenceID);
-			_propertyNameCache[property] = new[] { (byte)BinarySerialisationDataType.FieldName, (byte)BinarySerialisationDataType.NameReferenceID }.Concat(BitConverter.GetBytes(nextReferenceID)).ToArray();
+			_propertyNameCache[property] = new[] { (byte)BinarySerialisationDataType.FieldName, (byte)BinarySerialisationDataType.NameReferenceID }.Concat(GetBytesForIntWithoutDataType(nextReferenceID)).ToArray();
 			return true;
 		}
 
 		private void IntWithoutDataType(int value)
 		{
-			WriteBytes(BitConverter.GetBytes(value));
+			WriteByte((byte)(value >> 24));
+			WriteByte((byte)(value >> 16));
+			WriteByte((byte)(value >> 8));
+			WriteByte((byte)value);
+		}
+
+		private byte[] GetBytesForIntWithoutDataType(int value)
+		{
+			var bytes = new byte[4];
+			bytes[0] = (byte)(value >> 24);
+			bytes[1] = (byte)(value >> 16);
+			bytes[2] = (byte)(value >> 8);
+			bytes[3] = (byte)value;
+			return bytes;
 		}
 
 		private void StringWithoutDataType(string value)
 		{
-			WriteBytes(GetStringBytes(value));
-		}
-
-		private byte[] GetStringBytes(string value)
-		{
 			if (value == null)
-				return BitConverter.GetBytes(-1);
+			{
+				IntWithoutDataType(-1);
+				return;
+			}
+
 			var bytes = Encoding.UTF8.GetBytes(value);
-			var combinedContent = new byte[bytes.Length + 4];
-			Array.Copy(BitConverter.GetBytes(bytes.Length), combinedContent, length:  4);
-			Array.Copy(bytes, sourceIndex: 0, destinationArray: combinedContent, destinationIndex: 4, length: bytes.Length);
-			return combinedContent;
+			IntWithoutDataType(bytes.Length);
+			WriteBytes(bytes);
 		}
 
 		private void WriteByte(byte value)

@@ -91,7 +91,7 @@ namespace DanSerialiser
 
 		private int ReadNextInt()
 		{
-			return BitConverter.ToInt32(ReadNext(sizeof(Int32)), 0);
+			return (ReadNext() << 24) + (ReadNext() << 16) + (ReadNext() << 8) + ReadNext();
 		}
 
 		private string ReadNextString()
