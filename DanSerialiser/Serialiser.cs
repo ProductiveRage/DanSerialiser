@@ -177,8 +177,9 @@ namespace DanSerialiser
 		private void SerialiseObjectFieldsAndProperties(object value, Type type, Stack<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed, IWrite writer)
 		{
 			var (fields, properties) = _typeAnalyser.GetFieldsAndProperties(value.GetType());
-			foreach (var field in fields)
+			for (var i = 0; i < fields.Length; i++)
 			{
+				var field = fields[i];
 				if (writer.FieldName(field.Member, type))
 				{
 					if (parentsIfReferenceReuseDisallowed != null)
@@ -188,8 +189,9 @@ namespace DanSerialiser
 						parentsIfReferenceReuseDisallowed.Pop();
 				}
 			}
-			foreach (var property in properties)
+			for (var i = 0; i < properties.Length; i++)
 			{
+				var property = properties[i];
 				if (writer.PropertyName(property.Member, type))
 				{
 					if (parentsIfReferenceReuseDisallowed != null)
