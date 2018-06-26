@@ -37,7 +37,7 @@ namespace DanSerialiser.Reflection
 			return () => FormatterServices.GetUninitializedObject(typeIfAvailable);
 		}
 
-		public Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>> GetFieldsAndProperties(Type type)
+		public Tuple<MemberAndReader<FieldInfo>[], MemberAndReader<PropertyInfo>[]> GetFieldsAndProperties(Type type)
 		{
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
@@ -56,7 +56,7 @@ namespace DanSerialiser.Reflection
 				}
 				currentTypeToEnumerateMembersFor = currentTypeToEnumerateMembersFor.BaseType;
 			}
-			return Tuple.Create<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>(fields, properties);
+			return Tuple.Create(fields.ToArray(), properties.ToArray());
 		}
 
 		public FieldInfo[] GetAllFieldsThatShouldBeSet(Type type)

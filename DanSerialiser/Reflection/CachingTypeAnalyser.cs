@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Reflection;
 
 namespace DanSerialiser.Reflection
@@ -9,7 +8,7 @@ namespace DanSerialiser.Reflection
 	{
 		private readonly IAnalyseTypesForSerialisation _reader;
 		private readonly ConcurrentDictionary<string, Func<object>> _typeBuilderCache;
-		private readonly ConcurrentDictionary<Type, Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>> _fieldAndPropertyCache;
+		private readonly ConcurrentDictionary<Type, Tuple<MemberAndReader<FieldInfo>[], MemberAndReader<PropertyInfo>[]>> _fieldAndPropertyCache;
 		private readonly ConcurrentDictionary<Type, FieldInfo[]> _requiredFieldCache;
 		private readonly ConcurrentDictionary<Tuple<Type, string, string>, MemberAndWriter<FieldInfo>> _fieldNameCache;
 		private readonly ConcurrentDictionary<Tuple<Type, string, string, Type>, (Action<object, object>[], FieldInfo[])> _deprecatedPropertyCache;
@@ -17,7 +16,7 @@ namespace DanSerialiser.Reflection
 		{
 			_reader = reader ?? throw new ArgumentNullException(nameof(reader));
 			_typeBuilderCache = new ConcurrentDictionary<string, Func<object>>();
-			_fieldAndPropertyCache = new ConcurrentDictionary<Type, Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>>>();
+			_fieldAndPropertyCache = new ConcurrentDictionary<Type, Tuple<MemberAndReader<FieldInfo>[], MemberAndReader<PropertyInfo>[]>>();
 			_requiredFieldCache = new ConcurrentDictionary<Type, FieldInfo[]>();
 			_fieldNameCache = new ConcurrentDictionary<Tuple<Type, string, string>, MemberAndWriter<FieldInfo>>();
 			_deprecatedPropertyCache = new ConcurrentDictionary<Tuple<Type, string, string, Type>, (Action<object, object>[], FieldInfo[])>();
@@ -36,7 +35,7 @@ namespace DanSerialiser.Reflection
 			return result;
 		}
 
-		public Tuple<IEnumerable<MemberAndReader<FieldInfo>>, IEnumerable<MemberAndReader<PropertyInfo>>> GetFieldsAndProperties(Type type)
+		public Tuple<MemberAndReader<FieldInfo>[], MemberAndReader<PropertyInfo>[]> GetFieldsAndProperties(Type type)
 		{
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
