@@ -8,7 +8,7 @@ namespace DanSerialiser
 		/// <summary>
 		/// This uses the BinarySerialisationWriter and a MemoryStream to produce a byte array
 		/// </summary>
-		public static byte[] Serialise(object value, bool supportReferenceReuse = false)
+		public static byte[] Serialise(object value, bool supportReferenceReuse = true)
 		{
 			using (var stream = new MemoryStream())
 			{
