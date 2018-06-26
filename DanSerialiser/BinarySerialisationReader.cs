@@ -11,15 +11,18 @@ namespace DanSerialiser
 	{
 		private readonly Stream _stream;
 		private readonly IAnalyseTypesForSerialisation _typeAnalyser;
-		private readonly Dictionary<int, string> _nameReferences;
-		private readonly Dictionary<int, object> _objectReferences;
+		private readonly List<string> _nameReferences;
+		private readonly List<object> _objectReferences;
 		public BinarySerialisationReader(Stream stream) : this(stream, DefaultTypeAnalyser.Instance) { }
 		internal BinarySerialisationReader(Stream stream, IAnalyseTypesForSerialisation typeAnalyser) // internal constructor may be used by unit tests
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
 			_typeAnalyser = typeAnalyser ?? throw new ArgumentNullException(nameof(typeAnalyser));
-			_nameReferences = new Dictionary<int, string>();
-			_objectReferences = new Dictionary<int, object>();
+
+			// Reference IDs that appear in the data will appear in ascending numerical order (with no gaps), which means that it is safe to store them in a list so that read
+			// access is performed via the index (as opposed to a dictionary, for example, which would be required if the keys appeared out of order or were non-contiguous)
+			_nameReferences = new List<string>();
+			_objectReferences = new List<object>();
 		}
 
 		public T Read<T>()
@@ -107,17 +110,21 @@ namespace DanSerialiser
 				return null;
 			}
 
-			// If the next value is a Reference ID 
+			// If the next value is a Reference ID then the writer had supportReferenceReuse and all object definitions for reference types (except strings) will start with a
+			// Reference ID that will either be a new ID (followed by the object data) or an existing ID (followed by ObjectEnd)
 			int? referenceID;
 			var nextEntryType = ReadNextDataType();
 			if (nextEntryType == BinarySerialisationDataType.ReferenceID)
 			{
 				referenceID = ReadNextInt();
-				if (_objectReferences.TryGetValue(referenceID.Value, out var existingReference))
+				if (referenceID < 0)
+					throw new Exception("Encountered negative Reference ID, invalid:" + referenceID);
+				if (referenceID.Value < _objectReferences.Count)
 				{
+					// This is an existing Reference ID so ensure that it's followed by ObjectEnd and return the existing reference
 					if (ReadNextDataType() != BinarySerialisationDataType.ObjectEnd)
 						throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered after reused reference");
-					return existingReference;
+					return _objectReferences[referenceID.Value];
 				}
 				nextEntryType = ReadNextDataType();
 			}
@@ -131,7 +138,7 @@ namespace DanSerialiser
 				throw new TypeLoadException("Unable to load type " + typeName);
 			var valueIfTypeIsAvailable = (typeBuilderIfAvailable == null) ? null : typeBuilderIfAvailable();
 			if ((valueIfTypeIsAvailable != null) && (referenceID != null))
-				_objectReferences[referenceID.Value] = valueIfTypeIsAvailable;
+				_objectReferences.Add(valueIfTypeIsAvailable);
 			var typeIfAvailable = valueIfTypeIsAvailable?.GetType();
 			var fieldsThatHaveBeenSet = new List<FieldInfo>();
 			while (true)
@@ -159,13 +166,17 @@ namespace DanSerialiser
 					if (nextEntryType == BinarySerialisationDataType.String)
 					{
 						rawFieldNameInformation = ReadNextString();
-						_nameReferences[ReadNextInt()] = rawFieldNameInformation;
+						var nameReferenceID = ReadNextInt();
+						if (nameReferenceID != _nameReferences.Count)
+							throw new Exception($"Next Name Reference ID expected was {_nameReferences.Count} but encountered {nameReferenceID}");
+						_nameReferences.Add(rawFieldNameInformation);
 					}
 					else if (nextEntryType == BinarySerialisationDataType.NameReferenceID)
 					{
 						var nameReferenceID = ReadNextInt();
-						if (!_nameReferences.TryGetValue(nameReferenceID, out rawFieldNameInformation))
+						if ((nameReferenceID < 0) || (nameReferenceID >= _nameReferences.Count))
 							throw new ArgumentException("Invalid NameReferenceID: " + nameReferenceID);
+						rawFieldNameInformation = _nameReferences[nameReferenceID];
 					}
 					else
 						throw new ArgumentException("Unexpected " + nextEntryType + " after FieldName");
@@ -239,15 +250,20 @@ namespace DanSerialiser
 			{
 				var typeName = ReadNextString();
 				if (typeName != null)
-					_nameReferences[ReadNextInt()] = typeName;
+				{
+					var nameReferenceID = ReadNextInt();
+					if (nameReferenceID != _nameReferences.Count)
+						throw new Exception($"Next Name Reference ID expected was {_nameReferences.Count} but encountered {nameReferenceID}");
+					_nameReferences.Add(typeName);
+				}
 				return typeName;
 			}
 			else if (nextEntryType == BinarySerialisationDataType.NameReferenceID)
 			{
 				var nameReferenceID = ReadNextInt();
-				if (!_nameReferences.TryGetValue(nameReferenceID, out var typeName))
+				if ((nameReferenceID < 0) || (nameReferenceID >= _nameReferences.Count))
 					throw new ArgumentException("Invalid NameReferenceID: " + nameReferenceID);
-				return typeName;
+				return _nameReferences[nameReferenceID];
 			}
 			else
 				throw new ArgumentException("Expected String or NameReferenceID for object type name");

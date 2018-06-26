@@ -13,6 +13,7 @@ namespace DanSerialiser
 		private readonly Dictionary<Type, byte[]> _typeNameCache;
 		private readonly Dictionary<Tuple<FieldInfo, Type>, byte[]> _fieldNameCache;
 		private readonly Dictionary<PropertyInfo, byte[]> _propertyNameCache;
+		private int _nextNameReferenceID;
 		public BinarySerialisationWriter(Stream stream, bool supportReferenceReuse)
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
@@ -20,6 +21,11 @@ namespace DanSerialiser
 			_typeNameCache = new Dictionary<Type, byte[]>();
 			_fieldNameCache = new Dictionary<Tuple<FieldInfo, Type>, byte[]>();
 			_propertyNameCache = new Dictionary<PropertyInfo, byte[]>();
+
+			// Instead of repeating type and field name strings in the serialised data, each time a new value is declared it will be given a Name Reference ID and this
+			// numeric ID will be used instead of the string next time. The IDs increment each time that a new one is required and will appear in ascending numerical
+			// order in the serialised data (this fact may be used by the deserialisation process).
+			_nextNameReferenceID = 0;
 		}
 
 		public bool SupportReferenceReuse { get; }
@@ -179,7 +185,8 @@ namespace DanSerialiser
 
 			// This is first time that the type has been encountered and so we need to write the full string and the Name Reference ID but the bytes in the cache will just be a
 			// point to a NameReferenceID (so next time the type is encountered, ONLY that ID will be written)
-			var nextReferenceID = GetNextReferenceID();
+			var nextReferenceID = _nextNameReferenceID;
+			_nextNameReferenceID++;
 			WriteByte((byte)BinarySerialisationDataType.String);
 			StringWithoutDataType(typeIfValueIsNotNull.AssemblyQualifiedName);
 			IntWithoutDataType(nextReferenceID);
@@ -227,7 +234,8 @@ namespace DanSerialiser
 
 			// When recording a field name, either write a string and then the Name Reference ID that that string should be stored as OR write just the Name Reference ID
 			// (if the field name has already been recorded once and may be reused)
-			var nextReferenceID = GetNextReferenceID();
+			var nextReferenceID = _nextNameReferenceID;
+			_nextNameReferenceID++;
 			WriteByte((byte)BinarySerialisationDataType.FieldName);
 			String(BinaryReaderWriterShared.CombineTypeAndFieldName(fieldNameExistsMultipleTimesInHierarchy ? field.DeclaringType.AssemblyQualifiedName : null, field.Name));
 			IntWithoutDataType(nextReferenceID);
@@ -265,17 +273,13 @@ namespace DanSerialiser
 			//   on the safe side
 			// - Further note: Similar approach to type and field name recording is taken here; the first time a property is written, the string is serialised, while subsequent
 			//   times get a NameReferenceID instead
-			var nextReferenceID = GetNextReferenceID();
+			var nextReferenceID = _nextNameReferenceID;
+			_nextNameReferenceID++;
 			WriteByte((byte)BinarySerialisationDataType.FieldName); // Even though it's a property, we're stashing it using the backing field name
 			String(BinaryReaderWriterShared.CombineTypeAndFieldName(property.DeclaringType.AssemblyQualifiedName, BackingFieldHelpers.GetBackingFieldName(property.Name)));
 			IntWithoutDataType(nextReferenceID);
 			_propertyNameCache[property] = new[] { (byte)BinarySerialisationDataType.FieldName, (byte)BinarySerialisationDataType.NameReferenceID }.Concat(BitConverter.GetBytes(nextReferenceID)).ToArray();
 			return true;
-		}
-
-		private int GetNextReferenceID()
-		{
-			return _typeNameCache.Count + _fieldNameCache.Count + _propertyNameCache.Count;
 		}
 
 		private void IntWithoutDataType(int value)
