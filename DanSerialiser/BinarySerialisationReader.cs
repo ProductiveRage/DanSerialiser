@@ -11,7 +11,7 @@ namespace DanSerialiser
 	{
 		private readonly Stream _stream;
 		private readonly IAnalyseTypesForSerialisation _typeAnalyser;
-		private readonly List<string> _nameReferences;
+		private readonly Dictionary<int, string> _nameReferences;
 		private readonly List<object> _objectReferences;
 		public BinarySerialisationReader(Stream stream) : this(stream, DefaultTypeAnalyser.Instance) { }
 		internal BinarySerialisationReader(Stream stream, IAnalyseTypesForSerialisation typeAnalyser) // internal constructor may be used by unit tests
@@ -19,9 +19,11 @@ namespace DanSerialiser
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
 			_typeAnalyser = typeAnalyser ?? throw new ArgumentNullException(nameof(typeAnalyser));
 
-			// Reference IDs that appear in the data will appear in ascending numerical order (with no gaps), which means that it is safe to store them in a list so that read
-			// access is performed via the index (as opposed to a dictionary, for example, which would be required if the keys appeared out of order or were non-contiguous)
-			_nameReferences = new List<string>();
+			// Object Reference IDs that appear in the data will appear in ascending numerical order (with no gaps), which means that it is safe to store them in a list so that
+			// read access is performed via the index - this is possible to achieve when serialising because the Object Reference IDs are scoped to the particular writer instance
+			// whereas the Name Reference IDs are managed by the BinarySerialisationWriterCachedNames and so the Name Reference IDs encountered  to serialise a particular object
+			// may not be continuous and so a dictionary is required to describe a lookup for them here.
+			_nameReferences = new Dictionary<int, string>();
 			_objectReferences = new List<object>();
 		}
 
@@ -175,17 +177,13 @@ namespace DanSerialiser
 					if (nextEntryType == BinarySerialisationDataType.String)
 					{
 						rawFieldNameInformation = ReadNextString();
-						var nameReferenceID = ReadNextInt();
-						if (nameReferenceID != _nameReferences.Count)
-							throw new Exception($"Next Name Reference ID expected was {_nameReferences.Count} but encountered {nameReferenceID}");
-						_nameReferences.Add(rawFieldNameInformation);
+						_nameReferences[ReadNextInt()] = rawFieldNameInformation;
 					}
 					else if (nextEntryType == BinarySerialisationDataType.NameReferenceID)
 					{
 						var nameReferenceID = ReadNextInt();
-						if ((nameReferenceID < 0) || (nameReferenceID >= _nameReferences.Count))
+						if (!_nameReferences.TryGetValue(nameReferenceID, out rawFieldNameInformation))
 							throw new ArgumentException("Invalid NameReferenceID: " + nameReferenceID);
-						rawFieldNameInformation = _nameReferences[nameReferenceID];
 					}
 					else
 						throw new ArgumentException("Unexpected " + nextEntryType + " after FieldName");
@@ -259,20 +257,15 @@ namespace DanSerialiser
 			{
 				var typeName = ReadNextString();
 				if (typeName != null)
-				{
-					var nameReferenceID = ReadNextInt();
-					if (nameReferenceID != _nameReferences.Count)
-						throw new Exception($"Next Name Reference ID expected was {_nameReferences.Count} but encountered {nameReferenceID}");
-					_nameReferences.Add(typeName);
-				}
+					_nameReferences[ReadNextInt()] = typeName;
 				return typeName;
 			}
 			else if (nextEntryType == BinarySerialisationDataType.NameReferenceID)
 			{
 				var nameReferenceID = ReadNextInt();
-				if ((nameReferenceID < 0) || (nameReferenceID >= _nameReferences.Count))
+				if (!_nameReferences.TryGetValue(nameReferenceID, out var typeName))
 					throw new ArgumentException("Invalid NameReferenceID: " + nameReferenceID);
-				return _nameReferences[nameReferenceID];
+				return typeName;
 			}
 			else
 				throw new ArgumentException("Expected String or NameReferenceID for object type name");

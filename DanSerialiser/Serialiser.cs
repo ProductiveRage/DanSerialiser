@@ -31,13 +31,13 @@ namespace DanSerialiser
 			Serialise(
 				value,
 				value?.GetType() ?? typeof(T),
-				writer,
 				writer.SupportReferenceReuse ? null : new Stack<object>(),
-				writer.SupportReferenceReuse ? new Dictionary<object, int>(ReferenceEqualityComparer.Instance) : null
+				writer.SupportReferenceReuse ? new Dictionary<object, int>(ReferenceEqualityComparer.Instance) : null,
+				writer
 			);
 		}
 
-		private void Serialise(object value, Type type, IWrite writer, Stack<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed)
+		private void Serialise(object value, Type type, Stack<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed, IWrite writer)
 		{
 			if ((parentsIfReferenceReuseDisallowed != null) && parentsIfReferenceReuseDisallowed.Contains(value, ReferenceEqualityComparer.Instance))
 				throw new CircularReferenceException();
@@ -119,7 +119,7 @@ namespace DanSerialiser
 
 			if (type.IsEnum)
 			{
-				Serialise(value, type.GetEnumUnderlyingType(), writer, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed);
+				Serialise(value, type.GetEnumUnderlyingType(), parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, writer);
 				return;
 			}
 
@@ -135,7 +135,7 @@ namespace DanSerialiser
 						var element = array.GetValue(i);
 						if (parentsIfReferenceReuseDisallowed != null)
 							parentsIfReferenceReuseDisallowed.Push(value);
-						Serialise(element, elementType, writer, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed);
+						Serialise(element, elementType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, writer);
 						if (parentsIfReferenceReuseDisallowed != null)
 							parentsIfReferenceReuseDisallowed.Pop();
 					}
@@ -176,7 +176,9 @@ namespace DanSerialiser
 
 		private void SerialiseObjectFieldsAndProperties(object value, Type type, Stack<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed, IWrite writer)
 		{
-			var (fields, properties) = _typeAnalyser.GetFieldsAndProperties(value.GetType());
+			// Write out all of the data for the value
+			var valueType = value.GetType();
+			var (fields, properties) = _typeAnalyser.GetFieldsAndProperties(valueType);
 			for (var i = 0; i < fields.Length; i++)
 			{
 				var field = fields[i];
@@ -184,7 +186,7 @@ namespace DanSerialiser
 				{
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Push(value);
-					Serialise(field.Reader(value), field.Member.FieldType, writer, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed);
+					Serialise(field.Reader(value), field.Member.FieldType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, writer);
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Pop();
 				}
@@ -196,7 +198,7 @@ namespace DanSerialiser
 				{
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Push(value);
-					Serialise(property.Reader(value), property.Member.PropertyType, writer, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed);
+					Serialise(property.Reader(value), property.Member.PropertyType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, writer);
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Pop();
 				}

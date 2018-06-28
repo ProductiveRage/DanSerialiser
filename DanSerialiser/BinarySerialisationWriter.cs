@@ -1,31 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text;
+using DanSerialiser.Reflection;
 
 namespace DanSerialiser
 {
 	public sealed class BinarySerialisationWriter : IWrite
 	{
 		private readonly Stream _stream;
-		private readonly Dictionary<Type, byte[]> _typeNameCache;
-		private readonly Dictionary<Tuple<FieldInfo, Type>, byte[]> _fieldNameCache;
-		private readonly Dictionary<PropertyInfo, byte[]> _propertyNameCache;
-		private int _nextNameReferenceID;
-		public BinarySerialisationWriter(Stream stream, bool supportReferenceReuse)
+		private readonly IAnalyseTypesForSerialisation _typeAnalyser;
+		private readonly Dictionary<Type, BinarySerialisationWriterCachedNames.CachedNameData> _recordedTypeNames;
+		private readonly Dictionary<Tuple<FieldInfo, Type>, BinarySerialisationWriterCachedNames.CachedNameData> _encounteredFields;
+		private readonly Dictionary<PropertyInfo, BinarySerialisationWriterCachedNames.CachedNameData> _encounteredProperties;
+		public BinarySerialisationWriter(Stream stream, bool supportReferenceReuse) : this(stream, supportReferenceReuse, DefaultTypeAnalyser.Instance) { }
+		internal BinarySerialisationWriter(Stream stream, bool supportReferenceReuse, IAnalyseTypesForSerialisation typeAnalyser) // internal constructor for unit testing
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
 			SupportReferenceReuse = supportReferenceReuse;
-			_typeNameCache = new Dictionary<Type, byte[]>();
-			_fieldNameCache = new Dictionary<Tuple<FieldInfo, Type>, byte[]>();
-			_propertyNameCache = new Dictionary<PropertyInfo, byte[]>();
+			_typeAnalyser = typeAnalyser;
 
-			// Instead of repeating type and field name strings in the serialised data, each time a new value is declared it will be given a Name Reference ID and this
-			// numeric ID will be used instead of the string next time. The IDs increment each time that a new one is required and will appear in ascending numerical
-			// order in the serialised data (this fact may be used by the deserialisation process).
-			_nextNameReferenceID = 0;
+			_recordedTypeNames = new Dictionary<Type, BinarySerialisationWriterCachedNames.CachedNameData>();
+			_encounteredFields = new Dictionary<Tuple<FieldInfo, Type>, BinarySerialisationWriterCachedNames.CachedNameData>();
+			_encounteredProperties = new Dictionary<PropertyInfo, BinarySerialisationWriterCachedNames.CachedNameData>();
 		}
 
 		public bool SupportReferenceReuse { get; }
@@ -190,112 +188,77 @@ namespace DanSerialiser
 				return;
 			}
 
-			if (_typeNameCache.TryGetValue(typeIfValueIsNotNull, out var cachedResult))
+			if (_recordedTypeNames.TryGetValue(typeIfValueIsNotNull, out var cachedData))
 			{
-				WriteBytes(cachedResult);
+				// If we've encountered this field before then we return the bytes for the Name Reference ID only
+				WriteBytes(cachedData.OnlyAsReferenceID);
 				return;
 			}
 
-			// This is first time that the type has been encountered and so we need to write the full string and the Name Reference ID but the bytes in the cache will just be a
-			// point to a NameReferenceID (so next time the type is encountered, ONLY that ID will be written)
-			var nextReferenceID = _nextNameReferenceID;
-			_nextNameReferenceID++;
-			WriteByte((byte)BinarySerialisationDataType.String);
-			StringWithoutDataType(typeIfValueIsNotNull.AssemblyQualifiedName);
-			Int32WithoutDataType(nextReferenceID);
-			_typeNameCache[typeIfValueIsNotNull] = new[] { (byte)BinarySerialisationDataType.NameReferenceID }.Concat(GetBytesForInt32WithoutDataType(nextReferenceID)).ToArray();
+			// If we haven't encountered this type before then we'll need to write out the full string data (if another write has encountered this type then the call to the
+			// BinarySerialisationWriterCachedNames method should be very cheap but we need to include the string data so that the reader knows what string value to use for
+			// this type - if we run into it again in this serialisation process then we'll emit a Name Reference ID and NOT the full string data)
+			cachedData = BinarySerialisationWriterCachedNames.GetTypeNameBytes(typeIfValueIsNotNull);
+			_recordedTypeNames[typeIfValueIsNotNull] = cachedData;
+			WriteBytes(cachedData.AsStringAndReferenceID);
 		}
 
 		private bool WriteFieldNameBytesIfWantoSerialiseField(FieldInfo field, Type serialisationTargetType)
 		{
-			var cacheKey = Tuple.Create(field, serialisationTargetType);
-			if (_fieldNameCache.TryGetValue(cacheKey, out var cachedResult))
+			var fieldOnType = Tuple.Create(field, serialisationTargetType);
+			if (_encounteredFields.TryGetValue(fieldOnType, out var cachedData))
 			{
-				if (cachedResult == null)
+				// If we've encountered this field before then we return the bytes for the Name Reference ID only (unless we've got a null value, which means skip it and return
+				// null from here)
+				if (cachedData == null)
 					return false;
-				WriteBytes(cachedResult);
+
+				WriteByte((byte)BinarySerialisationDataType.FieldName);
+				WriteBytes(cachedData.OnlyAsReferenceID);
 				return true;
 			}
 
-			if (BinaryReaderWriterShared.IgnoreField(field))
-			{
-				_fieldNameCache[cacheKey] = null;
+			// If we haven't encountered this field before then we'll need to write out the full string data (if another write has encountered this field then the call to the
+			// BinarySerialisationWriterCachedNames method should be very cheap but we need to include the string data so that the reader knows what string value to use for
+			// this field - if we run into it again in this serialisation process then we'll emit a Name Reference ID and NOT the full string data)
+			cachedData = BinarySerialisationWriterCachedNames.GetFieldNameBytesIfWantoSerialiseField(field, serialisationTargetType);
+			_encounteredFields[fieldOnType] = cachedData;
+			if (cachedData == null)
 				return false;
-			}
 
-			// Serialisation of pointer fields will fail - I don't know how they would be supportable anyway but they fail with a stack overflow if attempted, so catch it
-			// first and raise as a more useful exception
-			if (field.FieldType.IsPointer || (field.FieldType == typeof(IntPtr)) || (field.FieldType == typeof(UIntPtr)))
-				throw new NotSupportedException($"Can not serialise pointer fields: {field.Name} on {field.DeclaringType.Name}");
-
-			// If a field is declared multiple times in the type hierarchy (whether through overrides or use of "new") then its name will need prefixing with the type
-			// that this FieldInfo relates to
-			var fieldNameExistsMultipleTimesInHierarchy = false;
-			var currentType = serialisationTargetType;
-			while (currentType != null)
-			{
-				if (currentType != serialisationTargetType)
-				{
-					if (currentType.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags).Any(f => f.Name == field.Name))
-					{
-						fieldNameExistsMultipleTimesInHierarchy = true;
-						break;
-					}
-				}
-				currentType = currentType.BaseType;
-			}
-
-			// When recording a field name, either write a string and then the Name Reference ID that that string should be stored as OR write just the Name Reference ID
-			// (if the field name has already been recorded once and may be reused)
-			var nextReferenceID = _nextNameReferenceID;
-			_nextNameReferenceID++;
 			WriteByte((byte)BinarySerialisationDataType.FieldName);
-			String(BinaryReaderWriterShared.CombineTypeAndFieldName(fieldNameExistsMultipleTimesInHierarchy ? field.DeclaringType.AssemblyQualifiedName : null, field.Name));
-			Int32WithoutDataType(nextReferenceID);
-			_fieldNameCache[cacheKey] = new[] { (byte)BinarySerialisationDataType.FieldName, (byte)BinarySerialisationDataType.NameReferenceID }.Concat(GetBytesForInt32WithoutDataType(nextReferenceID)).ToArray();
+			WriteBytes(cachedData.AsStringAndReferenceID);
 			return true;
 		}
 
 		private bool WritePropertyNameBytesIfWantoSerialiseField(PropertyInfo property)
 		{
-			if (_propertyNameCache.TryGetValue(property, out var cachedResult))
+			if (_encounteredProperties.TryGetValue(property, out var cachedData))
 			{
-				if (cachedResult == null)
+				// If we've encountered this property before then we return the bytes for the Name Reference ID only (unless we've got a null value, which means skip it and
+				// return null from here)
+				if (cachedData == null)
 					return false;
-				WriteBytes(cachedResult);
+
+				WriteByte((byte)BinarySerialisationDataType.FieldName);
+				WriteBytes(cachedData.OnlyAsReferenceID);
 				return true;
 			}
 
-			// Most of the time, we'll just serialise the backing fields because that should capture all of the data..
-			if (property.GetCustomAttribute<DeprecatedAttribute>() == null)
-			{
-				_propertyNameCache[property] = null;
+			// If we haven't encountered this field before then we'll need to write out the full string data (if another write has encountered this field then the call to the
+			// BinarySerialisationWriterCachedNames method should be very cheap but we need to include the string data so that the reader knows what string value to use for
+			// this field - if we run into it again in this serialisation process then we'll emit a Name Reference ID and NOT the full string data)
+			cachedData = BinarySerialisationWriterCachedNames.GetFieldNameBytesIfWantoSerialiseProperty(property);
+			_encounteredProperties[property] = cachedData;
+			if (cachedData == null)
 				return false;
-			}
 
-			if (property.PropertyType.IsPointer || (property.PropertyType == typeof(IntPtr)) || (property.PropertyType == typeof(UIntPtr)))
-				throw new NotSupportedException($"Can not serialise pointer properties: {property.Name} on {property.DeclaringType.Name}");
-
-			// .. however, if this is a property that has the [Deprecated] attribute on it then it is expected to exist for backwards compatibility and to be a computed property
-			// (and so have no backing field) but one that we want to include in the serialised data anyway. If V1 of a type has a string "Name" property which is replaced in V2
-			// with a "TranslatedName" property of type TranslatedString then a computed "Name" property could be added to the V2 type (annotated with [Deprecated]) whose getter
-			// returns the default language value of the TranslatedName - this value may then be included in the serialisation data so that an assembly that has loaded the V1
-			// type can deserialise and populate its Name property.
-			// - Note: We won't try to determine whether or not the type name prefix is necessary when recording the field name because the type hierarchy and the properties on
-			//   them might be different now than in the version of the types where deserialisation occurs so the type name will always be inserted before the field name to err
-			//   on the safe side
-			// - Further note: Similar approach to type and field name recording is taken here; the first time a property is written, the string is serialised, while subsequent
-			//   times get a NameReferenceID instead
-			var nextReferenceID = _nextNameReferenceID;
-			_nextNameReferenceID++;
-			WriteByte((byte)BinarySerialisationDataType.FieldName); // Even though it's a property, we're stashing it using the backing field name
-			String(BinaryReaderWriterShared.CombineTypeAndFieldName(property.DeclaringType.AssemblyQualifiedName, BackingFieldHelpers.GetBackingFieldName(property.Name)));
-			Int32WithoutDataType(nextReferenceID);
-			_propertyNameCache[property] = new[] { (byte)BinarySerialisationDataType.FieldName, (byte)BinarySerialisationDataType.NameReferenceID }.Concat(GetBytesForInt32WithoutDataType(nextReferenceID)).ToArray();
+			WriteByte((byte)BinarySerialisationDataType.FieldName);
+			WriteBytes(cachedData.AsStringAndReferenceID);
 			return true;
 		}
 
-		private void Int32WithoutDataType(int value)
+		internal void Int32WithoutDataType(int value)
 		{
 			WriteByte((byte)(value >> 24));
 			WriteByte((byte)(value >> 16));

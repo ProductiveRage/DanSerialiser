@@ -1,0 +1,29 @@
+// * Summary *
+
+BenchmarkDotNet=v0.10.14, OS=Windows 8.1 (6.3.9600.0)
+AMD FX(tm)-8350 Eight-Core Processor, 1 CPU, 8 logical and 4 physical cores
+Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
+.NET Core SDK=2.1.300
+  [Host] : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+  Clr    : .NET Framework 4.6.1 (CLR 4.0.30319.42000), 64bit RyuJIT-v4.7.2650.0
+  Core   : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+
+
+                     Method |  Job | Runtime |        Mean |        Error |        StdDev |
+--------------------------- |----- |-------- |------------:|-------------:|--------------:|
+           JsonNetSerialise |  Clr |     Clr | 99,410.0 us | 1,227.924 us | 1,148.6006 us |
+         JsonNetDeserialise |  Clr |     Clr | 79,504.9 us |   713.091 us |   632.1362 us |
+   BinaryFormatterSerialise |  Clr |     Clr | 52,373.6 us |   676.754 us |   633.0359 us |
+ BinaryFormatterDeserialise |  Clr |     Clr | 64,740.8 us |   485.910 us |   454.5207 us |
+          ProtoBufSerialise |  Clr |     Clr |  3,312.9 us |    26.612 us |    20.7767 us |
+        ProtoBufDeserialise |  Clr |     Clr |  6,407.3 us |    31.882 us |    29.8229 us |
+     DanSerialiserSerialise |  Clr |     Clr | 56,969.0 us |   347.383 us |   307.9459 us |
+   DanSerialiserDeserialise |  Clr |     Clr | 65,797.1 us |   719.252 us |   672.7889 us |
+           JsonNetSerialise | Core |    Core |  9,575.1 us |    48.557 us |    43.0448 us |
+         JsonNetDeserialise | Core |    Core | 12,168.7 us |    59.425 us |    46.3951 us |
+   BinaryFormatterSerialise | Core |    Core | 10,323.6 us |    70.759 us |    66.1883 us |
+ BinaryFormatterDeserialise | Core |    Core |  9,167.7 us |    53.444 us |    49.9920 us |
+          ProtoBufSerialise | Core |    Core |    464.4 us |     1.063 us |     0.8298 us |
+        ProtoBufDeserialise | Core |    Core |    817.7 us |     3.575 us |     2.9855 us |
+     DanSerialiserSerialise | Core |    Core |  8,863.2 us |   117.344 us |   109.7639 us |
+   DanSerialiserDeserialise | Core |    Core |  8,835.5 us |    82.064 us |    76.7625 us |
