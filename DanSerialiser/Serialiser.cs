@@ -33,11 +33,18 @@ namespace DanSerialiser
 				value?.GetType() ?? typeof(T),
 				writer.SupportReferenceReuse ? null : new Stack<object>(),
 				writer.SupportReferenceReuse ? new Dictionary<object, int>(ReferenceEqualityComparer.Instance) : null,
+				new Dictionary<Type, Action<object>>(),
 				writer
 			);
 		}
 
-		private void Serialise(object value, Type type, Stack<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed, IWrite writer)
+		private void Serialise(
+			object value,
+			Type type,
+			Stack<object> parentsIfReferenceReuseDisallowed,
+			Dictionary<object, int> objectHistoryIfReferenceReuseAllowed,
+			Dictionary<Type, Action<object>> generatedMemberSetters,
+			IWrite writer)
 		{
 			if ((parentsIfReferenceReuseDisallowed != null) && parentsIfReferenceReuseDisallowed.Contains(value, ReferenceEqualityComparer.Instance))
 				throw new CircularReferenceException();
@@ -119,7 +126,7 @@ namespace DanSerialiser
 
 			if (type.IsEnum)
 			{
-				Serialise(value, type.GetEnumUnderlyingType(), parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, writer);
+				Serialise(value, type.GetEnumUnderlyingType(), parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, generatedMemberSetters, writer);
 				return;
 			}
 
@@ -135,7 +142,7 @@ namespace DanSerialiser
 						var element = array.GetValue(i);
 						if (parentsIfReferenceReuseDisallowed != null)
 							parentsIfReferenceReuseDisallowed.Push(value);
-						Serialise(element, elementType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, writer);
+						Serialise(element, elementType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, generatedMemberSetters, writer);
 						if (parentsIfReferenceReuseDisallowed != null)
 							parentsIfReferenceReuseDisallowed.Pop();
 					}
@@ -169,15 +176,34 @@ namespace DanSerialiser
 				else
 					recordedAsOtherReference = false;
 				if (!recordedAsOtherReference)
-					SerialiseObjectFieldsAndProperties(value, type, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, writer);
+					SerialiseObjectFieldsAndProperties(value, type, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, generatedMemberSetters, writer);
 			}
 			writer.ObjectEnd();
 		}
 
-		private void SerialiseObjectFieldsAndProperties(object value, Type type, Stack<object> parentsIfReferenceReuseDisallowed, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed, IWrite writer)
+		private void SerialiseObjectFieldsAndProperties(
+			object value,
+			Type type,
+			Stack<object> parentsIfReferenceReuseDisallowed,
+			Dictionary<object, int> objectHistoryIfReferenceReuseAllowed,
+			Dictionary<Type, Action<object>> generatedMemberSetters,
+			IWrite writer)
 		{
-			// Write out all of the data for the value
+			// It may be possible for a "type generator" to be created for some types (generally simple types that won't require any nested Serialise calls that involve tracking
+			// parentsIfReferenceReuseDisallowed or objectHistoryIfReferenceReuseAllowed), so check that first. There are three cases; 1. we don't have any type generator data
+			// about the current type, 2. we have tried to retrieve a type generator before and got back null (meaning that this type does not match the writer's conditions
+			// for being able to create a type generator) and 3. we have successfully created a type generator before. If it's case 3 then we'll use that type generator
+			// instead of enumerating fields below but if it's case 1 or 2 then we'll have to do that work (but if it's case 1 then we'll try to find out whether it's
+			// possible to create a type generator at the bottom of this method).
 			var valueType = value.GetType();
+			var haveTriedToGenerateMemberSetterBefore = generatedMemberSetters.TryGetValue(type, out var memberSetter);
+			if (haveTriedToGenerateMemberSetterBefore && (memberSetter != null))
+			{
+				memberSetter(value);
+				return;
+			}
+
+			// Write out all of the data for the value
 			var (fields, properties) = _typeAnalyser.GetFieldsAndProperties(valueType);
 			for (var i = 0; i < fields.Length; i++)
 			{
@@ -186,7 +212,7 @@ namespace DanSerialiser
 				{
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Push(value);
-					Serialise(field.Reader(value), field.Member.FieldType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, writer);
+					Serialise(field.Reader(value), field.Member.FieldType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, generatedMemberSetters, writer);
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Pop();
 				}
@@ -198,11 +224,20 @@ namespace DanSerialiser
 				{
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Push(value);
-					Serialise(property.Reader(value), property.Member.PropertyType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, writer);
+					Serialise(property.Reader(value), property.Member.PropertyType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, generatedMemberSetters, writer);
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Pop();
 				}
 			}
+
+			// If we have tried before to create a type generator for this type and were unsuccessful then there is nothing more to do..
+			if (haveTriedToGenerateMemberSetterBefore)
+				return;
+
+			// .. but if we HAVEN'T tried to create a type generator before then ask the writer if it's able to do so (this is done after the first time that an instance of
+			// the type has been fully serialised so that the writer has a chance to create any Name Reference IDs that it might want to use for the member names and potentially
+			// have done some other forms of caching)
+			generatedMemberSetters[type] = writer.TryToGenerateMemberSetter(type);
 		}
 
 		// Caching these typeof(..) calls may help performance in some cases, as suggested here:

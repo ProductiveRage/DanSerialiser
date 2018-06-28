@@ -177,6 +177,17 @@ namespace DanSerialiser
 			return WritePropertyNameBytesIfWantoSerialiseField(property);
 		}
 
+		public Action<object> TryToGenerateMemberSetter(Type type)
+		{
+			if (type == null)
+				throw new ArgumentNullException(nameof(type));
+
+			var memberSetter = SharedGeneratedMemberSetters.TryToGenerateMemberSetter(type);
+			if (memberSetter == null)
+				return null;
+			return value => memberSetter(value, this);
+		}
+
 		private void WriteTypeName(Type typeIfValueIsNotNull)
 		{
 			// When recording a type name, either write a null string for it OR write a string and then the Name Reference ID that that string should be stored as OR write just

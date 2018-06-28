@@ -206,6 +206,12 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public void ArrayOfNullableInt32()
+		{
+			AssertCloneMatchesOriginal(new int?[] { 123, 456, null });
+		}
+
+		[Fact]
 		public void NullListOfInt32()
 		{
 			AssertCloneMatchesOriginal((List<int>)null);
