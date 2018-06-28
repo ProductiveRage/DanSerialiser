@@ -5,7 +5,6 @@ namespace DanSerialiser
 {
 	internal static class BinaryReaderWriterShared
 	{
-
 		public static readonly BindingFlags MemberRetrievalBindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
 		public static readonly int MaxReferenceCount = int.MaxValue;

@@ -27,38 +27,41 @@ namespace Benchmarking
 	[CoreJob, ClrJob]
 	public class SerialisationPerformance
 	{
-		private Product _product;
+		private Product[] _products;
 		private string _jsonNetSerialisedData;
 		private byte[] _binaryFormatterSerialisedData, _protoBufSerialisedData, _danSerialiserSerialisedData;
-		private Product _warmUpDeserialisedProductFromBinaryFormatter, _warmUpDeserialisedProductFromProtoBuf, _warmUpDeserialisedProductFromDanSerialiser;
+		private Product[] _warmUpDeserialisedProductsFromBinaryFormatter, _warmUpDeserialisedProductsFromProtoBuf, _warmUpDeserialisedProductsFromDanSerialiser;
 
 		[GlobalSetup]
 		public void Setup()
 		{
-			// The json file (and the object model) is derived from real world data that I deal with (it's not the entire object model - because I got bored exporting it and tidyig it up - but it's enough to
-			// work with). All of the text and location values have been changed to maintain their length and spread of characters (ie. not all ASCII) but to ensure that it's all anonymous (it's public data
-			// anyway but it does no harm to err on the safe side).
-			_product = JsonConvert.DeserializeObject<Product>(File.ReadAllText("SampleData\\1005143.json"));
+			// The json files (and the object model) are derived from real world data that I deal with (it's not the entire object model - because I got bored exporting it and tidyig it up - but it's enough
+			// tp work with). All of the text and location values have been changed to maintain their length and spread of characters (ie. not all ASCII) but to ensure that it's all anonymous (it's public
+			// data anyway but it does no harm to err on the safe side).
+			_products = new DirectoryInfo("SampleData")
+				.EnumerateFiles("*.json")
+				.Select(file => JsonConvert.DeserializeObject<Product>(File.ReadAllText(file.FullName)))
+				.ToArray();
 			_jsonNetSerialisedData = JsonNetSerialise();
 			RegisterTypesWithProtoBufThatShareAssemblyAndNamespaceWith(typeof(Product));
 			_binaryFormatterSerialisedData = BinaryFormatterSerialise();
-			_warmUpDeserialisedProductFromBinaryFormatter = BinaryFormatterDeserialise();
+			_warmUpDeserialisedProductsFromBinaryFormatter = BinaryFormatterDeserialise();
 			_protoBufSerialisedData = ProtoBufSerialise();
-			_warmUpDeserialisedProductFromProtoBuf = ProtoBufDeserialise();
+			_warmUpDeserialisedProductsFromProtoBuf = ProtoBufDeserialise();
 			_danSerialiserSerialisedData = DanSerialiserSerialise();
-			_warmUpDeserialisedProductFromDanSerialiser = DanSerialiserDeserialise();
+			_warmUpDeserialisedProductsFromDanSerialiser = DanSerialiserDeserialise();
 		}
 
 		[Benchmark]
 		public string JsonNetSerialise()
 		{
-			return JsonConvert.SerializeObject(_product);
+			return JsonConvert.SerializeObject(_products);
 		}
 
 		[Benchmark]
-		public Product JsonNetDeserialise()
+		public Product[] JsonNetDeserialise()
 		{
-			return JsonConvert.DeserializeObject<Product>(_jsonNetSerialisedData);
+			return JsonConvert.DeserializeObject<Product[]>(_jsonNetSerialisedData);
 		}
 
 		[Benchmark]
@@ -66,17 +69,17 @@ namespace Benchmarking
 		{
 			using (var stream = new MemoryStream())
 			{
-				(new BinaryFormatter()).Serialize(stream, _product);
+				(new BinaryFormatter()).Serialize(stream, _products);
 				return stream.ToArray();
 			}
 		}
 
 		[Benchmark]
-		public Product BinaryFormatterDeserialise()
+		public Product[] BinaryFormatterDeserialise()
 		{
 			using (var stream = new MemoryStream(_binaryFormatterSerialisedData))
 			{
-				return (Product)(new BinaryFormatter()).Deserialize(stream);
+				return (Product[])(new BinaryFormatter()).Deserialize(stream);
 			}
 		}
 
@@ -85,39 +88,43 @@ namespace Benchmarking
 		{
 			using (var stream = new MemoryStream())
 			{
-				Serializer.Serialize(stream, _product);
+				Serializer.Serialize(stream, _products);
 				return stream.ToArray();
 			}
 		}
 
 		[Benchmark]
-		public Product ProtoBufDeserialise()
+		public Product[] ProtoBufDeserialise()
 		{
 			using (var stream = new MemoryStream(_protoBufSerialisedData))
 			{
-				return Serializer.Deserialize<Product>(stream);
+				return Serializer.Deserialize<Product[]>(stream);
 			}
 		}
 
 		[Benchmark]
 		public byte[] DanSerialiserSerialise()
 		{
-			return BinarySerialisation.Serialise(_product);
+			return BinarySerialisation.Serialise(_products);
 		}
 
 		[Benchmark]
-		public Product DanSerialiserDeserialise()
+		public Product[] DanSerialiserDeserialise()
 		{
-			return BinarySerialisation.Deserialise<Product>(_danSerialiserSerialisedData);
+			return BinarySerialisation.Deserialise<Product[]>(_danSerialiserSerialisedData);
 		}
 
 		private static void RegisterTypesWithProtoBufThatShareAssemblyAndNamespaceWith(Type sourceType)
 		{
 			foreach (var type in sourceType.Assembly.GetTypes().Where(t => t.Namespace == sourceType.Namespace))
 			{
-				RuntimeTypeModel.Default
-					.Add(type, false)
-					.Add(type.GetProperties().Where(p => p.CanRead && p.CanWrite && !p.GetIndexParameters().Any()).Select(p => p.Name).ToArray());
+				string[] memberNames;
+				if (type.IsEnum)
+					memberNames = Enum.GetNames(type);
+				else
+					memberNames = type.GetProperties().Where(p => p.CanRead && p.CanWrite && !p.GetIndexParameters().Any()).Select(p => p.Name).ToArray();
+
+				RuntimeTypeModel.Default.Add(type, false).Add(memberNames);
 			}
 		}
 	}
