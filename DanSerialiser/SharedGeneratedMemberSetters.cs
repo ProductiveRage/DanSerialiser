@@ -41,7 +41,7 @@ namespace DanSerialiser
 
 				// Try to get a BinarySerialisationWriter method to call to serialise the value (if it's a Nullable then unwrap the underlying type and try to find a method
 				// for that - we'll have to include some null-checking to the member setter if we do this, see a litte further down..)
-				var nullableTypeInner = (Type)null; // TODO GetUnderlyingNullableTypeIfApplicable(field.FieldType);
+				var nullableTypeInner = GetUnderlyingNullableTypeIfApplicable(field.FieldType);
 				var fieldWriterMethod = TryToGetWriterMethodToSerialiseType(nullableTypeInner ?? field.FieldType);
 				if (fieldWriterMethod == null)
 					return null;
