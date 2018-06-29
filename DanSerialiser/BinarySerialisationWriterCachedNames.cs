@@ -163,11 +163,11 @@ namespace DanSerialiser
 
 		private static byte[] GetBytesForNameReferenceID(int referenceID)
 		{
-			var bytesForReferenceID = new List<byte> { (byte)BinarySerialisationDataType.NameReferenceID };
+			var bytesForReferenceID = new List<byte>();
 			using (var stream = new StreamThatAppendsBytesToList(bytesForReferenceID))
 			{
 				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse: true); // The supportReferenceReuse value doesn't make any difference here
-				writer.Int32WithoutDataType(referenceID);
+				writer.VariableLengthInt32(referenceID, BinarySerialisationDataType.NameReferenceID8, BinarySerialisationDataType.NameReferenceID16, BinarySerialisationDataType.NameReferenceID32);
 			}
 			return bytesForReferenceID.ToArray();
 		}

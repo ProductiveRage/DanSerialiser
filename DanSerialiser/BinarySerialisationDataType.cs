@@ -26,7 +26,9 @@
 		DateTime,
 
 		ObjectStart,
-		NameReferenceID,
+		NameReferenceID8,
+		NameReferenceID16,
+		NameReferenceID32,
 		ReferenceID,
 		FieldName,
 		ObjectEnd,

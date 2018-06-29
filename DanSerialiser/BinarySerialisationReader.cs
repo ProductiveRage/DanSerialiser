@@ -190,18 +190,14 @@ namespace DanSerialiser
 					if (nextEntryType == BinarySerialisationDataType.String)
 					{
 						rawFieldNameInformation = ReadNextString();
-						if (ReadNextDataType() != BinarySerialisationDataType.NameReferenceID)
-							throw new Exception("Type Name String values should always be followed by a Name Reference ID");
-						_nameReferences[ReadNextInt()] = rawFieldNameInformation;
+						_nameReferences[ReadNextNameReferenceID(ReadNextDataType())] = rawFieldNameInformation;
 					}
-					else if (nextEntryType == BinarySerialisationDataType.NameReferenceID)
+					else
 					{
-						var nameReferenceID = ReadNextInt();
+						var nameReferenceID = ReadNextNameReferenceID(nextEntryType);
 						if (!_nameReferences.TryGetValue(nameReferenceID, out rawFieldNameInformation))
 							throw new Exception("Invalid NameReferenceID: " + nameReferenceID);
 					}
-					else
-						throw new Exception("Unexpected " + nextEntryType + " after FieldName");
 					BinaryReaderWriterShared.SplitCombinedTypeAndFieldName(rawFieldNameInformation, out var typeNameIfRequired, out var fieldName);
 
 					// Try to get a reference to the field on the target type.. if there is one (if valueIfTypeIsAvailable is null then no-one cases about this data and we're just
@@ -243,6 +239,18 @@ namespace DanSerialiser
 			}
 		}
 
+		private int ReadNextNameReferenceID(BinarySerialisationDataType specifiedDataType)
+		{
+			if (specifiedDataType == BinarySerialisationDataType.NameReferenceID32)
+				return ReadNextInt();
+			else if (specifiedDataType == BinarySerialisationDataType.NameReferenceID16)
+				return ReadNextInt16();
+			else if (specifiedDataType == BinarySerialisationDataType.NameReferenceID8)
+				return ReadNext();
+			else
+				throw new Exception("Unexpected " + specifiedDataType + " (expected a Name Reference ID)");
+		}
+
 		private object ReadNextArray(bool ignoreAnyInvalidTypes)
 		{
 			var elementTypeName = ReadNextTypeName();
@@ -272,22 +280,16 @@ namespace DanSerialiser
 			{
 				var typeName = ReadNextString();
 				if (typeName != null)
-				{
-					if (ReadNextDataType() != BinarySerialisationDataType.NameReferenceID)
-						throw new Exception("Type Name String values should always be followed by a Name Reference ID");
-					_nameReferences[ReadNextInt()] = typeName;
-				}
+					_nameReferences[ReadNextNameReferenceID(ReadNextDataType())] = typeName;
 				return typeName;
 			}
-			else if (nextEntryType == BinarySerialisationDataType.NameReferenceID)
+			else
 			{
-				var nameReferenceID = ReadNextInt();
+				var nameReferenceID = ReadNextNameReferenceID(nextEntryType);
 				if (!_nameReferences.TryGetValue(nameReferenceID, out var typeName))
 					throw new Exception("Invalid NameReferenceID: " + nameReferenceID);
 				return typeName;
 			}
-			else
-				throw new Exception("Expected String or NameReferenceID for object type name");
 		}
 
 		private BinarySerialisationDataType ReadNextDataType()

@@ -51,28 +51,13 @@ namespace DanSerialiser
 		}
 		public void Int32(int value)
 		{
-			if ((value >= byte.MinValue) && (value <= byte.MaxValue))
-			{
-				WriteByte((byte)BinarySerialisationDataType.Int32_Byte);
-				WriteByte((byte)value);
-			}
-			else if ((value >= short.MinValue) && (value <= short.MaxValue))
-			{
-				WriteByte((byte)BinarySerialisationDataType.Int32_Int16);
-				Int16WithoutDataType((short)value);
-			}
-			else
-			{
-				WriteByte((byte)BinarySerialisationDataType.Int32);
-				Int32WithoutDataType(value);
-			}
+			VariableLengthInt32(value, BinarySerialisationDataType.Int32_Byte, BinarySerialisationDataType.Int32_Int16, BinarySerialisationDataType.Int32);
 		}
 		public void Int64(long value)
 		{
 			WriteByte((byte)BinarySerialisationDataType.Int64);
 			Int64WithoutDataType(value);
 		}
-
 		public void Single(float value)
 		{
 			WriteByte((byte)BinarySerialisationDataType.Single);
@@ -299,6 +284,25 @@ namespace DanSerialiser
 			WriteByte((byte)(value >> 16));
 			WriteByte((byte)(value >> 8));
 			WriteByte((byte)value);
+		}
+
+		internal void VariableLengthInt32(int value, BinarySerialisationDataType int8, BinarySerialisationDataType int16, BinarySerialisationDataType int32)
+		{
+			if ((value >= byte.MinValue) && (value <= byte.MaxValue))
+			{
+				WriteByte((byte)int8);
+				WriteByte((byte)value);
+			}
+			else if ((value >= short.MinValue) && (value <= short.MaxValue))
+			{
+				WriteByte((byte)int16);
+				Int16WithoutDataType((short)value);
+			}
+			else
+			{
+				WriteByte((byte)int32);
+				Int32WithoutDataType(value);
+			}
 		}
 
 		private void Int16WithoutDataType(short value)
