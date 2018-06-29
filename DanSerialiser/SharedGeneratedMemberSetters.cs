@@ -10,17 +10,16 @@ namespace DanSerialiser
 	internal static class SharedGeneratedMemberSetters
 	{
 		private static readonly Type _writerType = typeof(BinarySerialisationWriter);
-		private static readonly MethodInfo writeByteMethod = _writerType.GetMethod("WriteByte", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(byte) }, null);
-		private static readonly MethodInfo writeBytesMethod = _writerType.GetMethod("WriteBytes", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(byte[]) }, null);
-
+		private static readonly MethodInfo _writeByteMethod = _writerType.GetMethod("WriteByte", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(byte) }, null);
+		private static readonly MethodInfo _writeBytesMethod = _writerType.GetMethod("WriteBytes", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(byte[]) }, null);
 		public static Action<object, BinarySerialisationWriter> TryToGenerateMemberSetter(Type type)
 		{
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
 
-			if (writeByteMethod == null)
+			if (_writeByteMethod == null)
 				throw new Exception("Unable to identify writer method 'WriteByte'");
-			if (writeBytesMethod == null)
+			if (_writeBytesMethod == null)
 				throw new Exception("Unable to identify writer method 'WriteBytes'");
 
 			// If there are any fields or properties whose types don't match the TypeWillWorkWithTypeGenerator conditions then don't try to make a type generator (there will be
@@ -40,57 +39,67 @@ namespace DanSerialiser
 				if (fieldNameBytes == null)
 					return null;
 
-				// TODO: Support Nullable<T> somehow..? Specific ones or ALL of them??! Can't do ALL cos object reference could screw things up, so maybe just standard ones?
-
-				var methodArguments = new[] { field.FieldType };
-				string fieldWriterMethodName;
-				if (field.FieldType == typeof(Boolean))
-					fieldWriterMethodName = "Boolean";
-				else if (field.FieldType == typeof(Byte))
-					fieldWriterMethodName = "Byte";
-				else if (field.FieldType == typeof(SByte))
-					fieldWriterMethodName = "SByte";
-				else if (field.FieldType == typeof(Int16))
-					fieldWriterMethodName = "Int16";
-				else if (field.FieldType == typeof(Int32))
-					fieldWriterMethodName = "Int32";
-				else if (field.FieldType == typeof(Int64))
-					fieldWriterMethodName = "Int64";
-
-				// TODO: Other types (byte, int, etc..)
-
-				else if (field.FieldType == typeof(Single))
-					fieldWriterMethodName = "Single";
-				else if (field.FieldType == typeof(Double))
-					fieldWriterMethodName = "Double";
-				else if (field.FieldType == typeof(Decimal))
-					fieldWriterMethodName = "Decimal";
-				else if (field.FieldType == typeof(Char))
-					fieldWriterMethodName = "Char";
-				else if (field.FieldType == typeof(String))
-					fieldWriterMethodName = "String";
-				else
+				// Try to get a BinarySerialisationWriter method to call to serialise the value (if it's a Nullable then unwrap the underlying type and try to find a method
+				// for that - we'll have to include some null-checking to the member setter if we do this, see a litte further down..)
+				var nullableTypeInner = (Type)null; // TODO GetUnderlyingNullableTypeIfApplicable(field.FieldType);
+				var fieldWriterMethod = TryToGetWriterMethodToSerialiseType(nullableTypeInner ?? field.FieldType);
+				if (fieldWriterMethod == null)
 					return null;
 
-				var fieldWriterMethod = _writerType.GetMethod(fieldWriterMethodName, methodArguments);
-				if (fieldWriterMethod == null)
-					throw new Exception("Unable to identify writer method '" + fieldWriterMethodName + "'");
-
+				// Generate the write-FieldName-to-stream method call
 				statements.Add(
 					Expression.Call(
 						writerParameter,
-						writeBytesMethod,
+						_writeBytesMethod,
 						Expression.Constant(new[] { (byte)BinarySerialisationDataType.FieldName }.Concat(fieldNameBytes).ToArray())
 					)
 				);
-				statements.Add(
-					Expression.Call(
+
+				// Generate the write-Field-value-to-stream method call
+				if (nullableTypeInner != null)
+				{
+					// If this is a Nullable value then we need to check for is-null and then either write a null object or write the underlying value (Nullable<T> gets magic
+					// treatment by the compiler and so we don't have to write the data as a Nullable<T>, we can write either null or T)
+					statements.Add(Expression.IfThenElse(
+						test: Expression.Equal(
+							Expression.MakeMemberAccess(typedSource, field),
+							Expression.Constant(null, field.FieldType)
+						),
+						ifTrue: Expression.Block(
+							Expression.Call(
+								writerParameter,
+								nameof(BinarySerialisationWriter.ObjectStart),
+								typeArguments: new[] { typeof(object) },
+								arguments: new[] { Expression.Constant(null, typeof(object)) }
+							),
+							Expression.Call(
+								writerParameter,
+								nameof(BinarySerialisationWriter.ObjectEnd),
+								typeArguments: Type.EmptyTypes
+							)
+						),
+						ifFalse: Expression.Call(
+							writerParameter,
+							fieldWriterMethod,
+							Expression.Convert(
+								Expression.MakeMemberAccess(typedSource, field),
+								nullableTypeInner
+							)
+						)
+					));
+				}
+				else
+				{
+					// For non-Nullable values, we just write the value straight out using the identifier writer method
+					statements.Add(Expression.Call(
 						writerParameter,
 						fieldWriterMethod,
 						Expression.MakeMemberAccess(typedSource, field)
-					)
-				);
+					));
+				}
 			}
+
+			// Group all of the field setters together into one call
 			return
 				Expression.Lambda<Action<object, BinarySerialisationWriter>>(
 					Expression.Block(new[] { typedSource }, statements),
@@ -98,6 +107,53 @@ namespace DanSerialiser
 					writerParameter
 				)
 				.Compile();
+		}
+
+		private static Type GetUnderlyingNullableTypeIfApplicable(Type type)
+		{
+			return (type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(Nullable<>)))
+				? type.GetGenericArguments()[0]
+				: null;
+		}
+
+		private static MethodInfo TryToGetWriterMethodToSerialiseType(Type type)
+		{
+			string fieldWriterMethodName;
+			if (type == CommonTypeOfs.Boolean)
+				fieldWriterMethodName = "Boolean";
+			else if (type == CommonTypeOfs.Byte)
+				fieldWriterMethodName = "Byte";
+			else if (type == CommonTypeOfs.SByte)
+				fieldWriterMethodName = "SByte";
+			else if (type == CommonTypeOfs.Int16)
+				fieldWriterMethodName = "Int16";
+			else if (type == CommonTypeOfs.Int32)
+				fieldWriterMethodName = "Int32";
+			else if (type == CommonTypeOfs.Int64)
+				fieldWriterMethodName = "Int64";
+			else if (type == CommonTypeOfs.UInt16)
+				fieldWriterMethodName = "UInt16";
+			else if (type == CommonTypeOfs.UInt32)
+				fieldWriterMethodName = "UInt32";
+			else if (type == CommonTypeOfs.UInt64)
+				fieldWriterMethodName = "UInt64";
+			else if (type == CommonTypeOfs.Single)
+				fieldWriterMethodName = "Single";
+			else if (type == CommonTypeOfs.Double)
+				fieldWriterMethodName = "Double";
+			else if (type == CommonTypeOfs.Decimal)
+				fieldWriterMethodName = "Decimal";
+			else if (type == CommonTypeOfs.Char)
+				fieldWriterMethodName = "Char";
+			else if (type == CommonTypeOfs.String)
+				fieldWriterMethodName = "String";
+			else
+				return null;
+
+			var fieldWriterMethod = _writerType.GetMethod(fieldWriterMethodName, new[] { type });
+			if (fieldWriterMethod == null)
+				throw new Exception("Unable to identify writer method '" + fieldWriterMethodName + "'");
+			return fieldWriterMethod;
 		}
 	}
 }

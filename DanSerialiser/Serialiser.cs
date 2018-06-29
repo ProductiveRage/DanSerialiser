@@ -57,76 +57,76 @@ namespace DanSerialiser
 			if ((value != null) && type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(Nullable<>)))
 				type = type.GetGenericArguments()[0];
 
-			if (type == TypeOfBoolean)
+			if (type == CommonTypeOfs.Boolean)
 			{
 				writer.Boolean((Boolean)value);
 				return;
 			}
-			if (type == TypeOfByte)
+			if (type == CommonTypeOfs.Byte)
 			{
 				writer.Byte((Byte)value);
 				return;
 			}
-			if (type == TypeOfSByte)
+			if (type == CommonTypeOfs.SByte)
 			{
 				writer.SByte((SByte)value);
 				return;
 			}
 
-			if (type == TypeOfInt16)
+			if (type == CommonTypeOfs.Int16)
 			{
 				writer.Int16((Int16)value);
 				return;
 			}
-			if (type == TypeOfInt32)
+			if (type == CommonTypeOfs.Int32)
 			{
 				writer.Int32((Int32)value);
 				return;
 			}
-			if (type == TypeOfInt64)
+			if (type == CommonTypeOfs.Int64)
 			{
 				writer.Int64((Int64)value);
 				return;
 			}
 
-			if (type == TypeOfUInt16)
+			if (type == CommonTypeOfs.UInt16)
 			{
 				writer.UInt16((UInt16)value);
 				return;
 			}
-			if (type == TypeOfUInt32)
+			if (type == CommonTypeOfs.UInt32)
 			{
 				writer.UInt32((UInt32)value);
 				return;
 			}
-			if (type == TypeOfUInt64)
+			if (type == CommonTypeOfs.UInt64)
 			{
 				writer.UInt64((UInt64)value);
 				return;
 			}
 
-			if (type == TypeOfSingle)
+			if (type == CommonTypeOfs.Single)
 			{
 				writer.Single((Single)value);
 				return;
 			}
-			if (type == TypeOfDouble)
+			if (type == CommonTypeOfs.Double)
 			{
 				writer.Double((Double)value);
 				return;
 			}
-			if (type == TypeOfDecimal)
+			if (type == CommonTypeOfs.Decimal)
 			{
 				writer.Decimal((Decimal)value);
 				return;
 			}
 
-			if (type == TypeOfChar)
+			if (type == CommonTypeOfs.Char)
 			{
 				writer.Char((Char)value);
 				return;
 			}
-			if (type == TypeOfString)
+			if (type == CommonTypeOfs.String)
 			{
 				writer.String((String)value);
 				return;
@@ -163,7 +163,7 @@ namespace DanSerialiser
 			if (value != null)
 			{
 				bool recordedAsOtherReference;
-				if ((objectHistoryIfReferenceReuseAllowed != null) && (type != TypeOfString) && !type.IsValueType)
+				if ((objectHistoryIfReferenceReuseAllowed != null) && (type != CommonTypeOfs.String) && !type.IsValueType)
 				{
 					if (objectHistoryIfReferenceReuseAllowed.TryGetValue(value, out int referenceID))
 						recordedAsOtherReference = true;
@@ -247,24 +247,6 @@ namespace DanSerialiser
 			// have done some other forms of caching)
 			generatedMemberSetters[type] = writer.TryToGenerateMemberSetter(type);
 		}
-
-		// Caching these typeof(..) calls may help performance in some cases, as suggested here:
-		//  https://rogerjohansson.blog/2016/08/16/wire-writing-one-of-the-fastest-net-serializers/
-		// I saw negligible difference but makes intuitive sense, so I'll leave it in (if only to avoid thinking about it in the future)
-		private static readonly Type TypeOfBoolean = typeof(Boolean);
-		private static readonly Type TypeOfByte = typeof(Byte);
-		private static readonly Type TypeOfSByte = typeof(SByte);
-		private static readonly Type TypeOfInt16 = typeof(Int16);
-		private static readonly Type TypeOfInt32 = typeof(Int32);
-		private static readonly Type TypeOfInt64 = typeof(Int64);
-		private static readonly Type TypeOfUInt16 = typeof(UInt16);
-		private static readonly Type TypeOfUInt32 = typeof(UInt32);
-		private static readonly Type TypeOfUInt64 = typeof(UInt64);
-		private static readonly Type TypeOfSingle = typeof(Single);
-		private static readonly Type TypeOfDouble = typeof(Double);
-		private static readonly Type TypeOfDecimal = typeof(Decimal);
-		private static readonly Type TypeOfChar = typeof(Char);
-		private static readonly Type TypeOfString = typeof(String);
 
 		// Courtesy of https://stackoverflow.com/a/41169463/3813189
 		private sealed class ReferenceEqualityComparer : IEqualityComparer<object>
