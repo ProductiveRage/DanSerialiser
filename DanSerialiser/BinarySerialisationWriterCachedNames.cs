@@ -8,10 +8,6 @@ using System.Threading;
 
 namespace DanSerialiser
 {
-	// TODO: If the Name Reference IDs are now shared across serialisations, will it be possible for Name Reference IDs to clash if data was serialised and saved to disk last week
-	// and then data serialised yesterday and save to disk? This may need another rethink (it was safe when Name Reference IDs were always scoped to a single Serialise result).
-	// On the other hand, since the BinarySerialisationReader doesn't try to share Name Reference IDs across multiple deserialisation attempts, it may not be a problem because
-	// each individual serialisation byte array is guaranteed to be consistent.
 	/// <summary>
 	/// Encoding strings is expensive and so we want to reuse previously-encoded content where possible AND we want to be able to use a Name Reference ID for a type or field
 	/// name for the second, third, etc.. time that that name is encountered when performing serialisation. This class contains helper methods (and caches information) to achieve
