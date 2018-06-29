@@ -70,7 +70,7 @@ namespace DanSerialiser
 		public void Int64(long value)
 		{
 			WriteByte((byte)BinarySerialisationDataType.Int64);
-			WriteBytes(BitConverter.GetBytes(value));
+			Int64WithoutDataType(value);
 		}
 
 		public void Single(float value)
@@ -116,6 +116,18 @@ namespace DanSerialiser
 		{
 			WriteByte((byte)BinarySerialisationDataType.String);
 			StringWithoutDataType(value);
+		}
+
+		// There's nothing inherently special or awkward about DateTime that the Serialiser couldn't serialise it like any other type (by recording all of its fields' values) but it's
+		// such a common type that it seems like optimising it a little wouldn't hurt AND having it as an IWrite method means that the SharedGeneratedMemberSetters can make use of it,
+		// which broadens the range of types that it can generate (and that makes things faster when the same types are serialised over and over again)
+		public void DateTime(DateTime value)
+		{
+			// "under the hood a .NET DateTime is essentially a tick count plus a DateTimeKind"
+			// - "http://mark-dot-net.blogspot.com/2014/04/roundtrip-serialization-of-datetimes-in.html"
+			WriteByte((byte)BinarySerialisationDataType.DateTime);
+			Int64WithoutDataType(value.Ticks);
+			WriteByte((byte)value.Kind);
 		}
 
 		public void ArrayStart(object value, Type elementType)
@@ -267,6 +279,18 @@ namespace DanSerialiser
 			WriteByte((byte)BinarySerialisationDataType.FieldName);
 			WriteBytes(cachedData.AsStringAndReferenceID);
 			return true;
+		}
+
+		private void Int64WithoutDataType(long value)
+		{
+			WriteByte((byte)(value >> 56));
+			WriteByte((byte)(value >> 48));
+			WriteByte((byte)(value >> 40));
+			WriteByte((byte)(value >> 32));
+			WriteByte((byte)(value >> 24));
+			WriteByte((byte)(value >> 16));
+			WriteByte((byte)(value >> 8));
+			WriteByte((byte)value);
 		}
 
 		internal void Int32WithoutDataType(int value)

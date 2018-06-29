@@ -120,33 +120,35 @@ namespace DanSerialiser
 		{
 			string fieldWriterMethodName;
 			if (type == CommonTypeOfs.Boolean)
-				fieldWriterMethodName = "Boolean";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.Boolean);
 			else if (type == CommonTypeOfs.Byte)
-				fieldWriterMethodName = "Byte";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.Byte);
 			else if (type == CommonTypeOfs.SByte)
-				fieldWriterMethodName = "SByte";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.SByte);
 			else if (type == CommonTypeOfs.Int16)
-				fieldWriterMethodName = "Int16";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.Int16);
 			else if (type == CommonTypeOfs.Int32)
-				fieldWriterMethodName = "Int32";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.Int32);
 			else if (type == CommonTypeOfs.Int64)
-				fieldWriterMethodName = "Int64";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.Int64);
 			else if (type == CommonTypeOfs.UInt16)
-				fieldWriterMethodName = "UInt16";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.UInt16);
 			else if (type == CommonTypeOfs.UInt32)
-				fieldWriterMethodName = "UInt32";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.UInt32);
 			else if (type == CommonTypeOfs.UInt64)
-				fieldWriterMethodName = "UInt64";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.UInt64);
 			else if (type == CommonTypeOfs.Single)
-				fieldWriterMethodName = "Single";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.Single);
 			else if (type == CommonTypeOfs.Double)
-				fieldWriterMethodName = "Double";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.Double);
 			else if (type == CommonTypeOfs.Decimal)
-				fieldWriterMethodName = "Decimal";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.Decimal);
 			else if (type == CommonTypeOfs.Char)
-				fieldWriterMethodName = "Char";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.Char);
 			else if (type == CommonTypeOfs.String)
-				fieldWriterMethodName = "String";
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.String);
+			else if (type == CommonTypeOfs.DateTime)
+				fieldWriterMethodName = nameof(BinarySerialisationWriter.DateTime);
 			else
 				return null;
 

@@ -61,7 +61,7 @@ namespace DanSerialiser
 				case BinarySerialisationDataType.Int32_Int16:
 					return (int)ReadNextInt16();
 				case BinarySerialisationDataType.Int64:
-					return BitConverter.ToInt64(ReadNext(sizeof(Int64)), 0);
+					return ReadNextInt64();
 
 				case BinarySerialisationDataType.UInt16:
 					return BitConverter.ToUInt16(ReadNext(sizeof(UInt16)), 0);
@@ -87,6 +87,9 @@ namespace DanSerialiser
 				case BinarySerialisationDataType.String:
 					return ReadNextString();
 
+				case BinarySerialisationDataType.DateTime:
+					return ReadNextDateTime();
+
 				case BinarySerialisationDataType.ArrayStart:
 					return ReadNextArray(ignoreAnyInvalidTypes);
 
@@ -95,20 +98,30 @@ namespace DanSerialiser
 			}
 		}
 
+		private short ReadNextInt16()
+		{
+			return (short)((ReadNext() << 8) + ReadNext());
+		}
+
 		private int ReadNextInt()
 		{
 			return (ReadNext() << 24) + (ReadNext() << 16) + (ReadNext() << 8) + ReadNext();
 		}
 
-		private short ReadNextInt16()
+		private long ReadNextInt64()
 		{
-			return (short)((ReadNext() << 8) + ReadNext());
+			return ((long)ReadNext() << 56) + ((long)ReadNext() << 48) + ((long)ReadNext() << 40) + ((long)ReadNext() << 32) + ((long)ReadNext() << 24) + ((long)ReadNext() << 16) + ((long)ReadNext() << 8) + ReadNext();
 		}
 
 		private string ReadNextString()
 		{
 			var length = ReadNextInt();
 			return (length == -1) ? null : Encoding.UTF8.GetString(ReadNext(length));
+		}
+
+		private DateTime ReadNextDateTime()
+		{
+			return new DateTime(ReadNextInt64(), (DateTimeKind)ReadNext());
 		}
 
 		private object ReadNextObject(bool ignoreAnyInvalidTypes)

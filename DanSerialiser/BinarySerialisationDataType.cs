@@ -23,6 +23,8 @@
 		Char,
 		String,
 
+		DateTime,
+
 		ObjectStart,
 		NameReferenceID,
 		ReferenceID,

@@ -132,6 +132,12 @@ namespace DanSerialiser
 				return;
 			}
 
+			if (type == CommonTypeOfs.DateTime)
+			{
+				writer.DateTime((DateTime)value);
+				return;
+			}
+
 			if (type.IsEnum)
 			{
 				Serialise(value, type.GetEnumUnderlyingType(), parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, generatedMemberSetters, writer);
