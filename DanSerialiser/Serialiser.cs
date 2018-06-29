@@ -155,7 +155,7 @@ namespace DanSerialiser
 			if (value != null)
 			{
 				bool recordedAsOtherReference;
-				if ((objectHistoryIfReferenceReuseAllowed != null) && !type.IsValueType && (type != TypeOfString))
+				if ((objectHistoryIfReferenceReuseAllowed != null) && (type != TypeOfString) && !type.IsValueType)
 				{
 					if (objectHistoryIfReferenceReuseAllowed.TryGetValue(value, out int referenceID))
 						recordedAsOtherReference = true;
