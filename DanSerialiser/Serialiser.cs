@@ -49,6 +49,14 @@ namespace DanSerialiser
 			if ((parentsIfReferenceReuseDisallowed != null) && parentsIfReferenceReuseDisallowed.Contains(value, ReferenceEqualityComparer.Instance))
 				throw new CircularReferenceException();
 
+			// If the we've got a Nullable<> then unpack the internal value/type - if it's null then we'll get a null ObjectStart/ObjectEnd value which the BinarySerialisationReader
+			// will happily interpret (reading it as a null and setting the Nullable<> field) and if it's non-null then we'll serialise just the value itself (again, the reader will
+			// take that value and happily set a Nullable<> field - so if we write an int then the reader will read the int and set the int? field just fine). Doing this means that
+			// we have less work to do (otherwise we'd record the Nullable<> as an object and write the type name and so it's just more work to write, more work to read and takes
+			// up more data in the serialisation output).
+			if ((value != null) && type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(Nullable<>)))
+				type = type.GetGenericArguments()[0];
+
 			if (type == TypeOfBoolean)
 			{
 				writer.Boolean((Boolean)value);

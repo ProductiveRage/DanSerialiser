@@ -23,10 +23,6 @@ namespace DanSerialiser
 			if (writeBytesMethod == null)
 				throw new Exception("Unable to identify writer method 'WriteBytes'");
 
-			// TODO: Explain(?) - feel like we shouldn't even get here for nullables! Add special handling further up?
-			if (type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(Nullable<>)))
-				return null;
-
 			// If there are any fields or properties whose types don't match the TypeWillWorkWithTypeGenerator conditions then don't try to make a type generator (there will be
 			// potential complications such as checking for circular / reused references that can't be handled by a simple type generator)
 			var fields = DefaultTypeAnalyser.Instance.GetAllFieldsThatShouldBeSet(type);
