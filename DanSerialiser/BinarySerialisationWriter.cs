@@ -14,7 +14,7 @@ namespace DanSerialiser
 		private readonly Dictionary<Type, BinarySerialisationWriterCachedNames.CachedNameData> _recordedTypeNames;
 		private readonly Dictionary<Tuple<FieldInfo, Type>, BinarySerialisationWriterCachedNames.CachedNameData> _encounteredFields;
 		private readonly Dictionary<PropertyInfo, BinarySerialisationWriterCachedNames.CachedNameData> _encounteredProperties;
-		public BinarySerialisationWriter(Stream stream, bool supportReferenceReuse) : this(stream, supportReferenceReuse, DefaultTypeAnalyser.Instance) { }
+		public BinarySerialisationWriter(Stream stream, bool supportReferenceReuse = true) : this(stream, supportReferenceReuse, DefaultTypeAnalyser.Instance) { }
 		internal BinarySerialisationWriter(Stream stream, bool supportReferenceReuse, IAnalyseTypesForSerialisation typeAnalyser) // internal constructor for unit testing
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
