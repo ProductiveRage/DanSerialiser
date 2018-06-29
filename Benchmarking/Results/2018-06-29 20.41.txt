@@ -11,11 +11,11 @@ Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
 
                    Method |  Job | Runtime |        Mean |      Error |     StdDev |
 ------------------------- |----- |-------- |------------:|-----------:|-----------:|
-        ProtoBufSerialise |  Clr |     Clr |  3,810.4 us |  74.025 us |  82.279 us |
-      ProtoBufDeserialise |  Clr |     Clr |  7,114.6 us | 141.733 us | 132.577 us |
-   DanSerialiserSerialise |  Clr |     Clr | 33,611.7 us | 324.274 us | 303.326 us |
- DanSerialiserDeserialise |  Clr |     Clr | 67,851.6 us | 588.986 us | 550.938 us |
-        ProtoBufSerialise | Core |    Core |    466.0 us |   6.505 us |   6.085 us |
-      ProtoBufDeserialise | Core |    Core |    821.9 us |   8.592 us |   7.616 us |
-   DanSerialiserSerialise | Core |    Core |  8,916.7 us |  57.560 us |  44.939 us |
- DanSerialiserDeserialise | Core |    Core |  9,329.7 us |  38.696 us |  34.303 us |
+        ProtoBufSerialise |  Clr |     Clr |  3,328.7 us |  65.830 us |  61.577 us |
+      ProtoBufDeserialise |  Clr |     Clr |  6,350.4 us |  34.236 us |  26.729 us |
+   DanSerialiserSerialise |  Clr |     Clr | 35,931.3 us | 202.899 us | 189.792 us |
+ DanSerialiserDeserialise |  Clr |     Clr | 62,432.1 us | 715.593 us | 669.366 us |
+        ProtoBufSerialise | Core |    Core |    456.3 us |   2.332 us |   2.068 us |
+      ProtoBufDeserialise | Core |    Core |    806.3 us |   3.420 us |   2.856 us |
+   DanSerialiserSerialise | Core |    Core |  8,882.4 us |  40.117 us |  37.526 us |
+ DanSerialiserDeserialise | Core |    Core |  8,721.2 us |  16.980 us |  15.053 us |
