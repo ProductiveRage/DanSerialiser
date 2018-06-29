@@ -38,12 +38,7 @@ namespace DanSerialiser
 				return cachedResult;
 
 			var referenceID = Interlocked.Increment(ref _nextNameReferenceID);
-			var bytesForReferenceID = new List<byte>();
-			using (var stream = new StreamThatAppendsBytesToList(bytesForReferenceID))
-			{
-				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse: true); // The supportReferenceReuse value doesn't make any difference here
-				writer.Int32WithoutDataType(referenceID);
-			}
+			var bytesForReferenceID = GetBytesForNameReferenceID(referenceID);
 			var bytesForStringAndReferenceID = new List<byte>();
 			using (var stream = new StreamThatAppendsBytesToList(bytesForStringAndReferenceID))
 			{
@@ -53,7 +48,7 @@ namespace DanSerialiser
 			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
 			var cacheEntry = new CachedNameData(
 				asStringAndReferenceID: bytesForStringAndReferenceID.ToArray(),
-				onlyAsReferenceID: Prepend((byte)BinarySerialisationDataType.NameReferenceID, bytesForReferenceID)
+				onlyAsReferenceID: bytesForReferenceID.ToArray()
 			);
 			_typeNameCache.TryAdd(type, cacheEntry);
 			return cacheEntry;
@@ -101,12 +96,7 @@ namespace DanSerialiser
 			// When recording a field name, either write a string and then the Name Reference ID that that string should be stored as OR write just the Name Reference ID
 			// (if the field name has already been recorded once and may be reused)
 			var referenceID = Interlocked.Increment(ref _nextNameReferenceID);
-			var bytesForReferenceID = new List<byte>();
-			using (var stream = new StreamThatAppendsBytesToList(bytesForReferenceID))
-			{
-				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse: true); // The supportReferenceReuse value doesn't make any difference here
-				writer.Int32WithoutDataType(referenceID);
-			}
+			var bytesForReferenceID = GetBytesForNameReferenceID(referenceID);
 			var bytesForStringAndReferenceID = new List<byte>();
 			using (var stream = new StreamThatAppendsBytesToList(bytesForStringAndReferenceID))
 			{
@@ -116,7 +106,7 @@ namespace DanSerialiser
 			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
 			var cacheEntry = new CachedNameData(
 				asStringAndReferenceID: bytesForStringAndReferenceID.ToArray(),
-				onlyAsReferenceID: Prepend((byte)BinarySerialisationDataType.NameReferenceID, bytesForReferenceID)
+				onlyAsReferenceID: bytesForReferenceID.ToArray()
 			);
 			_fieldNameCache.TryAdd(cacheKey, cacheEntry);
 			return cacheEntry;
@@ -155,12 +145,7 @@ namespace DanSerialiser
 			// - Further note: Similar approach to type and field name recording is taken here; the first time a property is written, the string is serialised, while subsequent
 			//   times get a NameReferenceID instead
 			var referenceID = Interlocked.Increment(ref _nextNameReferenceID);
-			var bytesForReferenceID = new List<byte>();
-			using (var stream = new StreamThatAppendsBytesToList(bytesForReferenceID))
-			{
-				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse: true); // The supportReferenceReuse value doesn't make any difference here
-				writer.Int32WithoutDataType(referenceID);
-			}
+			var bytesForReferenceID = GetBytesForNameReferenceID(referenceID);
 			var bytesForStringAndReferenceID = new List<byte>();
 			using (var stream = new StreamThatAppendsBytesToList(bytesForStringAndReferenceID))
 			{
@@ -170,15 +155,21 @@ namespace DanSerialiser
 			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
 			var cacheEntry = new CachedNameData(
 				asStringAndReferenceID: bytesForStringAndReferenceID.ToArray(),
-				onlyAsReferenceID: Prepend((byte)BinarySerialisationDataType.NameReferenceID, bytesForReferenceID)
+				onlyAsReferenceID: bytesForReferenceID.ToArray()
 			);
 			_propertyNameCache.TryAdd(property, cacheEntry);
 			return cacheEntry;
 		}
 
-		private static byte[] Prepend(byte firstByte, IEnumerable<byte> everythingElse)
+		private static byte[] GetBytesForNameReferenceID(int referenceID)
 		{
-			return new[] { firstByte }.Concat(everythingElse).ToArray();
+			var bytesForReferenceID = new List<byte> { (byte)BinarySerialisationDataType.NameReferenceID };
+			using (var stream = new StreamThatAppendsBytesToList(bytesForReferenceID))
+			{
+				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse: true); // The supportReferenceReuse value doesn't make any difference here
+				writer.Int32WithoutDataType(referenceID);
+			}
+			return bytesForReferenceID.ToArray();
 		}
 
 		public sealed class CachedNameData

@@ -190,16 +190,18 @@ namespace DanSerialiser
 					if (nextEntryType == BinarySerialisationDataType.String)
 					{
 						rawFieldNameInformation = ReadNextString();
+						if (ReadNextDataType() != BinarySerialisationDataType.NameReferenceID)
+							throw new Exception("Type Name String values should always be followed by a Name Reference ID");
 						_nameReferences[ReadNextInt()] = rawFieldNameInformation;
 					}
 					else if (nextEntryType == BinarySerialisationDataType.NameReferenceID)
 					{
 						var nameReferenceID = ReadNextInt();
 						if (!_nameReferences.TryGetValue(nameReferenceID, out rawFieldNameInformation))
-							throw new ArgumentException("Invalid NameReferenceID: " + nameReferenceID);
+							throw new Exception("Invalid NameReferenceID: " + nameReferenceID);
 					}
 					else
-						throw new ArgumentException("Unexpected " + nextEntryType + " after FieldName");
+						throw new Exception("Unexpected " + nextEntryType + " after FieldName");
 					BinaryReaderWriterShared.SplitCombinedTypeAndFieldName(rawFieldNameInformation, out var typeNameIfRequired, out var fieldName);
 
 					// Try to get a reference to the field on the target type.. if there is one (if valueIfTypeIsAvailable is null then no-one cases about this data and we're just
@@ -270,18 +272,22 @@ namespace DanSerialiser
 			{
 				var typeName = ReadNextString();
 				if (typeName != null)
+				{
+					if (ReadNextDataType() != BinarySerialisationDataType.NameReferenceID)
+						throw new Exception("Type Name String values should always be followed by a Name Reference ID");
 					_nameReferences[ReadNextInt()] = typeName;
+				}
 				return typeName;
 			}
 			else if (nextEntryType == BinarySerialisationDataType.NameReferenceID)
 			{
 				var nameReferenceID = ReadNextInt();
 				if (!_nameReferences.TryGetValue(nameReferenceID, out var typeName))
-					throw new ArgumentException("Invalid NameReferenceID: " + nameReferenceID);
+					throw new Exception("Invalid NameReferenceID: " + nameReferenceID);
 				return typeName;
 			}
 			else
-				throw new ArgumentException("Expected String or NameReferenceID for object type name");
+				throw new Exception("Expected String or NameReferenceID for object type name");
 		}
 
 		private BinarySerialisationDataType ReadNextDataType()
