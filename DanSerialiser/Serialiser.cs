@@ -6,9 +6,6 @@ using DanSerialiser.Reflection;
 
 namespace DanSerialiser
 {
-	// TODO: Consider moving objectHistoryIfReferenceReuseAllowed to the writer (and having the writer expose a SupportCircularReferences property instead?)
-	// - This will make the interface a bit more complicated because it will have to communicate back that it has reused a references and that the properties
-	//   do not need to be enumerated and recorded
 	public sealed class Serialiser
 	{
 		public static Serialiser Instance { get; } = new Serialiser(DefaultTypeAnalyser.Instance);
