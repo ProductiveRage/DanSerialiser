@@ -56,10 +56,12 @@ namespace DanSerialiser
 					return ReadNextInt16();
 				case BinarySerialisationDataType.Int32:
 					return ReadNextInt();
-				case BinarySerialisationDataType.Int32_Byte:
+				case BinarySerialisationDataType.Int32_8:
 					return (int)ReadNext();
-				case BinarySerialisationDataType.Int32_Int16:
+				case BinarySerialisationDataType.Int32_16:
 					return (int)ReadNextInt16();
+				case BinarySerialisationDataType.Int32_24:
+					return ReadNextInt24();
 				case BinarySerialisationDataType.Int64:
 					return ReadNextInt64();
 
@@ -103,6 +105,11 @@ namespace DanSerialiser
 			return (short)((ReadNext() << 8) + ReadNext());
 		}
 
+		private int ReadNextInt24()
+		{
+			return (ReadNext() << 16) + (ReadNext() << 8) + ReadNext();
+		}
+
 		private int ReadNextInt()
 		{
 			return (ReadNext() << 24) + (ReadNext() << 16) + (ReadNext() << 8) + ReadNext();
@@ -138,9 +145,18 @@ namespace DanSerialiser
 			// Reference ID that will either be a new ID (followed by the object data) or an existing ID (followed by ObjectEnd)
 			int? referenceID;
 			var nextEntryType = ReadNextDataType();
-			if (nextEntryType == BinarySerialisationDataType.ReferenceID)
+			if (nextEntryType == BinarySerialisationDataType.ReferenceID8)
+				referenceID = ReadNext();
+			else if (nextEntryType == BinarySerialisationDataType.ReferenceID16)
+				referenceID = ReadNextInt16();
+			else if (nextEntryType == BinarySerialisationDataType.ReferenceID24)
+				referenceID = ReadNextInt24();
+			else if (nextEntryType == BinarySerialisationDataType.ReferenceID32)
+				referenceID = ReadNext();
+			else
+				referenceID = null;
+			if (referenceID != null)
 			{
-				referenceID = ReadNextInt();
 				if (referenceID < 0)
 					throw new Exception("Encountered negative Reference ID, invalid:" + referenceID);
 				if (referenceID.Value < _objectReferences.Count)
@@ -243,6 +259,8 @@ namespace DanSerialiser
 		{
 			if (specifiedDataType == BinarySerialisationDataType.NameReferenceID32)
 				return ReadNextInt();
+			else if (specifiedDataType == BinarySerialisationDataType.NameReferenceID24)
+				return ReadNextInt24();
 			else if (specifiedDataType == BinarySerialisationDataType.NameReferenceID16)
 				return ReadNextInt16();
 			else if (specifiedDataType == BinarySerialisationDataType.NameReferenceID8)

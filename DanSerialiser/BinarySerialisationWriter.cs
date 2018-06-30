@@ -30,18 +30,15 @@ namespace DanSerialiser
 
 		public void Boolean(bool value)
 		{
-			WriteByte((byte)BinarySerialisationDataType.Boolean);
-			WriteByte(value ? (byte)1 : (byte)0);
+			WriteBytes((byte)BinarySerialisationDataType.Boolean, value ? (byte)1 : (byte)0);
 		}
 		public void Byte(byte value)
 		{
-			WriteByte((byte)BinarySerialisationDataType.Byte);
-			WriteByte(value);
+			WriteBytes((byte)BinarySerialisationDataType.Byte, value);
 		}
 		public void SByte(sbyte value)
 		{
-			WriteByte((byte)BinarySerialisationDataType.SByte);
-			WriteByte((byte)value);
+			WriteBytes((byte)BinarySerialisationDataType.SByte, (byte)value);
 		}
 
 		public void Int16(short value)
@@ -51,7 +48,7 @@ namespace DanSerialiser
 		}
 		public void Int32(int value)
 		{
-			VariableLengthInt32(value, BinarySerialisationDataType.Int32_Byte, BinarySerialisationDataType.Int32_Int16, BinarySerialisationDataType.Int32);
+			VariableLengthInt32(value, BinarySerialisationDataType.Int32_8, BinarySerialisationDataType.Int32_16, BinarySerialisationDataType.Int32_24, BinarySerialisationDataType.Int32);
 		}
 		public void Int64(long value)
 		{
@@ -150,8 +147,7 @@ namespace DanSerialiser
 
 		public void ReferenceId(int value)
 		{
-			WriteByte((byte)BinarySerialisationDataType.ReferenceID);
-			Int32WithoutDataType(value);
+			VariableLengthInt32(value, BinarySerialisationDataType.ReferenceID8, BinarySerialisationDataType.ReferenceID16, BinarySerialisationDataType.ReferenceID24, BinarySerialisationDataType.ReferenceID32);
 		}
 
 		public bool FieldName(FieldInfo field, Type serialisationTargetType)
@@ -266,37 +262,21 @@ namespace DanSerialiser
 			return true;
 		}
 
-		private void Int64WithoutDataType(long value)
-		{
-			WriteByte((byte)(value >> 56));
-			WriteByte((byte)(value >> 48));
-			WriteByte((byte)(value >> 40));
-			WriteByte((byte)(value >> 32));
-			WriteByte((byte)(value >> 24));
-			WriteByte((byte)(value >> 16));
-			WriteByte((byte)(value >> 8));
-			WriteByte((byte)value);
-		}
-
-		internal void Int32WithoutDataType(int value)
-		{
-			WriteByte((byte)(value >> 24));
-			WriteByte((byte)(value >> 16));
-			WriteByte((byte)(value >> 8));
-			WriteByte((byte)value);
-		}
-
-		internal void VariableLengthInt32(int value, BinarySerialisationDataType int8, BinarySerialisationDataType int16, BinarySerialisationDataType int32)
+		private static readonly int _int24Min = -(int)Math.Pow(2, 23);
+		private static readonly int _int24Max = (int)(Math.Pow(2, 23) - 1);
+		internal void VariableLengthInt32(int value, BinarySerialisationDataType int8, BinarySerialisationDataType int16, BinarySerialisationDataType int24, BinarySerialisationDataType int32)
 		{
 			if ((value >= byte.MinValue) && (value <= byte.MaxValue))
-			{
-				WriteByte((byte)int8);
-				WriteByte((byte)value);
-			}
+				WriteBytes((byte)int8, (byte)value);
 			else if ((value >= short.MinValue) && (value <= short.MaxValue))
 			{
 				WriteByte((byte)int16);
 				Int16WithoutDataType((short)value);
+			}
+			else if ((value >= _int24Min) && (value <= _int24Max))
+			{
+				WriteByte((byte)int24);
+				Int24WithoutDataType(value);
 			}
 			else
 			{
@@ -305,20 +285,33 @@ namespace DanSerialiser
 			}
 		}
 
-		private void Int16WithoutDataType(short value)
+		private void Int64WithoutDataType(long value)
 		{
-			WriteByte((byte)(value >> 8));
-			WriteByte((byte)value);
+			WriteBytes(
+				(byte)(value >> 56),
+				(byte)(value >> 48),
+				(byte)(value >> 40),
+				(byte)(value >> 32),
+				(byte)(value >> 24),
+				(byte)(value >> 16),
+				(byte)(value >> 8),
+				(byte)value
+			);
 		}
 
-		private byte[] GetBytesForInt32WithoutDataType(int value)
+		private void Int24WithoutDataType(int value)
 		{
-			var bytes = new byte[4];
-			bytes[0] = (byte)(value >> 24);
-			bytes[1] = (byte)(value >> 16);
-			bytes[2] = (byte)(value >> 8);
-			bytes[3] = (byte)value;
-			return bytes;
+			WriteBytes((byte)(value >> 16), (byte)(value >> 8), (byte)value);
+		}
+
+		private void Int32WithoutDataType(int value)
+		{
+			WriteBytes((byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value);
+		}
+
+		private void Int16WithoutDataType(short value)
+		{
+			WriteBytes((byte)(value >> 8), (byte)value);
 		}
 
 		private void StringWithoutDataType(string value)
@@ -342,6 +335,26 @@ namespace DanSerialiser
 		private void WriteBytes(byte[] value)
 		{
 			_stream.Write(value, 0, value.Length);
+		}
+
+		// These WriteBytes overloads that take multiple individual bytes are to make it easier to compare calling WriteByte multiple times and wrapping into an array to pass to WriteBytes once
+		// (2018-06-30: BenchmarkDotNet seems to report that it's slightly WORSE to call WriteBytes with an array but the flame graph in Code Track indicates a significant speed increase if a
+		// single call to WriteByte is used.. I'd like the Benchmark stats to get better but it's only a small decrease shown there and a big increase elsewhere and so I'm going with my gut)
+		private void WriteBytes(byte b0, byte b1)
+		{
+			WriteBytes(new[] { b0, b1 });
+		}
+		private void WriteBytes(byte b0, byte b1, byte b2)
+		{
+			WriteBytes(new[] { b0, b1, b2 });
+		}
+		private void WriteBytes(byte b0, byte b1, byte b2, byte b3)
+		{
+			WriteBytes(new[] { b0, b1, b2, b3 });
+		}
+		private void WriteBytes(byte b0, byte b1, byte b2, byte b3, byte b4, byte b5, byte b6, byte b7)
+		{
+			WriteBytes(new[] { b0, b1, b2, b3, b4, b5, b6, b7 });
 		}
 	}
 }

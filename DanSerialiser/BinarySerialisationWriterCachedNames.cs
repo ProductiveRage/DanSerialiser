@@ -163,7 +163,13 @@ namespace DanSerialiser
 			using (var stream = new StreamThatAppendsBytesToList(bytesForReferenceID))
 			{
 				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse: true); // The supportReferenceReuse value doesn't make any difference here
-				writer.VariableLengthInt32(referenceID, BinarySerialisationDataType.NameReferenceID8, BinarySerialisationDataType.NameReferenceID16, BinarySerialisationDataType.NameReferenceID32);
+				writer.VariableLengthInt32(
+					referenceID,
+					BinarySerialisationDataType.NameReferenceID8,
+					BinarySerialisationDataType.NameReferenceID16,
+					BinarySerialisationDataType.NameReferenceID24,
+					BinarySerialisationDataType.NameReferenceID32
+				);
 			}
 			return bytesForReferenceID.ToArray();
 		}
