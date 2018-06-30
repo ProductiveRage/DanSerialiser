@@ -36,7 +36,7 @@ namespace Benchmarking
 		public void Setup()
 		{
 			// The json files (and the object model) are derived from real world data that I deal with (it's not the entire object model - because I got bored exporting it and tidyig it up - but it's enough
-			// tp work with). All of the text and location values have been changed to maintain their length and spread of characters (ie. not all ASCII) but to ensure that it's all anonymous (it's public
+			// to work with). All of the text and location values have been changed to maintain their length and spread of characters (ie. not all ASCII) but to ensure that it's all anonymous (it's public
 			// data anyway but it does no harm to err on the safe side).
 			_products = new DirectoryInfo("SampleData")
 				.EnumerateFiles("*.json")
