@@ -7,9 +7,10 @@
 		SByte,
 
 		Int16,
+		Int32_8,
+		Int32_16,
+		Int32_24,
 		Int32,
-		Int32_Byte,
-		Int32_Int16,
 		Int64,
 
 		UInt16,
@@ -28,8 +29,12 @@
 		ObjectStart,
 		NameReferenceID8,
 		NameReferenceID16,
+		NameReferenceID24,
 		NameReferenceID32,
-		ReferenceID,
+		ReferenceID8,
+		ReferenceID16,
+		ReferenceID24,
+		ReferenceID32,
 		FieldName,
 		ObjectEnd,
 
