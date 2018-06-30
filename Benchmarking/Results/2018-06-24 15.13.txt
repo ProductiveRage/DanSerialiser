@@ -13,22 +13,22 @@ Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
 
                      Method |  Job | Runtime |         Mean |        Error |       StdDev |
 --------------------------- |----- |-------- |-------------:|-------------:|-------------:|
-           JsonNetSerialise |  Clr |     Clr |  16,016.9 us |   240.137 us |   224.624 us |
-         JsonNetDeserialise |  Clr |     Clr |  13,144.7 us |   220.326 us |   183.982 us |
-   BinaryFormatterSerialise |  Clr |     Clr |   8,914.8 us |   170.361 us |   196.188 us |
- BinaryFormatterDeserialise |  Clr |     Clr |   7,672.7 us |    68.321 us |    63.908 us |
-          ProtoBufSerialise |  Clr |     Clr |     503.4 us |     3.624 us |     3.390 us |
-        ProtoBufDeserialise |  Clr |     Clr |     752.1 us |     5.513 us |     4.887 us |
-     DanSerialiserSerialise |  Clr |     Clr | 117,690.6 us | 1,101.753 us |   920.014 us | 233.8x
-   DanSerialiserDeserialise |  Clr |     Clr | 243,330.4 us | 1,458.238 us | 1,217.694 us | 323.5x
-           JsonNetSerialise | Core |    Core |   8,892.1 us |    70.194 us |    65.659 us |
-         JsonNetDeserialise | Core |    Core |  12,576.5 us |    96.591 us |    85.626 us |
-   BinaryFormatterSerialise | Core |    Core |  10,536.7 us |   113.782 us |   106.431 us |
- BinaryFormatterDeserialise | Core |    Core |   9,995.6 us |   105.336 us |    87.960 us |
-          ProtoBufSerialise | Core |    Core |     530.7 us |    10.430 us |    10.711 us |
-        ProtoBufDeserialise | Core |    Core |     858.5 us |     9.959 us |     8.829 us |
-     DanSerialiserSerialise | Core |    Core | 103,218.4 us |   752.487 us |   667.060 us | 194.5x
-   DanSerialiserDeserialise | Core |    Core | 189,534.7 us | 1,269.117 us | 1,125.039 us | 220.8x
+           JsonNetSerialise |  Clr |     Clr |  16,016.9 us |   240.137 us |   224.624 us | 7.3x faster
+         JsonNetDeserialise |  Clr |     Clr |  13,144.7 us |   220.326 us |   183.982 us | 18.5x faster
+   BinaryFormatterSerialise |  Clr |     Clr |   8,914.8 us |   170.361 us |   196.188 us | 13.2x faster
+ BinaryFormatterDeserialise |  Clr |     Clr |   7,672.7 us |    68.321 us |    63.908 us | 31.7x faster
+          ProtoBufSerialise |  Clr |     Clr |     503.4 us |     3.624 us |     3.390 us | 233.8x faster
+        ProtoBufDeserialise |  Clr |     Clr |     752.1 us |     5.513 us |     4.887 us | 323.5x faster
+     DanSerialiserSerialise |  Clr |     Clr | 117,690.6 us | 1,101.753 us |   920.014 us |
+   DanSerialiserDeserialise |  Clr |     Clr | 243,330.4 us | 1,458.238 us | 1,217.694 us |
+           JsonNetSerialise | Core |    Core |   8,892.1 us |    70.194 us |    65.659 us | 11.6x faster
+         JsonNetDeserialise | Core |    Core |  12,576.5 us |    96.591 us |    85.626 us | 15.1x faster
+   BinaryFormatterSerialise | Core |    Core |  10,536.7 us |   113.782 us |   106.431 us | 9.8x faster
+ BinaryFormatterDeserialise | Core |    Core |   9,995.6 us |   105.336 us |    87.960 us | 19.0x faster
+          ProtoBufSerialise | Core |    Core |     530.7 us |    10.430 us |    10.711 us | 194.5x faster
+        ProtoBufDeserialise | Core |    Core |     858.5 us |     9.959 us |     8.829 us | 220.8x faster
+     DanSerialiserSerialise | Core |    Core | 103,218.4 us |   752.487 us |   667.060 us |
+   DanSerialiserDeserialise | Core |    Core | 189,534.7 us | 1,269.117 us | 1,125.039 us |
 
 // * Hints *
 Outliers

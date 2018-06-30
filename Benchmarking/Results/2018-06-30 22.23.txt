@@ -9,13 +9,21 @@ Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
   Core   : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
 
 
-                   Method |  Job | Runtime |      Mean |     Error |    StdDev |
-------------------------- |----- |-------- |----------:|----------:|----------:|
-        ProtoBufSerialise |  Clr |     Clr |  4.548 ms | 0.0866 ms | 0.0926 ms |
-      ProtoBufDeserialise |  Clr |     Clr |  8.430 ms | 0.1644 ms | 0.1827 ms |
-   DanSerialiserSerialise |  Clr |     Clr | 40.458 ms | 0.5908 ms | 0.5527 ms | 8.9x
- DanSerialiserDeserialise |  Clr |     Clr | 66.718 ms | 0.5975 ms | 0.5589 ms | 7.9x
-        ProtoBufSerialise | Core |    Core |  4.712 ms | 0.0543 ms | 0.0453 ms |
-      ProtoBufDeserialise | Core |    Core |  7.867 ms | 0.0585 ms | 0.0518 ms |
-   DanSerialiserSerialise | Core |    Core | 30.717 ms | 0.1440 ms | 0.1276 ms | 6.5x
- DanSerialiserDeserialise | Core |    Core | 69.532 ms | 0.5889 ms | 0.5220 ms | 8.8x
+                     Method |  Job | Runtime |       Mean |     Error |    StdDev |
+--------------------------- |----- |-------- |-----------:|----------:|----------:|
+           JsonNetSerialise |  Clr |     Clr | 105.868 ms | 2.0740 ms | 2.6968 ms | 2.6x slower
+         JsonNetDeserialise |  Clr |     Clr |  81.800 ms | 0.2608 ms | 0.2312 ms | 1.2x slower
+   BinaryFormatterSerialise |  Clr |     Clr |  54.636 ms | 0.2901 ms | 0.2713 ms | 1.4x slower
+ BinaryFormatterDeserialise |  Clr |     Clr |  69.531 ms | 0.3249 ms | 0.2713 ms | 1.0x slower
+          ProtoBufSerialise |  Clr |     Clr |   4.421 ms | 0.0701 ms | 0.0586 ms | 9.1x faster
+        ProtoBufDeserialise |  Clr |     Clr |   8.054 ms | 0.0439 ms | 0.0411 ms | 8.3x faster
+     DanSerialiserSerialise |  Clr |     Clr |  40.452 ms | 0.6952 ms | 0.6163 ms |
+   DanSerialiserDeserialise |  Clr |     Clr |  67.019 ms | 0.8194 ms | 0.7664 ms |
+           JsonNetSerialise | Core |    Core |  59.146 ms | 0.7125 ms | 0.6665 ms | 1.9x slower
+         JsonNetDeserialise | Core |    Core |  82.204 ms | 0.4501 ms | 0.3990 ms | 1.2x slower
+   BinaryFormatterSerialise | Core |    Core |  69.506 ms | 1.0461 ms | 0.8735 ms | 2.3x slower
+ BinaryFormatterDeserialise | Core |    Core |  81.136 ms | 0.7341 ms | 0.6866 ms | 1.2x slower
+          ProtoBufSerialise | Core |    Core |   4.696 ms | 0.0495 ms | 0.0413 ms | 6.5x faster
+        ProtoBufDeserialise | Core |    Core |   7.784 ms | 0.0436 ms | 0.0407 ms | 8.7x faster
+     DanSerialiserSerialise | Core |    Core |  30.505 ms | 0.1606 ms | 0.1341 ms |
+   DanSerialiserDeserialise | Core |    Core |  67.918 ms | 0.7603 ms | 0.7112 ms |
