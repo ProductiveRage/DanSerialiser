@@ -318,12 +318,12 @@ namespace DanSerialiser
 		{
 			if (value == null)
 			{
-				Int32WithoutDataType(-1);
+				Int32(-1);
 				return;
 			}
 
 			var bytes = Encoding.UTF8.GetBytes(value);
-			Int32WithoutDataType(bytes.Length);
+			Int32(bytes.Length);
 			WriteBytes(bytes);
 		}
 

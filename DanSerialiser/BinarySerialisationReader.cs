@@ -40,10 +40,11 @@ namespace DanSerialiser
 
 		private object Read(bool ignoreAnyInvalidTypes)
 		{
-			switch (ReadNextDataType())
+			var dataType = ReadNextDataType();
+			switch (dataType)
 			{
 				default:
-					throw new NotImplementedException();
+					throw new Exception("Unexpected BinarySerialisationDataType: " + dataType);
 
 				case BinarySerialisationDataType.Boolean:
 					return ReadNext() != 0;
@@ -54,14 +55,14 @@ namespace DanSerialiser
 
 				case BinarySerialisationDataType.Int16:
 					return ReadNextInt16();
-				case BinarySerialisationDataType.Int32:
-					return ReadNextInt();
 				case BinarySerialisationDataType.Int32_8:
 					return (int)ReadNext();
 				case BinarySerialisationDataType.Int32_16:
 					return (int)ReadNextInt16();
 				case BinarySerialisationDataType.Int32_24:
 					return ReadNextInt24();
+				case BinarySerialisationDataType.Int32:
+					return ReadNextInt();
 				case BinarySerialisationDataType.Int64:
 					return ReadNextInt64();
 
@@ -122,7 +123,18 @@ namespace DanSerialiser
 
 		private string ReadNextString()
 		{
-			var length = ReadNextInt();
+			var dataType = ReadNextDataType();
+			int length;
+			if (dataType == BinarySerialisationDataType.Int32_8)
+				length = (int)ReadNext();
+			else if (dataType == BinarySerialisationDataType.Int32_16)
+				length = (int)ReadNextInt16();
+			else if (dataType == BinarySerialisationDataType.Int32_24)
+				length = ReadNextInt24();
+			else if (dataType == BinarySerialisationDataType.Int32)
+				length = ReadNextInt();
+			else
+				throw new Exception("Unexpected BinarySerialisationDataType for String length: " + dataType);
 			return (length == -1) ? null : Encoding.UTF8.GetString(ReadNext(length));
 		}
 
