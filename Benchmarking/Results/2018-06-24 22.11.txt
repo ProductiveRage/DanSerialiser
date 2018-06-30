@@ -12,6 +12,6 @@ Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
                  Method |  Job | Runtime |        Mean |      Error |     StdDev |
 ----------------------- |----- |-------- |------------:|-----------:|-----------:|
       ProtoBufSerialise |  Clr |     Clr |    476.2 us |   9.124 us |   9.370 us |
- DanSerialiserSerialise |  Clr |     Clr | 51,635.7 us | 323.703 us | 286.954 us |
+ DanSerialiserSerialise |  Clr |     Clr | 51,635.7 us | 323.703 us | 286.954 us | 108.4x
       ProtoBufSerialise | Core |    Core |    494.5 us |   5.380 us |   5.032 us |
- DanSerialiserSerialise | Core |    Core | 53,674.3 us | 346.098 us | 289.008 us |
+ DanSerialiserSerialise | Core |    Core | 53,674.3 us | 346.098 us | 289.008 us | 108.5x

@@ -13,9 +13,9 @@ Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
 ------------------------- |----- |-------- |------------:|-----------:|-----------:|------------:|
         ProtoBufSerialise |  Clr |     Clr |    490.1 us |   9.715 us |  20.064 us |    479.2 us |
       ProtoBufDeserialise |  Clr |     Clr |    710.2 us |   3.401 us |   3.015 us |    709.7 us |
-   DanSerialiserSerialise |  Clr |     Clr | 10,091.9 us | 112.303 us |  99.554 us | 10,080.3 us |
- DanSerialiserDeserialise |  Clr |     Clr |  9,515.7 us |  66.524 us |  51.937 us |  9,527.7 us |
+   DanSerialiserSerialise |  Clr |     Clr | 10,091.9 us | 112.303 us |  99.554 us | 10,080.3 us | 20.6x
+ DanSerialiserDeserialise |  Clr |     Clr |  9,515.7 us |  66.524 us |  51.937 us |  9,527.7 us | 13.4x
         ProtoBufSerialise | Core |    Core |    517.2 us |   3.907 us |   3.262 us |    516.5 us |
       ProtoBufDeserialise | Core |    Core |    824.3 us |   8.603 us |   8.047 us |    824.8 us |
-   DanSerialiserSerialise | Core |    Core | 10,087.9 us |  71.842 us |  67.201 us | 10,088.6 us |
- DanSerialiserDeserialise | Core |    Core |  9,439.0 us | 187.104 us | 291.298 us |  9,401.9 us |
+   DanSerialiserSerialise | Core |    Core | 10,087.9 us |  71.842 us |  67.201 us | 10,088.6 us | 19.5x
+ DanSerialiserDeserialise | Core |    Core |  9,439.0 us | 187.104 us | 291.298 us |  9,401.9 us | 11.5x

@@ -17,13 +17,13 @@ Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
  BinaryFormatterDeserialise |  Clr |     Clr | 64,740.8 us |   485.910 us |   454.5207 us |
           ProtoBufSerialise |  Clr |     Clr |  3,312.9 us |    26.612 us |    20.7767 us |
         ProtoBufDeserialise |  Clr |     Clr |  6,407.3 us |    31.882 us |    29.8229 us |
-     DanSerialiserSerialise |  Clr |     Clr | 56,969.0 us |   347.383 us |   307.9459 us |
-   DanSerialiserDeserialise |  Clr |     Clr | 65,797.1 us |   719.252 us |   672.7889 us |
+     DanSerialiserSerialise |  Clr |     Clr | 56,969.0 us |   347.383 us |   307.9459 us | 17.2x
+   DanSerialiserDeserialise |  Clr |     Clr | 65,797.1 us |   719.252 us |   672.7889 us | 10.3x
            JsonNetSerialise | Core |    Core |  9,575.1 us |    48.557 us |    43.0448 us |
          JsonNetDeserialise | Core |    Core | 12,168.7 us |    59.425 us |    46.3951 us |
    BinaryFormatterSerialise | Core |    Core | 10,323.6 us |    70.759 us |    66.1883 us |
  BinaryFormatterDeserialise | Core |    Core |  9,167.7 us |    53.444 us |    49.9920 us |
           ProtoBufSerialise | Core |    Core |    464.4 us |     1.063 us |     0.8298 us |
         ProtoBufDeserialise | Core |    Core |    817.7 us |     3.575 us |     2.9855 us |
-     DanSerialiserSerialise | Core |    Core |  8,863.2 us |   117.344 us |   109.7639 us |
-   DanSerialiserDeserialise | Core |    Core |  8,835.5 us |    82.064 us |    76.7625 us |
+     DanSerialiserSerialise | Core |    Core |  8,863.2 us |   117.344 us |   109.7639 us | 19.1x
+   DanSerialiserDeserialise | Core |    Core |  8,835.5 us |    82.064 us |    76.7625 us | 10.8x
