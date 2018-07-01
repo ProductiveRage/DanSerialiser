@@ -1,0 +1,31 @@
+// * Summary *
+
+BenchmarkDotNet=v0.10.14, OS=Windows 8.1 (6.3.9600.0)
+AMD FX(tm)-8350 Eight-Core Processor, 1 CPU, 8 logical and 4 physical cores
+Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
+.NET Core SDK=2.1.300
+  [Host] : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+  Clr    : .NET Framework 4.6.1 (CLR 4.0.30319.42000), 64bit RyuJIT-v4.7.2650.0
+  Core   : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+
+
+                   Method |  Job | Runtime |      Mean |     Error |    StdDev |
+------------------------- |----- |-------- |----------:|----------:|----------:|
+        ProtoBufSerialise |  Clr |     Clr |  4.511 ms | 0.0901 ms | 0.0885 ms | 8.6x faster
+      ProtoBufDeserialise |  Clr |     Clr |  8.123 ms | 0.0430 ms | 0.0402 ms | 8.3x faster
+   DanSerialiserSerialise |  Clr |     Clr | 38.865 ms | 0.3587 ms | 0.3355 ms |
+ DanSerialiserDeserialise |  Clr |     Clr | 67.236 ms | 0.4339 ms | 0.4058 ms |
+        ProtoBufSerialise | Core |    Core |  4.701 ms | 0.0627 ms | 0.0524 ms | 6.5x faster
+      ProtoBufDeserialise | Core |    Core |  7.762 ms | 0.0617 ms | 0.0547 ms | 8.7x faster
+   DanSerialiserSerialise | Core |    Core | 30.432 ms | 0.2120 ms | 0.1770 ms |
+ DanSerialiserDeserialise | Core |    Core | 67.419 ms | 0.6920 ms | 0.6473 ms |
+
+NOTE: These are results for the Benchmarks as the repo stands now, the file
+      "2018-07-01 23.35-RollbackIntStructs.txt" contains the results of the
+      Benchmarks if the changes to use Int16/24/32Bytes structs are removed.
+      It seemed like things were going backwards when other profiling tools
+      (when I looked in CodeTrack, for example) suggested they were going
+      forwards. Running the tests as close to back-to-back at least get
+      the Benchmark results to seem like things aren't going in reverse
+      (though I'm not sure what the breakthrough is going to be to get
+      with 5x of ProtoBuf).
