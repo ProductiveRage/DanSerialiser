@@ -56,36 +56,34 @@ namespace DanSerialiser
 				);
 
 				// Generate the write-Field-value-to-stream method call
-				if (nullableTypeInner != null)
+				if ((nullableTypeInner != null) || !field.FieldType.IsValueType)
 				{
 					// If this is a Nullable value then we need to check for is-null and then either write a null object or write the underlying value (Nullable<T> gets magic
 					// treatment by the compiler and so we don't have to write the data as a Nullable<T>, we can write either null or T)
+					// 2018-07-01: Now that there is a "Null" method on IWrite, we need to apply the same logic to reference type fields (it's cheaper to write a single Null
+					// byte for a null Object - which would otherwise be two bytes of ObjectStart, ObjectEnd - or a null Array - which would otherwise be an ArrayStart byte,
+					// the bytes for a null String and an ArrayEnd - or a null String - which would have required three bytes for the String data type and then a length of
+					// minus one encoded as an Int32_16 data type and two bytes for a -1 length)
+					var ifNull = Expression.Call(
+						writerParameter,
+						nameof(BinarySerialisationWriter.Null),
+						typeArguments: Type.EmptyTypes
+					);
+					var ifNotNull = Expression.Call(
+						writerParameter,
+						fieldWriterMethod,
+						Expression.Convert(
+							Expression.MakeMemberAccess(typedSource, field),
+							nullableTypeInner ?? field.FieldType
+						)
+					);
 					statements.Add(Expression.IfThenElse(
-						test: Expression.Equal(
+						Expression.Equal(
 							Expression.MakeMemberAccess(typedSource, field),
 							Expression.Constant(null, field.FieldType)
 						),
-						ifTrue: Expression.Block(
-							Expression.Call(
-								writerParameter,
-								nameof(BinarySerialisationWriter.ObjectStart),
-								typeArguments: new[] { typeof(object) },
-								arguments: new[] { Expression.Constant(null, typeof(object)) }
-							),
-							Expression.Call(
-								writerParameter,
-								nameof(BinarySerialisationWriter.ObjectEnd),
-								typeArguments: Type.EmptyTypes
-							)
-						),
-						ifFalse: Expression.Call(
-							writerParameter,
-							fieldWriterMethod,
-							Expression.Convert(
-								Expression.MakeMemberAccess(typedSource, field),
-								nullableTypeInner
-							)
-						)
+						ifNull,
+						ifNotNull
 					));
 				}
 				else

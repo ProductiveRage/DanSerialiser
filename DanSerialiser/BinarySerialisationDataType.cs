@@ -26,6 +26,8 @@
 
 		DateTime,
 
+		Null,
+
 		ObjectStart,
 		NameReferenceID8,
 		NameReferenceID16,

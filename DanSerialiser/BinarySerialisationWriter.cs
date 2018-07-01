@@ -134,6 +134,11 @@ namespace DanSerialiser
 			WriteByte((byte)BinarySerialisationDataType.ArrayEnd);
 		}
 
+		public void Null()
+		{
+			WriteByte((byte)BinarySerialisationDataType.Null);
+		}
+
 		public void ObjectStart<T>(T value)
 		{
 			WriteByte((byte)BinarySerialisationDataType.ObjectStart);

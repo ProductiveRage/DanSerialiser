@@ -125,13 +125,24 @@ namespace DanSerialiser
 			}
 			if (type == CommonTypeOfs.String)
 			{
-				writer.String((String)value);
+				if (value == null)
+					writer.Null();
+				else
+					writer.String((String)value);
 				return;
 			}
 
 			if (type == CommonTypeOfs.DateTime)
 			{
 				writer.DateTime((DateTime)value);
+				return;
+			}
+
+			// For Object and Array types, if we've got a null reference then write a Null value (having this null check here avoids the type.IsEnum and type.IsArray checks
+			// for cases where we DO have a null reference(
+			if (value == null)
+			{
+				writer.Null();
 				return;
 			}
 
@@ -163,32 +174,29 @@ namespace DanSerialiser
 			}
 
 			writer.ObjectStart(value);
-			if (value != null)
+			bool recordedAsOtherReference;
+			if ((objectHistoryIfReferenceReuseAllowed != null) && (type != CommonTypeOfs.String) && !type.IsValueType)
 			{
-				bool recordedAsOtherReference;
-				if ((objectHistoryIfReferenceReuseAllowed != null) && (type != CommonTypeOfs.String) && !type.IsValueType)
-				{
-					if (objectHistoryIfReferenceReuseAllowed.TryGetValue(value, out int referenceID))
-						recordedAsOtherReference = true;
-					else
-					{
-						if (objectHistoryIfReferenceReuseAllowed.Count == BinaryReaderWriterShared.MaxReferenceCount)
-						{
-							// The references need to be tracked in the object history dictionary and there is a limit to how many items will fit (MaxReferenceCount will be int.MaxValue) -
-							// this probably won't ever be hit (more likely to run out of memory first) but it's better to have a descriptive exception in case it ever is encountered
-							throw new MaxObjectGraphSizeExceededException();
-						}
-						referenceID = objectHistoryIfReferenceReuseAllowed.Count;
-						objectHistoryIfReferenceReuseAllowed[value] = referenceID;
-						recordedAsOtherReference = false;
-					}
-					writer.ReferenceId(referenceID);
-				}
+				if (objectHistoryIfReferenceReuseAllowed.TryGetValue(value, out int referenceID))
+					recordedAsOtherReference = true;
 				else
+				{
+					if (objectHistoryIfReferenceReuseAllowed.Count == BinaryReaderWriterShared.MaxReferenceCount)
+					{
+						// The references need to be tracked in the object history dictionary and there is a limit to how many items will fit (MaxReferenceCount will be int.MaxValue) -
+						// this probably won't ever be hit (more likely to run out of memory first) but it's better to have a descriptive exception in case it ever is encountered
+						throw new MaxObjectGraphSizeExceededException();
+					}
+					referenceID = objectHistoryIfReferenceReuseAllowed.Count;
+					objectHistoryIfReferenceReuseAllowed[value] = referenceID;
 					recordedAsOtherReference = false;
-				if (!recordedAsOtherReference)
-					SerialiseObjectFieldsAndProperties(value, type, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, generatedMemberSetters, writer);
+				}
+				writer.ReferenceId(referenceID);
 			}
+			else
+				recordedAsOtherReference = false;
+			if (!recordedAsOtherReference)
+				SerialiseObjectFieldsAndProperties(value, type, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, generatedMemberSetters, writer);
 			writer.ObjectEnd();
 		}
 

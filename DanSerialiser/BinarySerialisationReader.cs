@@ -46,6 +46,9 @@ namespace DanSerialiser
 				default:
 					throw new Exception("Unexpected BinarySerialisationDataType: " + dataType);
 
+				case BinarySerialisationDataType.Null:
+					return null;
+
 				case BinarySerialisationDataType.Boolean:
 					return ReadNext() != 0;
 				case BinarySerialisationDataType.Byte:
