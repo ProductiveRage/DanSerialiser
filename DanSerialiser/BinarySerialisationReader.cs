@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using DanSerialiser.BinaryTypeStructures;
 using DanSerialiser.Reflection;
 
 namespace DanSerialiser
@@ -79,7 +80,7 @@ namespace DanSerialiser
 				case BinarySerialisationDataType.Single:
 					return BitConverter.ToSingle(ReadNext(sizeof(Single)), 0);
 				case BinarySerialisationDataType.Double:
-					return BitConverter.ToDouble(ReadNext(sizeof(Double)), 0);
+					return (new DoubleBytes(ReadNext(8))).Value;
 				case BinarySerialisationDataType.Decimal:
 					// BitConverter does not deal with decimal (there is no GetBytes overloads for it and no ToDecimal method) so BinaryWriter used decimal.GetBits, which
 					// returns four int values and so we need to do the opposite here
