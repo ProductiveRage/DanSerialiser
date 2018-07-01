@@ -284,10 +284,7 @@ namespace DanSerialiser
 				Int24WithoutDataType(value);
 			}
 			else
-			{
-				WriteByte((byte)int32);
-				Int32WithoutDataType(value);
-			}
+				WriteBytes((new Int32Bytes(value)).GetLittleEndianBytesWithDataType(int32));
 		}
 
 		private void Int64WithoutDataType(long value)
@@ -311,7 +308,8 @@ namespace DanSerialiser
 
 		private void Int32WithoutDataType(int value)
 		{
-			WriteBytes((byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value);
+
+			WriteBytes((new Int32Bytes(value)).GetLittleEndianBytesWithoutDataType());
 		}
 
 		private void Int16WithoutDataType(short value)

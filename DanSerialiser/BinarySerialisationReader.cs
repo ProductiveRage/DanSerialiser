@@ -117,7 +117,7 @@ namespace DanSerialiser
 
 		private int ReadNextInt()
 		{
-			return (ReadNext() << 24) + (ReadNext() << 16) + (ReadNext() << 8) + ReadNext();
+			return (new Int32Bytes(ReadNext(4))).Value;
 		}
 
 		private long ReadNextInt64()
