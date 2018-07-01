@@ -19,28 +19,28 @@ namespace DanSerialiser.BinaryTypeStructures
 		public readonly double Value;
 
 		[FieldOffset(0)]
-		public readonly Byte Byte0;
+		private readonly Byte Byte0;
 
 		[FieldOffset(1)]
-		public readonly Byte Byte1;
+		private readonly Byte Byte1;
 
 		[FieldOffset(2)]
-		public readonly Byte Byte2;
+		private readonly Byte Byte2;
 
 		[FieldOffset(3)]
-		public readonly Byte Byte3;
+		private readonly Byte Byte3;
 
 		[FieldOffset(4)]
-		public readonly Byte Byte4;
+		private readonly Byte Byte4;
 
 		[FieldOffset(5)]
-		public readonly Byte Byte5;
+		private readonly Byte Byte5;
 
 		[FieldOffset(6)]
-		public readonly Byte Byte6;
+		private readonly Byte Byte6;
 
 		[FieldOffset(7)]
-		public readonly Byte Byte7;
+		private readonly Byte Byte7;
 
 		public DoubleBytes(double value)
 		{
@@ -78,6 +78,14 @@ namespace DanSerialiser.BinaryTypeStructures
 				this.Byte6 = littleEndianBytes[1];
 				this.Byte7 = littleEndianBytes[0];
 			}
+		}
+
+		public byte[] GetLittleEndianBytesWithDataType()
+		{
+			if (BitConverter.IsLittleEndian)
+				return new[] { (byte)BinarySerialisationDataType.Double, Byte0, Byte1, Byte2, Byte3, Byte4, Byte5, Byte6, Byte7 };
+			else
+				return new[] { (byte)BinarySerialisationDataType.Double, Byte7, Byte6, Byte5, Byte4, Byte3, Byte2, Byte1, Byte0 };
 		}
 	}
 }

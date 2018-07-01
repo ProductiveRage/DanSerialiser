@@ -63,13 +63,7 @@ namespace DanSerialiser
 		}
 		public void Double(double value)
 		{
-			// The order of the bytes exposed via DoubleBytes will depend upon the endianness of the system. I'm using Windows, which is little endian and so I'm going to record the bytes
-			// in that order in the serialisation stream (it doesn't really matter so long as there is consistency between this and the DoubleBytes constructor that takes a byte array)
-			var exposedBytes = new DoubleBytes(value);
-			if (BitConverter.IsLittleEndian)
-				WriteBytes((byte)BinarySerialisationDataType.Double, exposedBytes.Byte0, exposedBytes.Byte1, exposedBytes.Byte2, exposedBytes.Byte3, exposedBytes.Byte4, exposedBytes.Byte5, exposedBytes.Byte6, exposedBytes.Byte7);
-			else
-				WriteBytes((byte)BinarySerialisationDataType.Double, exposedBytes.Byte7, exposedBytes.Byte6, exposedBytes.Byte5, exposedBytes.Byte4, exposedBytes.Byte3, exposedBytes.Byte2, exposedBytes.Byte1, exposedBytes.Byte0);
+			WriteBytes((new DoubleBytes(value)).GetLittleEndianBytesWithDataType());
 		}
 		public void Decimal(decimal value)
 		{
