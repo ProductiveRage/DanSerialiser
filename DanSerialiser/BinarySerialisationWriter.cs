@@ -44,8 +44,7 @@ namespace DanSerialiser
 
 		public void Int16(short value)
 		{
-			WriteByte((byte)BinarySerialisationDataType.Int16);
-			Int16WithoutDataType(value);
+			WriteBytes((new Int16Bytes(value)).GetLittleEndianBytesWithDataType(BinarySerialisationDataType.Int16));
 		}
 		public void Int32(int value)
 		{
@@ -125,7 +124,7 @@ namespace DanSerialiser
 			{
 				// If the value is null then WriteTypeName will have written a representation of a null string and the BinaryReader will understand that this represents a
 				// null value (and so we don't need to write any length data here)
-				Int32WithoutDataType(((Array)(object)value).Length);
+				Int32(((Array)(object)value).Length);
 			}
 		}
 
@@ -274,15 +273,9 @@ namespace DanSerialiser
 			if ((value >= byte.MinValue) && (value <= byte.MaxValue))
 				WriteBytes((byte)int8, (byte)value);
 			else if ((value >= short.MinValue) && (value <= short.MaxValue))
-			{
-				WriteByte((byte)int16);
-				Int16WithoutDataType((short)value);
-			}
+				WriteBytes((new Int16Bytes((short)value)).GetLittleEndianBytesWithDataType(int16));
 			else if ((value >= _int24Min) && (value <= _int24Max))
-			{
-				WriteByte((byte)int24);
-				Int24WithoutDataType(value);
-			}
+				WriteBytes((new Int24Bytes(value)).GetLittleEndianBytesWithDataType(int24));
 			else
 				WriteBytes((new Int32Bytes(value)).GetLittleEndianBytesWithDataType(int32));
 		}
@@ -301,20 +294,19 @@ namespace DanSerialiser
 			);
 		}
 
+		private void Int16WithoutDataType(short value)
+		{
+			WriteBytes((new Int16Bytes(value)).GetLittleEndianBytesWithoutDataType());
+		}
+
 		private void Int24WithoutDataType(int value)
 		{
-			WriteBytes((byte)(value >> 16), (byte)(value >> 8), (byte)value);
+			WriteBytes((new Int24Bytes(value)).GetLittleEndianBytesWithoutDataType());
 		}
 
 		private void Int32WithoutDataType(int value)
 		{
-
 			WriteBytes((new Int32Bytes(value)).GetLittleEndianBytesWithoutDataType());
-		}
-
-		private void Int16WithoutDataType(short value)
-		{
-			WriteBytes((byte)(value >> 8), (byte)value);
 		}
 
 		private void StringWithoutDataType(string value)

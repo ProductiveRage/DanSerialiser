@@ -107,12 +107,12 @@ namespace DanSerialiser
 
 		private short ReadNextInt16()
 		{
-			return (short)((ReadNext() << 8) + ReadNext());
+			return (new Int16Bytes(ReadNext(2))).Value;
 		}
 
 		private int ReadNextInt24()
 		{
-			return (ReadNext() << 16) + (ReadNext() << 8) + ReadNext();
+			return (new Int24Bytes(ReadNext(3))).Value;
 		}
 
 		private int ReadNextInt()
@@ -130,9 +130,9 @@ namespace DanSerialiser
 			var dataType = ReadNextDataType();
 			int length;
 			if (dataType == BinarySerialisationDataType.Int32_8)
-				length = (int)ReadNext();
+				length = ReadNext();
 			else if (dataType == BinarySerialisationDataType.Int32_16)
-				length = (int)ReadNextInt16();
+				length = ReadNextInt16();
 			else if (dataType == BinarySerialisationDataType.Int32_24)
 				length = ReadNextInt24();
 			else if (dataType == BinarySerialisationDataType.Int32)
@@ -296,7 +296,19 @@ namespace DanSerialiser
 				return null;
 			}
 			var elementType = Type.GetType(elementTypeName, throwOnError: true);
-			var items = Array.CreateInstance(elementType, length: ReadNextInt());
+			var lengthDataType = ReadNextDataType();
+			int length;
+			if (lengthDataType == BinarySerialisationDataType.Int32_8)
+				length = ReadNext();
+			else if (lengthDataType == BinarySerialisationDataType.Int32_16)
+				length = ReadNextInt16();
+			else if (lengthDataType == BinarySerialisationDataType.Int32_24)
+				length = ReadNextInt24();
+			else if (lengthDataType == BinarySerialisationDataType.Int32)
+				length = ReadNextInt();
+			else
+				throw new Exception("Unexpected BinarySerialisationDataType for Array length: " + lengthDataType);
+			var items = Array.CreateInstance(elementType, length);
 			for (var i = 0; i < items.Length; i++)
 				items.SetValue(Read(ignoreAnyInvalidTypes), i);
 			var nextEntryType = ReadNextDataType();
