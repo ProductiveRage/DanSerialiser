@@ -15,6 +15,7 @@ namespace DanSerialiser
 		private readonly IAnalyseTypesForSerialisation _typeAnalyser;
 		private readonly Dictionary<int, string> _nameReferences;
 		private readonly List<object> _objectReferences;
+		private readonly Dictionary<int, BinarySerialisationReaderTypeReader> _typeReaders;
 		public BinarySerialisationReader(Stream stream) : this(stream, DefaultTypeAnalyser.Instance) { }
 		internal BinarySerialisationReader(Stream stream, IAnalyseTypesForSerialisation typeAnalyser) // internal constructor may be used by unit tests
 		{
@@ -27,6 +28,16 @@ namespace DanSerialiser
 			// may not be continuous and so a dictionary is required to describe a lookup for them here.
 			_nameReferences = new Dictionary<int, string>();
 			_objectReferences = new List<object>();
+
+			// In the same way as we take advantage of the BinarySerialisationWriter's implementation details above, where Object Reference IDs are known to appear in order, we
+			// can take adantage of the fact that the fields for each distinct type will always appear in the same order (and there will always be the precise same number of
+			// field entries for subsequent occurrences of a particular type) AND the field names will always use Name Reference IDs after the first time that a type is written
+			// out. So, instead of treating the field data as dynamic content and having to try to resolve the fields each time that an object is to be deserialised, we can
+			// build specialised deserialisers for each type that know what fields are going to appear and that have cached the field lookup data - this will mean that there is
+			// a lot less work to do when there are many instances of a given type within a payload. Also note that after the first appearance of a type, Name Reference IDs will
+			// always be used for the type name and so the lookup that is constructed to these per-type deserialisers has an int key (which is less work to match than using the
+			// full type name as the key would be).
+			_typeReaders = new Dictionary<int, BinarySerialisationReaderTypeReader>();
 		}
 
 		public T Read<T>()
@@ -40,7 +51,7 @@ namespace DanSerialiser
 			return (T)Read(ignoreAnyInvalidTypes: false);
 		}
 
-		private object Read(bool ignoreAnyInvalidTypes)
+		internal object Read(bool ignoreAnyInvalidTypes)
 		{
 			var dataType = ReadNextDataType();
 			switch (dataType)
@@ -150,7 +161,7 @@ namespace DanSerialiser
 
 		private object ReadNextObject(bool ignoreAnyInvalidTypes)
 		{
-			var typeName = ReadNextTypeName();
+			var typeName = ReadNextTypeName(out var typeNameReferenceID);
 			if (typeName == null)
 			{
 				if (ReadNextDataType() != BinarySerialisationDataType.ObjectEnd)
@@ -188,6 +199,11 @@ namespace DanSerialiser
 			else
 				referenceID = null;
 
+			// If we have already encountered this type then we should have a BinarySerialisationReaderTypeReader instance prepared that loops through the field data quickly,
+			// rather than having to perform the more expensive work below (with its type name resolution and field name lookups)
+			if (_typeReaders.TryGetValue(typeNameReferenceID, out var typeReader))
+				return typeReader.Read(this, nextEntryType, ignoreAnyInvalidTypes);
+
 			// Try to get a type builder for the type that we should be deserialising to. If ignoreAnyInvalidTypes is true then don't worry if we can't find the type that is
 			// specified because we don't care about the return value from this method, we're just parsing the data to progress to the next data that we DO care about.
 			var typeBuilderIfAvailable = _typeAnalyser.TryToGetUninitialisedInstanceBuilder(typeName);
@@ -198,6 +214,7 @@ namespace DanSerialiser
 				_objectReferences.Add(valueIfTypeIsAvailable);
 			var typeIfAvailable = valueIfTypeIsAvailable?.GetType();
 			var fieldsThatHaveBeenSet = new List<FieldInfo>();
+			var fieldSettingInformationForGeneratingTypeBuilder = new List<BinarySerialisationReaderTypeReader.FieldSettingDetails>();
 			while (true)
 			{
 				if (nextEntryType == BinarySerialisationDataType.ObjectEnd)
@@ -214,22 +231,32 @@ namespace DanSerialiser
 							}
 						}
 					}
+					if (typeBuilderIfAvailable != null)
+					{
+						// Create a BinarySerialisationReaderTypeReader instance for this type so that we can reuse the field name lookup results that we had to do in this
+						// loop next time (this works because the BinarySerialisationWriter will always write out the same field data in the same order for a given type,
+						// so if the data was valid this time - no missing required fields, for example - then it will be valid next time and we can read the data much
+						// mroe quickly)
+						_typeReaders[typeNameReferenceID] = new BinarySerialisationReaderTypeReader(typeBuilderIfAvailable, fieldSettingInformationForGeneratingTypeBuilder.ToArray());
+					}
 					return valueIfTypeIsAvailable;
 				}
 				else if (nextEntryType == BinarySerialisationDataType.FieldName)
 				{
 					nextEntryType = ReadNextDataType();
 					string rawFieldNameInformation;
+					int fieldNameReferenceID;
 					if (nextEntryType == BinarySerialisationDataType.String)
 					{
 						rawFieldNameInformation = ReadNextString();
-						_nameReferences[ReadNextNameReferenceID(ReadNextDataType())] = rawFieldNameInformation;
+						fieldNameReferenceID = ReadNextNameReferenceID(ReadNextDataType());
+						_nameReferences[fieldNameReferenceID] = rawFieldNameInformation;
 					}
 					else
 					{
-						var nameReferenceID = ReadNextNameReferenceID(nextEntryType);
-						if (!_nameReferences.TryGetValue(nameReferenceID, out rawFieldNameInformation))
-							throw new Exception("Invalid NameReferenceID: " + nameReferenceID);
+						fieldNameReferenceID = ReadNextNameReferenceID(nextEntryType);
+						if (!_nameReferences.TryGetValue(fieldNameReferenceID, out rawFieldNameInformation))
+							throw new Exception("Invalid NameReferenceID: " + fieldNameReferenceID);
 					}
 					BinaryReaderWriterShared.SplitCombinedTypeAndFieldName(rawFieldNameInformation, out var typeNameIfRequired, out var fieldName);
 
@@ -252,6 +279,10 @@ namespace DanSerialiser
 							field.WriterUnlessFieldShouldBeIgnored(valueIfTypeIsAvailable, fieldValue);
 							fieldsThatHaveBeenSet.Add(field.Member);
 						}
+						fieldSettingInformationForGeneratingTypeBuilder.Add(new BinarySerialisationReaderTypeReader.FieldSettingDetails(
+							fieldNameReferenceID,
+							(field.WriterUnlessFieldShouldBeIgnored == null) ? new Action<object, object>[0] : new[] { field.WriterUnlessFieldShouldBeIgnored }
+						));
 					}
 					else if (valueIfTypeIsAvailable != null)
 					{
@@ -264,6 +295,10 @@ namespace DanSerialiser
 						foreach (var propertySetter in propertySetters)
 							propertySetter(valueIfTypeIsAvailable, fieldValue);
 						fieldsThatHaveBeenSet.AddRange(relatedFieldsThatHaveBeenSet);
+						fieldSettingInformationForGeneratingTypeBuilder.Add(new BinarySerialisationReaderTypeReader.FieldSettingDetails(
+							fieldNameReferenceID,
+							propertySetters
+						));
 					}
 				}
 				else
@@ -272,7 +307,7 @@ namespace DanSerialiser
 			}
 		}
 
-		private int ReadNextNameReferenceID(BinarySerialisationDataType specifiedDataType)
+		internal int ReadNextNameReferenceID(BinarySerialisationDataType specifiedDataType)
 		{
 			if (specifiedDataType == BinarySerialisationDataType.NameReferenceID32)
 				return ReadNextInt();
@@ -288,7 +323,7 @@ namespace DanSerialiser
 
 		private object ReadNextArray(bool ignoreAnyInvalidTypes)
 		{
-			var elementTypeName = ReadNextTypeName();
+			var elementTypeName = ReadNextTypeName(out var typeNameReferenceID);
 			if (elementTypeName == null)
 			{
 				// If the element type was recorded as null then it means that the array itself was null (and so the next character should be an ArrayEnd)
@@ -318,7 +353,7 @@ namespace DanSerialiser
 			return items;
 		}
 
-		private string ReadNextTypeName()
+		private string ReadNextTypeName(out int typeNameReferenceID)
 		{
 			// If a null type name is written out then there will be no Name Reference ID but every non-null type name will either be represented by a string and then the
 			// Name Reference ID that that string should be recorded as or it just be a Name Reference ID for a reference that has already been encountered
@@ -326,20 +361,21 @@ namespace DanSerialiser
 			if (nextEntryType == BinarySerialisationDataType.String)
 			{
 				var typeName = ReadNextString();
+				typeNameReferenceID = ReadNextNameReferenceID(ReadNextDataType());
 				if (typeName != null)
-					_nameReferences[ReadNextNameReferenceID(ReadNextDataType())] = typeName;
+					_nameReferences[typeNameReferenceID] = typeName;
 				return typeName;
 			}
 			else
 			{
-				var nameReferenceID = ReadNextNameReferenceID(nextEntryType);
-				if (!_nameReferences.TryGetValue(nameReferenceID, out var typeName))
-					throw new Exception("Invalid NameReferenceID: " + nameReferenceID);
+				typeNameReferenceID = ReadNextNameReferenceID(nextEntryType);
+				if (!_nameReferences.TryGetValue(typeNameReferenceID, out var typeName))
+					throw new Exception("Invalid NameReferenceID: " + typeNameReferenceID);
 				return typeName;
 			}
 		}
 
-		private BinarySerialisationDataType ReadNextDataType()
+		internal BinarySerialisationDataType ReadNextDataType()
 		{
 			return (BinarySerialisationDataType)ReadNext();
 		}
