@@ -163,11 +163,7 @@ namespace DanSerialiser
 		{
 			var typeName = ReadNextTypeName(out var typeNameReferenceID);
 			if (typeName == null)
-			{
-				if (ReadNextDataType() != BinarySerialisationDataType.ObjectEnd)
-					throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered after null value");
-				return null;
-			}
+				throw new InvalidOperationException("Null type names should not exist in object data since there is a Null binary serialisation data type");
 
 			// If the next value is a Reference ID then the writer had supportReferenceReuse and all object definitions for reference types (except strings) will start with a
 			// Reference ID that will either be a new ID (followed by the object data) or an existing ID (followed by ObjectEnd)
@@ -325,12 +321,8 @@ namespace DanSerialiser
 		{
 			var elementTypeName = ReadNextTypeName(out var typeNameReferenceID);
 			if (elementTypeName == null)
-			{
-				// If the element type was recorded as null then it means that the array itself was null (and so the next character should be an ArrayEnd)
-				if (ReadNextDataType() != BinarySerialisationDataType.ArrayEnd)
-					throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ArrayEnd)} was not encountered");
-				return null;
-			}
+				throw new InvalidOperationException("Null array element type names should not exist in object data since there is a Null binary serialisation data type");
+
 			var elementType = Type.GetType(elementTypeName, throwOnError: true);
 			var lengthDataType = ReadNextDataType();
 			int length;
