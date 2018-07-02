@@ -6,7 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 
-namespace DanSerialiser
+namespace DanSerialiser.CachedLookups
 {
 	/// <summary>
 	/// Encoding strings is expensive and so we want to reuse previously-encoded content where possible AND we want to be able to use a Name Reference ID for a type or field

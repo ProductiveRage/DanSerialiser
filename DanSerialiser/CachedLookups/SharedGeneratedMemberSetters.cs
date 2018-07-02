@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using DanSerialiser.Reflection;
 
-namespace DanSerialiser
+namespace DanSerialiser.CachedLookups
 {
 	internal static class SharedGeneratedMemberSetters
 	{

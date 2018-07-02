@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DanSerialiser
+namespace DanSerialiser.CachedLookups
 {
 	/// <summary>
 	/// Caching these typeof(..) calls may help performance in some cases, as suggested here:
