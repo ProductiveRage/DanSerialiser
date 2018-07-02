@@ -1,0 +1,50 @@
+// * Summary *
+
+BenchmarkDotNet=v0.10.14, OS=Windows 8.1 (6.3.9600.0)
+AMD FX(tm)-8350 Eight-Core Processor, 1 CPU, 8 logical and 4 physical cores
+Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
+.NET Core SDK=2.1.300
+  [Host] : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+  Clr    : .NET Framework 4.6.1 (CLR 4.0.30319.42000), 64bit RyuJIT-v4.7.2650.0
+  Core   : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+
+
+                     Method |  Job | Runtime |      Mean |     Error |    StdDev |
+--------------------------- |----- |-------- |----------:|----------:|----------:|
+           JsonNetSerialise |  Clr |     Clr | 152.39 ms | 0.8945 ms | 0.7929 ms | 2.7x slower
+         JsonNetDeserialise |  Clr |     Clr | 128.61 ms | 0.7112 ms | 0.6652 ms | 3.5x slower
+   BinaryFormatterSerialise |  Clr |     Clr |  89.68 ms | 0.7623 ms | 0.6757 ms | 1.6x slower
+ BinaryFormatterDeserialise |  Clr |     Clr | 128.53 ms | 1.2025 ms | 1.1248 ms | 3.5x slower
+          ProtoBufSerialise |  Clr |     Clr |  11.52 ms | 0.1714 ms | 0.1338 ms | 4.9x faster
+        ProtoBufDeserialise |  Clr |     Clr |  21.70 ms | 0.1375 ms | 0.1286 ms | 1.7x faster
+     DanSerialiserSerialise |  Clr |     Clr |  56.29 ms | 0.1879 ms | 0.1758 ms |
+   DanSerialiserDeserialise |  Clr |     Clr |  37.09 ms | 0.7141 ms | 0.7333 ms |
+           JsonNetSerialise | Core |    Core |  98.05 ms | 0.8354 ms | 0.7814 ms | 2.1x slower
+         JsonNetDeserialise | Core |    Core | 129.66 ms | 0.3665 ms | 0.3249 ms | 3.7x slower
+   BinaryFormatterSerialise | Core |    Core | 105.34 ms | 0.7633 ms | 0.7140 ms | 2.2x slower
+ BinaryFormatterDeserialise | Core |    Core | 135.73 ms | 0.8164 ms | 0.6818 ms | 3.8x slower
+          ProtoBufSerialise | Core |    Core |  10.26 ms | 0.1192 ms | 0.0996 ms | 4.6x faster
+        ProtoBufDeserialise | Core |    Core |  21.35 ms | 0.1531 ms | 0.1358 ms | 1.7x faster
+     DanSerialiserSerialise | Core |    Core |  47.44 ms | 0.4564 ms | 0.4269 ms |
+   DanSerialiserDeserialise | Core |    Core |  35.46 ms | 0.3907 ms | 0.3463 ms |
+
+NOTE: Another addition of data to the benchmarks (again, this serialiser does better over time
+      and after it's encountered more instances of the same types because it performs some of
+      its optimisations on-the-fly, whereas ProtoBuf generates everything up-front* and I don't
+      include that time in the ProtoBuf benchmarks**) and so the times per operation have all
+      gone up. But now I'm in a place where ProtoBuf is no more than 5x faster (and that's to
+      serialise - it's less than 2x faster to deserialise) and I'm happy enough with that
+      (these tests compare performance on "lowest common denominator" serialisation actions
+      and exist to prove that the performance of this serialiser isn't too appalling but the
+      selling point for this library is the additional features, such as the improved control
+      over backward and forward versioning and the flexibility around what is supported - eg.
+      ProtoBuf doesn't support nested of jagged lists or arrays; the underlying protocol
+      doesn't make any distinction between empty lists and null lists and so data can get
+      changed in a serialisation roundtrip; attributes are required on classes or the
+      RuntimeTypeModel.Default approach must be used and all types that may be required
+      must be declared ahead of time)
+      
+ * (I think)
+** (But I also do some "warming up" of this serialiser outside of Benchmarks, so I must admit
+   to being slightly confused as to why it does better with more and more data compared to
+   ProtoBuf)
