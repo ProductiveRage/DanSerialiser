@@ -263,16 +263,16 @@ There is a project in the repository that uses [BenchmarkDotNet](https://github.
 |         JsonNetDeserialise |  Clr |     Clr | 128.61 ms | 0.7112 ms | 0.6652 ms | 3.5x slower               |
 |   BinaryFormatterSerialise |  Clr |     Clr |  89.68 ms | 0.7623 ms | 0.6757 ms | 1.6x slower               |
 | BinaryFormatterDeserialise |  Clr |     Clr | 128.53 ms | 1.2025 ms | 1.1248 ms | 3.5x slower               |
-|          ProtoBufSerialise |  Clr |     Clr |  11.52 ms | 0.1714 ms | 0.1338 ms | 4.9x faster               |
-|        ProtoBufDeserialise |  Clr |     Clr |  21.70 ms | 0.1375 ms | 0.1286 ms | 1.7x faster               |
+|          ProtoBufSerialise |  Clr |     Clr |  11.52 ms | 0.1714 ms | 0.1338 ms | **4.9x faster**           |
+|        ProtoBufDeserialise |  Clr |     Clr |  21.70 ms | 0.1375 ms | 0.1286 ms | **1.7x faster**           |
 |     DanSerialiserSerialise |  Clr |     Clr |  56.29 ms | 0.1879 ms | 0.1758 ms | -                         |
 |   DanSerialiserDeserialise |  Clr |     Clr |  37.09 ms | 0.7141 ms | 0.7333 ms | -                         |
 |           JsonNetSerialise | Core |    Core |  98.05 ms | 0.8354 ms | 0.7814 ms | 2.1x slower               |
 |         JsonNetDeserialise | Core |    Core | 129.66 ms | 0.3665 ms | 0.3249 ms | 3.7x slower               |
 |   BinaryFormatterSerialise | Core |    Core | 105.34 ms | 0.7633 ms | 0.7140 ms | 2.2x slower               |
 | BinaryFormatterDeserialise | Core |    Core | 135.73 ms | 0.8164 ms | 0.6818 ms | 3.8x slower               |
-|          ProtoBufSerialise | Core |    Core |  10.26 ms | 0.1192 ms | 0.0996 ms | 4.6x faster               |
-|        ProtoBufDeserialise | Core |    Core |  21.35 ms | 0.1531 ms | 0.1358 ms | 1.7x faster               |
+|          ProtoBufSerialise | Core |    Core |  10.26 ms | 0.1192 ms | 0.0996 ms | **4.6x faster**           |
+|        ProtoBufDeserialise | Core |    Core |  21.35 ms | 0.1531 ms | 0.1358 ms | **1.7x faster**           |
 |     DanSerialiserSerialise | Core |    Core |  47.44 ms | 0.4564 ms | 0.4269 ms | -                         |
 |   DanSerialiserDeserialise | Core |    Core |  35.46 ms | 0.3907 ms | 0.3463 ms | -                         |
 
