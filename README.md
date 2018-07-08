@@ -8,7 +8,7 @@ I want it to be possible to have cached some data to disk and to reload this dat
 
 For the simplest cases, I don't want to have to add any special attributes or interfaces or to have to compromise on how types are structured. If I want to serialise / deserialise a POCO using this, then I should be able to. If I want to serialise / deserialise an immutable type using this, then I should be able to. If I want to support backwards / forwards compatibility across versions of types when serialising / deserialising then some additional annotations will be acceptable but they shouldn't be necessary otherwise.
 
-Well, this library meets those requirements! It's written using .NET Standard 2.0, which means that it can be used by both .NET Framework 4.6.1+ *and* .NET Standard 2.0+.
+Well, this library meets those requirements! It's written using .NET Standard 2.0, which means that it can be used by both .NET Framework 4.6.1+ *and* .NET Standard 2.0+. (Get it from NuGet! [www.nuget.org/packages/DanSerialiser](https://www.nuget.org/packages/DanSerialiser/))
 
 Using it is as simple as this:
 
