@@ -28,12 +28,23 @@ namespace DanSerialiser
 			return false;
 		}
 
-		public static string CombineTypeAndFieldName(string typeNameIfRequired, string fieldName)
+		public static string CombineTypeAndFieldName(Type typeIfRequired, string fieldName)
 		{
 			if (fieldName == null)
 				throw new ArgumentNullException(nameof(fieldName));
 
-			return ((typeNameIfRequired == null) ? "" : (typeNameIfRequired + "\n")) + fieldName;
+			// Note: If there is a type name specified then it will be a Type's "FullName" value and not its "AssemblyQualifiedName" because the AssemblyQualifiedName includes
+			// the version number of the assembly and if there is a type name here then the chances are that this is to do with a [Deprecated] property, which means that the
+			// versions of the assembly are expected to be different between now and when the serialised data was generated for some deserialisation attempts (when type
+			// names appear elsewhere - for types to be instantiated - the AssemblyQualifiedName is required, though the Type.GetType method used to create instances
+			// is conveniently flexible with version numbers - eg.
+			//
+			//   Type.GetType("Tester.PersonDetails, Tester, Version=4.0.0.0, Culture=neutral, PublicKeyToken=null")
+			//
+			// will work even if the currently assembly version of Tester is a version other than 4.0.0.0 (TODO: So long as the type's assembly has already been loaded into
+			// memory by that time - which is often the case, I hope, when the project has been built to reference the entities that will be de/serialised but which is possibly
+			// something that could be improved.. it's something that I'm finding awkward to unit test at the moment, which I'm not happy about)
+			return ((typeIfRequired == null) ? "" : (typeIfRequired.FullName + "\n")) + fieldName;
 		}
 
 		public static void SplitCombinedTypeAndFieldName(string value, out string typeNameIfRequired, out string fieldName)

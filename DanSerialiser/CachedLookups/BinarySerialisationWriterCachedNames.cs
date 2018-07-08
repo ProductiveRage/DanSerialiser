@@ -97,7 +97,7 @@ namespace DanSerialiser.CachedLookups
 			using (var stream = new StreamThatAppendsBytesToList(bytesForStringAndReferenceID))
 			{
 				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse: true); // The supportReferenceReuse value doesn't make any difference here
-				writer.String(BinaryReaderWriterShared.CombineTypeAndFieldName(fieldNameExistsMultipleTimesInHierarchy ? field.DeclaringType.AssemblyQualifiedName : null, field.Name));
+				writer.String(BinaryReaderWriterShared.CombineTypeAndFieldName(fieldNameExistsMultipleTimesInHierarchy ? field.DeclaringType : null, field.Name));
 			}
 			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
 			var cacheEntry = new CachedNameData(
@@ -146,7 +146,7 @@ namespace DanSerialiser.CachedLookups
 			using (var stream = new StreamThatAppendsBytesToList(bytesForStringAndReferenceID))
 			{
 				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse: true); // The supportReferenceReuse value doesn't make any difference here
-				writer.String(BinaryReaderWriterShared.CombineTypeAndFieldName(property.DeclaringType.AssemblyQualifiedName, BackingFieldHelpers.GetBackingFieldName(property.Name)));
+				writer.String(BinaryReaderWriterShared.CombineTypeAndFieldName(property.DeclaringType, BackingFieldHelpers.GetBackingFieldName(property.Name)));
 			}
 			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
 			var cacheEntry = new CachedNameData(
