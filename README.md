@@ -258,7 +258,7 @@ My primary goal with this library was to see if I could create something that fi
 There is a project in the repository that uses [BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) and sample data that matches the primary use case that I had in mind when I started this project. On my computer, the results are currently as follows:
 
 |                     Method |  Job | Runtime |      Mean |     Error |    StdDev | Compared to DanSerialiser |
-|--------------------------- |----- |-------- |----------:|----------:|----------:|---------------------------|
+|--------------------------- |:----:|:-------:|----------:|----------:|----------:|---------------------------|
 |           JsonNetSerialise |  Clr |     Clr | 152.39 ms | 0.8945 ms | 0.7929 ms | 2.7x slower               |
 |         JsonNetDeserialise |  Clr |     Clr | 128.61 ms | 0.7112 ms | 0.6652 ms | 3.5x slower               |
 |   BinaryFormatterSerialise |  Clr |     Clr |  89.68 ms | 0.7623 ms | 0.6757 ms | 1.6x slower               |
