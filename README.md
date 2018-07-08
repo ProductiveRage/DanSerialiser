@@ -12,91 +12,91 @@ Well, this library meets those requirements! It's written using .NET Standard 2.
 
 Using it is as simple as this:
 
-	// Get a byte array
-	var serialisedData = DanSerialiser.BinarySerialisation.Serialise(value);
-	
-	// Deserialise the byte array back into an object
-	var result = DanSerialiser.BinarySerialisation.Deserialise<PersonDetails>(serialisedData);
-	
+    // Get a byte array
+    var serialisedData = DanSerialiser.BinarySerialisation.Serialise(value);
+    
+    // Deserialise the byte array back into an object
+    var result = DanSerialiser.BinarySerialisation.Deserialise<PersonDetails>(serialisedData);
+    
 The above are static convenience methods that serialise to and from a byte array via a MemoryStream using code like the following:
 
-	// Serialise to a strem
-	var writer = new BinarySerialisationWriter(stream);
-	Serialiser.Instance.Serialise(value, writer);
+    // Serialise to a strem
+    var writer = new BinarySerialisationWriter(stream);
+    Serialiser.Instance.Serialise(value, writer);
 
-	// Deserialise data from the stream back into an object
-	var result = (new BinarySerialisationReader(stream)).Read<PersonDetails>();
-	
+    // Deserialise data from the stream back into an object
+    var result = (new BinarySerialisationReader(stream)).Read<PersonDetails>();
+    
 .. and so, if you want to use a different stream (to read/write straight from/to disk, for example) then you can do so easily.
-	
+    
 ## "backwards / forwards compatibility" examples?
 
 Say I have an internal API that returns the following class:
 
     public sealed class PersonDetails
-	{
-	    public PersonDetails(int id, string name)
-		{
-		    Id = id;
-			Name = name ?? throw new ArgumentNullException(nameof(name));
-		}
-		
-		public int Id { get; }
-		
-		public string Name { get; }
-	}
+    {
+        public PersonDetails(int id, string name)
+        {
+            Id = id;
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+        }
+        
+        public int Id { get; }
+        
+        public string Name { get; }
+    }
 
 Then, one day, I need to change the "Name" field such that it can have different string values for different languages - like this:
 
     public sealed class PersonDetails
-	{
-	    public PersonDetails(int id, TranslatedString translatedName)
-		{
-		    Id = id;
-			TranslatedName = translatedName ?? throw new ArgumentNullException(nameof(translatedName));
-		}
-		
-		public int Id { get; }
-		
-		public TranslatedString TranslatedName { get; private set; }
-	}
-
-	public sealed class TranslatedName
-	{
-	    public TranslatedName(string defaultValue, Dictionary<int, string> translations)
-		{
-		    DefaultValue = defaultValue ?? throw new ArgumentNullException(nameof(defaultValue));
-			Translations = translations ?? throw new ArgumentNullException(nameof(translations));
-		}
-		
-		public string DefaultValue { get; }
-		
-		public Dictionary<int, string> Translations { get; }
+    {
+        public PersonDetails(int id, TranslatedString translatedName)
+        {
+            Id = id;
+            TranslatedName = translatedName ?? throw new ArgumentNullException(nameof(translatedName));
+        }
+        
+        public int Id { get; }
+        
+        public TranslatedString TranslatedName { get; private set; }
     }
-	
+
+    public sealed class TranslatedName
+    {
+        public TranslatedName(string defaultValue, Dictionary<int, string> translations)
+        {
+            DefaultValue = defaultValue ?? throw new ArgumentNullException(nameof(defaultValue));
+            Translations = translations ?? throw new ArgumentNullException(nameof(translations));
+        }
+        
+        public string DefaultValue { get; }
+        
+        public Dictionary<int, string> Translations { get; }
+    }
+    
 I update the server code so that it's using this new version of the entity but now I have to update all of the clients so that they know about the new **PersonDetails** format - until I do that, the clients are broken. This is annoying because sometimes I'd like to roll out changes to services one-by-one instead of requiring a "big bang" update involving *all* related services.
 
 What this library allows me to do is add some properties that can make a type "backwards compatible" in terms of serialisation - eg.
-	
+    
     public sealed class PersonDetails
-	{
-	    public PersonDetails(int id, TranslatedString translatedName)
-		{
-		    Id = id;
-			TranslatedName = translatedName ?? throw new ArgumentNullException(nameof(translatedName));
-		}
-		
-		public int Id { get; }
-		
-		public TranslatedString TranslatedName { get; }
-		
-		[Deprecated]
-		public string Name
-		{
-		    get { return TranslatedName.DefaultValue; }
-		}
-	}
-	
+    {
+        public PersonDetails(int id, TranslatedString translatedName)
+        {
+            Id = id;
+            TranslatedName = translatedName ?? throw new ArgumentNullException(nameof(translatedName));
+        }
+        
+        public int Id { get; }
+        
+        public TranslatedString TranslatedName { get; }
+        
+        [Deprecated]
+        public string Name
+        {
+            get { return TranslatedName.DefaultValue; }
+        }
+    }
+    
 The "Name" property on the updated version of this class has two purposes. The obvious one is that when I rebuild my client project against this updated entity class, the code will still compile - though none of the translations for the name values will be used, everywhere will show the DefaultValue (this may or may not be desirable, I'll touch on this again in a moment). The second benefit is that this serialiser will use that [Deprecated] property annotation to generate binary data that may be deserialised into the new version of the entity *or* the old version. This means that clients that reference the old version of the entity class can deserialise data from the server when the server is referencing the *new* version of the entity. This allows me to update my API service first, without worrying about the clients breaking.. and then I can update the clients at a later date.
 
 That's what I'm referring to as "backwards compatible" serialisation support - serialised data from a new version of an entity can be deserialised as an older version of the entity.
@@ -104,24 +104,24 @@ That's what I'm referring to as "backwards compatible" serialisation support - s
 However, a similar problem can occur the other way around. What if the client needs to be able to send data to the server, when the server is referencing the newer version of **PersonDetails** and the client is referencing the older one? That can also be handled, in a similar manner:
 
     public sealed class PersonDetails
-	{
-	    public PersonDetails(int id, TranslatedString translatedName)
-		{
-		    Id = id;
-			TranslatedName = translatedName ?? throw new ArgumentNullException(nameof(translatedName));
-		}
-		
-		public int Id { get; }
-		
-		public TranslatedString TranslatedName { get; private set; }
-		
-		[Deprecated(replacedBy: nameof(TranslatedName))]
-		public string Name
-		{
-		    get { return TranslatedName.DefaultValue; }
-			private set { TranslatedName = new TranslatedString(value, new Dictionary<int, string>()); }
-		}
-	}
+    {
+        public PersonDetails(int id, TranslatedString translatedName)
+        {
+            Id = id;
+            TranslatedName = translatedName ?? throw new ArgumentNullException(nameof(translatedName));
+        }
+        
+        public int Id { get; }
+        
+        public TranslatedString TranslatedName { get; private set; }
+        
+        [Deprecated(replacedBy: nameof(TranslatedName))]
+        public string Name
+        {
+            get { return TranslatedName.DefaultValue; }
+            private set { TranslatedName = new TranslatedString(value, new Dictionary<int, string>()); }
+        }
+    }
 
 The [Deprecated] property now has a private setter. This can never be called by regular code (because it's private) but the serialiser can use it when the [Deprecated] attribute has a "replacedBy" value. If an old version of **PersonDetails** is serialised and then deserialised into a *new* version of **PersonDetails** then the "Name" value from the old-format data will be used to populate the "TranslatedName" property.
 
@@ -132,28 +132,28 @@ As well as for communications between services, this feature could be useful for
 I said above that the [Deprecated] property being public might be seen as a benefit - because upgrading an assembly such that the new version of **PersonDetails** is referenced won't break your existing code that reads the "Name" property. You may disagree and say "no, when I upgrade and get the new version of **PersonDetails**, I *want* to have to change all of the references to the 'Name' property because everywhere *should* use 'TranslatedName' now". Well that is fine too, you can make the property private and then the serialiser can still use it but regular code won't:
 
     public sealed class PersonDetails
-	{
-	    public PersonDetails(int id, TranslatedString translatedName)
-		{
-		    Id = id;
-			TranslatedName = translatedName ?? throw new ArgumentNullException(nameof(translatedName));
-		}
-		
-		public int Id { get; }
-		
-		public TranslatedString TranslatedName { get; private set; }
-		
-		// Private property - only for serialisation backwards/forward version compatibility
-		[Deprecated(replacedBy: nameof(TranslatedName))]
-		private string Name
-		{
-		    get { return TranslatedName.DefaultValue; }
-			set { TranslatedName = new TranslatedString(value, new Dictionary<int, string>()); }
-		}
-	}
+    {
+        public PersonDetails(int id, TranslatedString translatedName)
+        {
+            Id = id;
+            TranslatedName = translatedName ?? throw new ArgumentNullException(nameof(translatedName));
+        }
+        
+        public int Id { get; }
+        
+        public TranslatedString TranslatedName { get; private set; }
+        
+        // Private property - only for serialisation backwards/forward version compatibility
+        [Deprecated(replacedBy: nameof(TranslatedName))]
+        private string Name
+        {
+            get { return TranslatedName.DefaultValue; }
+            set { TranslatedName = new TranslatedString(value, new Dictionary<int, string>()); }
+        }
+    }
 
 ## Reliability
-	
+    
 It's worth noting that I don't want versioning "flexibility" such that data may be deserialised into a type and for there to be some kind of undefined behaviour. It must always be well understood how everything will be populated and if there are properties on the type being deserialised to that can not be populated from the serialised data then it should be a hard error\*.
 
 \* *(For example, I don't want to be able to define an immutable type that is initialised by a constructor that ensures that every property is set to a non-null value and for the deserialiser to be able to side step that and create an instance that has properties with null values because that is very likely to confusion at some point down the road)*
@@ -161,68 +161,68 @@ It's worth noting that I don't want versioning "flexibility" such that data may 
 For example, if I tried to deserialise from the old version of **PersonDetails** -
 
     public sealed class PersonDetails
-	{
-	    public PersonDetails(int id, string name)
-		{
-		    Id = id;
-			Name = name ?? throw new ArgumentNullException(nameof(name));
-		}
-		
-		public int Id { get; }
-		
-		public string Name { get; }
-	}
+    {
+        public PersonDetails(int id, string name)
+        {
+            Id = id;
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+        }
+        
+        public int Id { get; }
+        
+        public string Name { get; }
+    }
 
 .. into a new version that *doesn't* have the [Deprecated] attribute on its "TranslatedName" property -
 
     public sealed class PersonDetails
-	{
-	    public PersonDetails(int id, TranslatedString translatedName)
-		{
-		    Id = id;
-			TranslatedName = translatedName ?? throw new ArgumentNullException(nameof(translatedName));
-		}
-		
-		public int Id { get; }
-		
-		public TranslatedString TranslatedName { get; }
-	}
+    {
+        public PersonDetails(int id, TranslatedString translatedName)
+        {
+            Id = id;
+            TranslatedName = translatedName ?? throw new ArgumentNullException(nameof(translatedName));
+        }
+        
+        public int Id { get; }
+        
+        public TranslatedString TranslatedName { get; }
+    }
 
 .. then there will be a runtime error. There is no way for the serialiser to set the "TranslatedName" property. I would never expect to see an instance of **PersonDetails** with a null "TranslatedName" value because the constructor won't allow it - if the serialiser allowed us to create an instance of **PersonDetails** with a null "TranslatedName" value then I could get a very nasty surprise elsewhere in my system!
 
 There is one more attribute to cover. Sometimes, in a "forward compatible" deserialisation scenario, you *want* it be acceptable for some properties not to be set. For example, if the disk cached data has an instance of this class:
 
     public sealed class PersonDetails
-	{
-	    public PersonDetails(int id, string name)
-		{
-		    Id = id;
-			Name = name ?? throw new ArgumentNullException(nameof(name));
-		}
-		
-		public int Id { get; }
-		
-		public string Name { get; }
-	}
-	
+    {
+        public PersonDetails(int id, string name)
+        {
+            Id = id;
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+        }
+        
+        public int Id { get; }
+        
+        public string Name { get; }
+    }
+    
 .. and, since that data was written, a new property has been added to **PersonDetails** then you might want to tell the serialiser "don't worry if there is no data for this". That may be done using the [OptionalWhenDeserialisingAttribute] attribute -
 
     public sealed class PersonDetails
-	{
-	    public PersonDetails(int id, string name, DateTime? lastKnownContact)
-		{
-		    Id = id;
-			Name = name ?? throw new ArgumentNullException(nameof(name));
-			LastKnownContact = lastKnownContact;
-		}
-		
-		public int Id { get; }
-		
-		public string Name { get; }
-		
-		[OptionalWhenDeserialisingAttribute]
-		public DateTime? LastKnownContact { get; }
-	}
+    {
+        public PersonDetails(int id, string name, DateTime? lastKnownContact)
+        {
+            Id = id;
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+            LastKnownContact = lastKnownContact;
+        }
+        
+        public int Id { get; }
+        
+        public string Name { get; }
+        
+        [OptionalWhenDeserialisingAttribute]
+        public DateTime? LastKnownContact { get; }
+    }
 
 Without this attribute, the deserialisation would fail - it is not acceptable for nullable or reference-type values to be left as null if there is no content for them in serialised data *unless* they are marked as [OptionalWhenDeserialisingAttribute] (this attribute may also be used with value types, in which case the property or field will be left as the default(T) for that type).
 
@@ -231,20 +231,20 @@ Without this attribute, the deserialisation would fail - it is not acceptable fo
 I like my data to be represented by immutable structures unless there's a really compelling reason not to. These generally (though not *always*) avoid circular references by being tree-like in nature. However, should you want to serialise data that contains circular references with this library then you can. If we take this class, for example:
 
     public class PersonDetails
-	{
-		public int Id { get; set; }
-		
-		public string Name { get; set; }
-		
-		public PersonDetail BestFriend { get; set; }
-	}
-	
+    {
+        public int Id { get; set; }
+        
+        public string Name { get; set; }
+        
+        public PersonDetail BestFriend { get; set; }
+    }
+    
 .. and whip up a couple of inter-connected instances:
 
-	var tim = new PersonDetails { Id = 1, Name = "Tim" };
-	var bob = new PersonDetails { Id = 2, Name = "Bob", BestFriend = tim };
-	tim.BestFriend = bob;
-	
+    var tim = new PersonDetails { Id = 1, Name = "Tim" };
+    var bob = new PersonDetails { Id = 2, Name = "Bob", BestFriend = tim };
+    tim.BestFriend = bob;
+    
 .. then these may be serialised / deserialised without issue.
 
 This works but I have seen it fail (with a stack overflow exception) if the object model has array properties that are very wide and where each element is the start of a chain that ends with a circular reference. The serialiser approaches data as if it is a tree and so this arrangement will effectively add layers to the stack trace for every element in the array. If these array elements are object references that have properties that are *also* arrays then the problem gets even worse, quickly! I've had some thoughts about ways to try to tackle structures such as this but I don't have anything that I'm happy with yet.
