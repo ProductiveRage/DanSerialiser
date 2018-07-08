@@ -12,6 +12,7 @@
     <Description>Description of the package</Description>
     <PackageTags>c#, serializer</PackageTags>
     <NoPackageAnalysis>true</NoPackageAnalysis>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
