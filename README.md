@@ -61,9 +61,9 @@ Then, one day, I need to change the "Name" field such that it can have different
         public TranslatedString TranslatedName { get; private set; }
     }
 
-    public sealed class TranslatedName
+    public sealed class TranslatedString
     {
-        public TranslatedName(string defaultValue, Dictionary<int, string> translations)
+        public TranslatedString(string defaultValue, Dictionary<int, string> translations)
         {
             DefaultValue = defaultValue ?? throw new ArgumentNullException(nameof(defaultValue));
             Translations = translations ?? throw new ArgumentNullException(nameof(translations));
