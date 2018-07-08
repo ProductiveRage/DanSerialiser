@@ -3,13 +3,14 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>DanSerialiser</PackageId>
+    <PackageTitle>DanSerialiser</PackageTitle>
     <PackageVersion>1.0.0.0</PackageVersion>
     <Authors>ProductiveRage</Authors>
     <PackageLicenseUrl>https://github.com/ProductiveRage/DanSerialiser/blob/master/LICENSE</PackageLicenseUrl>
     <PackageProjectUrl>https://github.com/ProductiveRage/DanSerialiser</PackageProjectUrl>
     <PackageIconUrl>https://secure.gravatar.com/avatar/6a1f781d4d5e2d50dcff04f8f049767a?s=200</PackageIconUrl>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <Description>Description of the package</Description>
+    <Description>A binary serialiser for C# whose priorities are to making it easy to integrate into a project, to be flexible in terms of what object model may be used (POCOs, immutable types, etc..) and to support reliable serialising to and from different versions of entities (performance is not a top priority but it should be faster than the BinaryFormatter and Json.NET)</Description>
     <PackageTags>c#, serializer</PackageTags>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
