@@ -7,8 +7,6 @@ namespace Tester
 	{
 		static void Main()
 		{
-			UnitTests.BinarySerialisationVersioningTests.AllowDeserialisationIfFieldCanNotBeSetIfFieldIsForAutoPropertyThatIsMarkedAsOptionalForDeserialisation();
-
 			var value = 32;
 			var serialiser = Serialiser.Instance;
 			var serialisedData = BinarySerialisation.Serialise(value);
