@@ -38,9 +38,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="..\DanSerialiserAnalyser\bin\Release\netstandard1.3\DanSerialiserAnalyser.dll" Pack="true"  />
-    <None Update="..\DanSerialiserAnalyser\tools\install.ps1" Pack="true"  />
-    <None Update="..\DanSerialiserAnalyser\tools\uninstall.ps1" Pack="true"  />
+    <None Update="..\DanSerialiserAnalyser\bin\Release\netstandard1.3\DanSerialiserAnalyser.dll" Pack="true" Link="LinksForNuGetPackage\DanSerialiserAnalyser.dll" />
+    <None Update="..\DanSerialiserAnalyser\tools\install.ps1" Pack="true" Link="LinksForNuGetPackage\install.ps1" />
+    <None Update="..\DanSerialiserAnalyser\tools\uninstall.ps1" Pack="true" Link="LinksForNuGetPackage\uninstall.ps1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="LinksForNuGetPackage\" />
   </ItemGroup>
 
 </Project>
