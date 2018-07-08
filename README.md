@@ -58,7 +58,7 @@ Then, one day, I need to change the "Name" field such that it can have different
         
         public int Id { get; }
         
-        public TranslatedString TranslatedName { get; private set; }
+        public TranslatedString TranslatedName { get; }
     }
 
     public sealed class TranslatedString
