@@ -257,24 +257,24 @@ My primary goal with this library was to see if I could create something that fi
 
 There is a project in the repository that uses [BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) and sample data that matches the primary use case that I had in mind when I started this project. On my computer, the results are currently as follows:
 
-|                     Method |  Job | Runtime |      Mean |     Error |    StdDev | Compared to DanSerialiser
-|--------------------------- |----- |-------- |----------:|----------:|----------:|
-|           JsonNetSerialise |  Clr |     Clr | 152.39 ms | 0.8945 ms | 0.7929 ms | 2.7x slower
-|         JsonNetDeserialise |  Clr |     Clr | 128.61 ms | 0.7112 ms | 0.6652 ms | 3.5x slower
-|   BinaryFormatterSerialise |  Clr |     Clr |  89.68 ms | 0.7623 ms | 0.6757 ms | 1.6x slower
-| BinaryFormatterDeserialise |  Clr |     Clr | 128.53 ms | 1.2025 ms | 1.1248 ms | 3.5x slower
-|          ProtoBufSerialise |  Clr |     Clr |  11.52 ms | 0.1714 ms | 0.1338 ms | 4.9x faster
-|        ProtoBufDeserialise |  Clr |     Clr |  21.70 ms | 0.1375 ms | 0.1286 ms | 1.7x faster
-|     DanSerialiserSerialise |  Clr |     Clr |  56.29 ms | 0.1879 ms | 0.1758 ms | -
-|   DanSerialiserDeserialise |  Clr |     Clr |  37.09 ms | 0.7141 ms | 0.7333 ms | -
-|           JsonNetSerialise | Core |    Core |  98.05 ms | 0.8354 ms | 0.7814 ms | 2.1x slower
-|         JsonNetDeserialise | Core |    Core | 129.66 ms | 0.3665 ms | 0.3249 ms | 3.7x slower
-|   BinaryFormatterSerialise | Core |    Core | 105.34 ms | 0.7633 ms | 0.7140 ms | 2.2x slower
-| BinaryFormatterDeserialise | Core |    Core | 135.73 ms | 0.8164 ms | 0.6818 ms | 3.8x slower
-|          ProtoBufSerialise | Core |    Core |  10.26 ms | 0.1192 ms | 0.0996 ms | 4.6x faster
-|        ProtoBufDeserialise | Core |    Core |  21.35 ms | 0.1531 ms | 0.1358 ms | 1.7x faster
-|     DanSerialiserSerialise | Core |    Core |  47.44 ms | 0.4564 ms | 0.4269 ms | -
-|   DanSerialiserDeserialise | Core |    Core |  35.46 ms | 0.3907 ms | 0.3463 ms | -
+|                     Method |  Job | Runtime |      Mean |     Error |    StdDev | Compared to DanSerialiser |
+|--------------------------- |----- |-------- |----------:|----------:|----------:|---------------------------|
+|           JsonNetSerialise |  Clr |     Clr | 152.39 ms | 0.8945 ms | 0.7929 ms | 2.7x slower               |
+|         JsonNetDeserialise |  Clr |     Clr | 128.61 ms | 0.7112 ms | 0.6652 ms | 3.5x slower               |
+|   BinaryFormatterSerialise |  Clr |     Clr |  89.68 ms | 0.7623 ms | 0.6757 ms | 1.6x slower               |
+| BinaryFormatterDeserialise |  Clr |     Clr | 128.53 ms | 1.2025 ms | 1.1248 ms | 3.5x slower               |
+|          ProtoBufSerialise |  Clr |     Clr |  11.52 ms | 0.1714 ms | 0.1338 ms | 4.9x faster               |
+|        ProtoBufDeserialise |  Clr |     Clr |  21.70 ms | 0.1375 ms | 0.1286 ms | 1.7x faster               |
+|     DanSerialiserSerialise |  Clr |     Clr |  56.29 ms | 0.1879 ms | 0.1758 ms | -                         |
+|   DanSerialiserDeserialise |  Clr |     Clr |  37.09 ms | 0.7141 ms | 0.7333 ms | -                         |
+|           JsonNetSerialise | Core |    Core |  98.05 ms | 0.8354 ms | 0.7814 ms | 2.1x slower               |
+|         JsonNetDeserialise | Core |    Core | 129.66 ms | 0.3665 ms | 0.3249 ms | 3.7x slower               |
+|   BinaryFormatterSerialise | Core |    Core | 105.34 ms | 0.7633 ms | 0.7140 ms | 2.2x slower               |
+| BinaryFormatterDeserialise | Core |    Core | 135.73 ms | 0.8164 ms | 0.6818 ms | 3.8x slower               |
+|          ProtoBufSerialise | Core |    Core |  10.26 ms | 0.1192 ms | 0.0996 ms | 4.6x faster               |
+|        ProtoBufDeserialise | Core |    Core |  21.35 ms | 0.1531 ms | 0.1358 ms | 1.7x faster               |
+|     DanSerialiserSerialise | Core |    Core |  47.44 ms | 0.4564 ms | 0.4269 ms | -                         |
+|   DanSerialiserDeserialise | Core |    Core |  35.46 ms | 0.3907 ms | 0.3463 ms | -                         |
 
 Initially, I imagined that getting with one order of magnitude of protobuf would be acceptable but I hadn't realised how close Json.NET would be in performance - approx. 13.2x / 9.6x times slower than protobuf to serialise the data on .NET 4.6.1 / .NET Core 2.1 and only 5.9x / 6.0x slower to deserialise it. Considering that Json.NET is so general purpose, I thought that that was impressive!
 
