@@ -17,6 +17,14 @@ namespace DanSerialiser
 		private readonly Dictionary<Tuple<FieldInfo, Type>, BinarySerialisationWriterCachedNames.CachedNameData> _encounteredFields;
 		private readonly Dictionary<PropertyInfo, BinarySerialisationWriterCachedNames.CachedNameData> _encounteredProperties;
 		private readonly Dictionary<Tuple<MemberInfo, Type>, bool> _shouldSerialiseMemberCache;
+		/// <summary>
+		/// The default configuration for a BinarySerialisationWriter is to encourage the serialiser to treat the data as a tree-like structure and to traverse each branch to its
+		/// end - if the object model has large arrays whose elements are the starts of circular reference chains then this can cause a stack overflow exception. If the value that
+		/// you want to serialise sounds like that then setting optimiseForWideCircularReference to true will change how the serialiser approaches the data and should fix the problem
+		/// - this alternate approach is more expensive, though (both to serialise and deserialise), and so it is recommended that you only enable it if you have to. Note that the
+		/// BinarySerialisationReader constructor does not take this argument, it will be able to tell from the incoming binary data whether the serialiser had
+		/// optimiseForWideCircularReference enabled or not.
+		/// </summary>
 		public BinarySerialisationWriter(Stream stream, bool optimiseForWideCircularReference = false)
 			: this(stream, optimiseForWideCircularReference ? ReferenceReuseOptions.OptimiseForWideCircularReferences : ReferenceReuseOptions.SupportReferenceReUseInMostlyTreeLikeStructure, DefaultTypeAnalyser.Instance) { }
 		internal BinarySerialisationWriter(Stream stream, ReferenceReuseOptions referenceReuseStrategy) : this(stream, referenceReuseStrategy, DefaultTypeAnalyser.Instance) { } // internal constructor for unit testing
