@@ -22,7 +22,7 @@ namespace UnitTests
 		[Fact]
 		public static void CircularReferenceExceptionCanBeSerialisedWithDanSerialiser()
 		{
-			Assert.IsType<CircularReferenceException>(BinarySerialisationCloner.Clone(new CircularReferenceException(), supportReferenceReuse: false));
+			Assert.IsType<CircularReferenceException>(BinarySerialisationCloner.Clone(new CircularReferenceException(), ReferenceReuseOptions.SupportReferenceReUseInMostlyTreeLikeStructure));
 		}
 
 		[Fact]
@@ -37,7 +37,7 @@ namespace UnitTests
 		[Fact]
 		public static void FieldNotPresentInSerialisedDataExceptionCanBeSerialisedWithDanSerialiser()
 		{
-			var clone = BinarySerialisationCloner.Clone(new FieldNotPresentInSerialisedDataException("MyType", "MyField"), supportReferenceReuse: false);
+			var clone = BinarySerialisationCloner.Clone(new FieldNotPresentInSerialisedDataException("MyType", "MyField"), ReferenceReuseOptions.SupportReferenceReUseInMostlyTreeLikeStructure);
 			Assert.IsType<FieldNotPresentInSerialisedDataException>(clone);
 			Assert.Equal("MyType", clone.TypeName);
 			Assert.Equal("MyField", clone.FieldName);

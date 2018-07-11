@@ -16,19 +16,23 @@ namespace DanSerialiser
 		private readonly Dictionary<Type, BinarySerialisationWriterCachedNames.CachedNameData> _recordedTypeNames;
 		private readonly Dictionary<Tuple<FieldInfo, Type>, BinarySerialisationWriterCachedNames.CachedNameData> _encounteredFields;
 		private readonly Dictionary<PropertyInfo, BinarySerialisationWriterCachedNames.CachedNameData> _encounteredProperties;
-		public BinarySerialisationWriter(Stream stream, bool supportReferenceReuse = true) : this(stream, supportReferenceReuse, DefaultTypeAnalyser.Instance) { }
-		internal BinarySerialisationWriter(Stream stream, bool supportReferenceReuse, IAnalyseTypesForSerialisation typeAnalyser) // internal constructor for unit testing
+		private readonly Dictionary<Tuple<MemberInfo, Type>, bool> _shouldSerialiseMemberCache;
+		public BinarySerialisationWriter(Stream stream, bool optimiseForWideCircularReference = false)
+			: this(stream, optimiseForWideCircularReference ? ReferenceReuseOptions.OptimiseForWideCircularReferences : ReferenceReuseOptions.SupportReferenceReUseInMostlyTreeLikeStructure, DefaultTypeAnalyser.Instance) { }
+		internal BinarySerialisationWriter(Stream stream, ReferenceReuseOptions referenceReuseStrategy) : this(stream, referenceReuseStrategy, DefaultTypeAnalyser.Instance) { } // internal constructor for unit testing
+		internal BinarySerialisationWriter(Stream stream, ReferenceReuseOptions referenceReuseStrategy, IAnalyseTypesForSerialisation typeAnalyser) // internal constructor for unit testing
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
-			SupportReferenceReuse = supportReferenceReuse;
+			ReferenceReuseStrategy = referenceReuseStrategy;
 			_typeAnalyser = typeAnalyser;
 
 			_recordedTypeNames = new Dictionary<Type, BinarySerialisationWriterCachedNames.CachedNameData>();
 			_encounteredFields = new Dictionary<Tuple<FieldInfo, Type>, BinarySerialisationWriterCachedNames.CachedNameData>();
 			_encounteredProperties = new Dictionary<PropertyInfo, BinarySerialisationWriterCachedNames.CachedNameData>();
+			_shouldSerialiseMemberCache = new Dictionary<Tuple<MemberInfo, Type>, bool>();
 		}
 
-		public bool SupportReferenceReuse { get; }
+		public ReferenceReuseOptions ReferenceReuseStrategy { get; }
 
 		public void Boolean(bool value)
 		{
@@ -155,6 +159,15 @@ namespace DanSerialiser
 			VariableLengthInt32(value, BinarySerialisationDataType.ReferenceID8, BinarySerialisationDataType.ReferenceID16, BinarySerialisationDataType.ReferenceID24, BinarySerialisationDataType.ReferenceID32);
 		}
 
+		/// <summary>
+		/// This indicates that the current object reference being serialised will have its member data written later - when deserialising, an uninitialised instance should be created
+		/// that will later have its fields and properties set
+		/// </summary>
+		public void ObjectContentPostponed()
+		{
+			WriteByte((byte)BinarySerialisationDataType.ObjectContentPostponed);
+		}
+
 		public bool FieldName(FieldInfo field, Type serialisationTargetType)
 		{
 			if (field == null)
@@ -163,6 +176,46 @@ namespace DanSerialiser
 				throw new ArgumentNullException(nameof(serialisationTargetType));
 
 			return WriteFieldNameBytesIfWantoSerialiseField(field, serialisationTargetType);
+		}
+
+		/// <summary>
+		/// This should only be called when writing out data for deferred-initialised object references - otherwise the boolean return value from the FieldName method will indicate
+		/// whether a field should be serialised or not
+		/// </summary>
+		public bool ShouldSerialiseField(FieldInfo field, Type serialisationTargetType)
+		{
+			if (field == null)
+				throw new ArgumentNullException(nameof(field));
+			if (serialisationTargetType == null)
+				throw new ArgumentNullException(nameof(serialisationTargetType));
+
+			var fieldOnType = Tuple.Create((MemberInfo)field, serialisationTargetType);
+			if (_shouldSerialiseMemberCache.TryGetValue(fieldOnType, out var cachedData))
+				return cachedData;
+
+			cachedData = (BinarySerialisationWriterCachedNames.GetFieldNameBytesIfWantoSerialiseField(field, serialisationTargetType) != null);
+			_shouldSerialiseMemberCache[fieldOnType] = cachedData;
+			return cachedData;
+		}
+
+		/// <summary>
+		/// This should only be called when writing out data for deferred-initialised object references - otherwise the boolean return value from the FieldName method will indicate
+		/// whether a property should be serialised or not
+		/// </summary>
+		public bool ShouldSerialiseProperty(PropertyInfo property, Type serialisationTargetType)
+		{
+			if (property == null)
+				throw new ArgumentNullException(nameof(property));
+			if (serialisationTargetType == null)
+				throw new ArgumentNullException(nameof(serialisationTargetType));
+
+			var propertyOnType = Tuple.Create((MemberInfo)property, serialisationTargetType);
+			if (_shouldSerialiseMemberCache.TryGetValue(propertyOnType, out var cachedData))
+				return cachedData;
+
+			cachedData = (BinarySerialisationWriterCachedNames.GetFieldNameBytesIfWantoSerialiseProperty(property) != null);
+			_shouldSerialiseMemberCache[propertyOnType] = cachedData;
+			return cachedData;
 		}
 
 		public bool PropertyName(PropertyInfo property, Type serialisationTargetType)

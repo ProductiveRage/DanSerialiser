@@ -5,7 +5,7 @@ namespace DanSerialiser
 {
 	public interface IWrite
 	{
-		bool SupportReferenceReuse { get; }
+		ReferenceReuseOptions ReferenceReuseStrategy { get; }
 
 		void Boolean(bool value);
 		void Byte(byte value);
@@ -38,6 +38,24 @@ namespace DanSerialiser
 		void ReferenceId(int value);
 
 		/// <summary>
+		/// This indicates that the current object reference being serialised will have its member data written later - when deserialising, an uninitialised instance should be created
+		/// that will later have its fields and properties set
+		/// </summary>
+		void ObjectContentPostponed();
+
+		/// <summary>
+		/// This should only be called when writing out data for deferred-initialised object references - otherwise the boolean return value from the FieldName method will indicate
+		/// whether a field should be serialised or not
+		/// </summary>
+		bool ShouldSerialiseField(FieldInfo field, Type serialisationTargetType);
+
+		/// <summary>
+		/// This should only be called when writing out data for deferred-initialised object references - otherwise the boolean return value from the FieldName method will indicate
+		/// whether a property should be serialised or not
+		/// </summary>
+		bool ShouldSerialiseProperty(PropertyInfo property, Type serialisationTargetType);
+
+		/// <summary>
 		/// This will return false if the field should be skipped
 		/// </summary>
 		bool FieldName(FieldInfo field, Type serialisationTargetType);
@@ -45,7 +63,7 @@ namespace DanSerialiser
 		/// <summary>
 		/// This will return false if the property should be skipped
 		/// </summary>
-		bool PropertyName(PropertyInfo field, Type serialisationTargetType);
+		bool PropertyName(PropertyInfo property, Type serialisationTargetType);
 
 		Action<object> TryToGenerateMemberSetter(Type type);
 	}

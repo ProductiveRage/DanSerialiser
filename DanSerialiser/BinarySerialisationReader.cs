@@ -14,30 +14,33 @@ namespace DanSerialiser
 		private readonly Stream _stream;
 		private readonly IAnalyseTypesForSerialisation _typeAnalyser;
 		private readonly Dictionary<int, string> _nameReferences;
-		private readonly List<object> _objectReferences;
+		private readonly Dictionary<int, object> _objectReferences;
+		private readonly HashSet<int> _deferredInitialisationReferenceIDsAwaitingPopulation;
 		private readonly Dictionary<int, BinarySerialisationReaderTypeReader> _typeReaders;
+		private bool _haveEncounteredDeferredInitialisationObject;
 		public BinarySerialisationReader(Stream stream) : this(stream, DefaultTypeAnalyser.Instance) { }
 		internal BinarySerialisationReader(Stream stream, IAnalyseTypesForSerialisation typeAnalyser) // internal constructor may be used by unit tests
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
 			_typeAnalyser = typeAnalyser ?? throw new ArgumentNullException(nameof(typeAnalyser));
 
-			// Object Reference IDs that appear in the data will appear in ascending numerical order (with no gaps), which means that it is safe to store them in a list so that
-			// read access is performed via the index - this is possible to achieve when serialising because the Object Reference IDs are scoped to the particular writer instance
-			// whereas the Name Reference IDs are managed by the BinarySerialisationWriterCachedNames and so the Name Reference IDs encountered  to serialise a particular object
-			// may not be continuous and so a dictionary is required to describe a lookup for them here.
 			_nameReferences = new Dictionary<int, string>();
-			_objectReferences = new List<object>();
+			_objectReferences = new Dictionary<int, object>();
+			_deferredInitialisationReferenceIDsAwaitingPopulation = new HashSet<int>();
 
-			// In the same way as we take advantage of the BinarySerialisationWriter's implementation details above, where Object Reference IDs are known to appear in order, we
-			// can take adantage of the fact that the fields for each distinct type will always appear in the same order (and there will always be the precise same number of
+			// We can take adantage of the fact that the fields for each distinct type will always appear in the same order (and there will always be the precise same number of
 			// field entries for subsequent occurrences of a particular type) AND the field names will always use Name Reference IDs after the first time that a type is written
 			// out. So, instead of treating the field data as dynamic content and having to try to resolve the fields each time that an object is to be deserialised, we can
 			// build specialised deserialisers for each type that know what fields are going to appear and that have cached the field lookup data - this will mean that there is
 			// a lot less work to do when there are many instances of a given type within a payload. Also note that after the first appearance of a type, Name Reference IDs will
 			// always be used for the type name and so the lookup that is constructed to these per-type deserialisers has an int key (which is less work to match than using the
 			// full type name as the key would be).
+			// - This is confused if the BinarySerialisationWriter is optimised for wide circular references because it shifts object definitions around and so the type readers
+			//   can't be used in that case (which means that performance per-instance deserialisation performance is reduced but it would stack overflow otherwise, so it's not
+			//   really compromised since the optimised-for-tree approach might not work at all!)
 			_typeReaders = new Dictionary<int, BinarySerialisationReaderTypeReader>();
+
+			_haveEncounteredDeferredInitialisationObject = false;
 		}
 
 		public T Read<T>()
@@ -48,7 +51,10 @@ namespace DanSerialiser
 			// Note: As this is the top level "Read" call, if it is an object being deserialised and the type of that object is not available then the deserialisation attempt
 			// should fail, which is why ignoreAnyInvalidTypes is passed as false (that option only applies in cases where a nested object is being deserialised but the field
 			// that it would be used to set does not exist on the parent object - if there is no field to set, who cares if the value is of a type that is not available)
-			return (T)Read(ignoreAnyInvalidTypes: false);
+			var result = Read(ignoreAnyInvalidTypes: false);
+			if (_deferredInitialisationReferenceIDsAwaitingPopulation.Count > 0)
+				throw new InvalidOperationException("There were deferred-initialisation references encountered in the data that did not get fully populated before the stream ended");
+			return (T)result;
 		}
 
 		internal object Read(bool ignoreAnyInvalidTypes)
@@ -113,7 +119,7 @@ namespace DanSerialiser
 					return ReadNextArray(ignoreAnyInvalidTypes);
 
 				case BinarySerialisationDataType.ObjectStart:
-					return ReadNextObject(ignoreAnyInvalidTypes);
+					return ReadNextObject(ignoreAnyInvalidTypes, toPopulateDeferredInstance: false);
 			}
 		}
 
@@ -159,7 +165,7 @@ namespace DanSerialiser
 			return new DateTime(ReadNextInt64(), (DateTimeKind)ReadNext());
 		}
 
-		private object ReadNextObject(bool ignoreAnyInvalidTypes)
+		private object ReadNextObject(bool ignoreAnyInvalidTypes, bool toPopulateDeferredInstance)
 		{
 			var typeName = ReadNextTypeName(out var typeNameReferenceID);
 			if (typeName == null)
@@ -179,25 +185,42 @@ namespace DanSerialiser
 				referenceID = ReadNext();
 			else
 				referenceID = null;
+			object alreadyEncounteredReference;
 			if (referenceID != null)
 			{
 				if (referenceID < 0)
 					throw new Exception("Encountered negative Reference ID, invalid:" + referenceID);
-				if (referenceID.Value < _objectReferences.Count)
+				if (_objectReferences.TryGetValue(referenceID.Value, out alreadyEncounteredReference))
 				{
-					// This is an existing Reference ID so ensure that it's followed by ObjectEnd and return the existing reference
-					if (ReadNextDataType() != BinarySerialisationDataType.ObjectEnd)
-						throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered after reused reference");
-					return _objectReferences[referenceID.Value];
+					// This is an existing Reference ID so ensure that it's followed by ObjectEnd and return the existing reference.. unless it is an object reference that was
+					// created as a placeholder and now needs to be fully populated (whicch is only the case if BinarySerialisationWriter is optimised for wide circular references,
+					// as opposed to tree structures)
+					if (!toPopulateDeferredInstance)
+					{
+						nextEntryType = ReadNextDataType();
+						if (nextEntryType != BinarySerialisationDataType.ObjectEnd)
+							throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered after reused reference");
+						return alreadyEncounteredReference;
+					}
+					else
+					{
+						_haveEncounteredDeferredInitialisationObject = true;
+					}
 				}
 				nextEntryType = ReadNextDataType();
-			}
+			} 
 			else
+			{
 				referenceID = null;
+				alreadyEncounteredReference = null;
+			}
 
 			// If we have already encountered this type then we should have a BinarySerialisationReaderTypeReader instance prepared that loops through the field data quickly,
 			// rather than having to perform the more expensive work below (with its type name resolution and field name lookups)
-			if (_typeReaders.TryGetValue(typeNameReferenceID, out var typeReader))
+			// - Note: If the content that is being deserialised include deferred-population object references (which is the case if the BinarySerialisationWriter was set up
+			//   to be optimised for wide circular references) then we can't use these optimised type builders because sometimes we need to create new populated instances and
+			//   somtimes we have to populate initialised-but-unpopulated references)
+			if (!_haveEncounteredDeferredInitialisationObject && _typeReaders.TryGetValue(typeNameReferenceID, out var typeReader))
 				return typeReader.Read(this, nextEntryType, ignoreAnyInvalidTypes);
 
 			// Try to get a type builder for the type that we should be deserialising to. If ignoreAnyInvalidTypes is true then don't worry if we can't find the type that is
@@ -205,9 +228,46 @@ namespace DanSerialiser
 			var typeBuilderIfAvailable = _typeAnalyser.TryToGetUninitialisedInstanceBuilder(typeName);
 			if ((typeBuilderIfAvailable == null) && !ignoreAnyInvalidTypes)
 				throw new TypeLoadException("Unable to load type " + typeName);
-			var valueIfTypeIsAvailable = (typeBuilderIfAvailable == null) ? null : typeBuilderIfAvailable();
+			object valueIfTypeIsAvailable;
+			if (toPopulateDeferredInstance)
+			{
+				// If this is a deferred-initialisation reference then we already have a reference but it hasn't been populated yet - so use that reference instead of
+				// creating a new one
+				valueIfTypeIsAvailable = alreadyEncounteredReference;
+			}
+			else
+				valueIfTypeIsAvailable = (typeBuilderIfAvailable == null) ? null : typeBuilderIfAvailable();
 			if ((valueIfTypeIsAvailable != null) && (referenceID != null))
-				_objectReferences.Add(valueIfTypeIsAvailable);
+			{
+				// If this is data from a BinarySerialisationWriter that was optimised for wide circular references then some object references will be passed through twice;
+				// once to create an non-populated placeholder and again to set all of the fields (but if the writer was optimised for trees then each object reference will
+				// only ever be set once). Since there is a chance that we will encounter a reference twice, we COULD check ContainsKey and THEN call Add OR we could just
+				// set the item once and do the lookup / find-insert-point only once (and since it will be the same reference that is going in to the particular slot in
+				// the objectReferences dictionary - though potentially twice - then there is no risk of replacing a reference by accident)
+				_objectReferences[referenceID.Value] = valueIfTypeIsAvailable;
+			}
+
+			// If the BinarySerialisationWriter was optimised for wide circular references then the first instance of an object definition may include an "ObjectContentPostponed"
+			// flag to indicate that the instance should be created now but it will be unpopulated (for now.. it will be populated in a second pass later in). We'll track the
+			// Reference IDs of deferred-initialisation / postponed-content references because we want to make sure that they all get fully initialised before the deserialisation
+			// process completes
+			if (nextEntryType == BinarySerialisationDataType.ObjectContentPostponed)
+			{
+				if (referenceID == null)
+					throw new InvalidOperationException(nameof(BinarySerialisationDataType.ObjectContentPostponed) + " should always appear with a ReferenceID");
+				nextEntryType = ReadNextDataType();
+				if (nextEntryType != BinarySerialisationDataType.ObjectEnd)
+					throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} after {nameof(BinarySerialisationDataType.ObjectContentPostponed)} but encountered {nextEntryType}");
+				_deferredInitialisationReferenceIDsAwaitingPopulation.Add(referenceID.Value);
+				return valueIfTypeIsAvailable;
+			}
+			else if (toPopulateDeferredInstance)
+			{
+				if (referenceID == null)
+					throw new InvalidOperationException($"There should always be a ReferenceID when {nameof(toPopulateDeferredInstance)} is true");
+				_deferredInitialisationReferenceIDsAwaitingPopulation.Remove(referenceID.Value);
+			}
+
 			var typeIfAvailable = valueIfTypeIsAvailable?.GetType();
 			var fieldsThatHaveBeenSet = new List<FieldInfo>();
 			var fieldSettingInformationForGeneratingTypeBuilder = new List<BinarySerialisationReaderTypeReader.FieldSettingDetails>();
@@ -303,6 +363,31 @@ namespace DanSerialiser
 			}
 		}
 
+		private void PrepareObjectDeferred()
+		{
+			var typeName = ReadNextTypeName(out var typeNameReferenceID);
+			if (typeName == null)
+				throw new InvalidOperationException("Null type names should not exist in object data since there is a Null binary serialisation data type");
+
+			int referenceID;
+			var nextEntryType = ReadNextDataType();
+			if (nextEntryType == BinarySerialisationDataType.ReferenceID8)
+				referenceID = ReadNext();
+			else if (nextEntryType == BinarySerialisationDataType.ReferenceID16)
+				referenceID = ReadNextInt16();
+			else if (nextEntryType == BinarySerialisationDataType.ReferenceID24)
+				referenceID = ReadNextInt24();
+			else if (nextEntryType == BinarySerialisationDataType.ReferenceID32)
+				referenceID = ReadNext();
+			else
+				throw new InvalidOperationException("Expected Object Reference ID for " + nameof(BinarySerialisationDataType.ObjectContentPostponed));
+			if (referenceID < 0)
+				throw new Exception("Encountered negative Reference ID, invalid:" + referenceID);
+			if (_objectReferences.ContainsKey(referenceID))
+				throw new InvalidOperationException($"Don't expect {nameof(BinarySerialisationDataType.ObjectContentPostponed)} for object reference that has already been populated");
+
+		}
+
 		internal int ReadNextNameReferenceID(BinarySerialisationDataType specifiedDataType)
 		{
 			if (specifiedDataType == BinarySerialisationDataType.NameReferenceID32)
@@ -336,10 +421,21 @@ namespace DanSerialiser
 				length = ReadNextInt();
 			else
 				throw new Exception("Unexpected BinarySerialisationDataType for Array length: " + lengthDataType);
+
 			var items = Array.CreateInstance(elementType, length);
 			for (var i = 0; i < items.Length; i++)
 				items.SetValue(Read(ignoreAnyInvalidTypes), i);
+
+			// If the BinarySerialisationWriter is configured to optimise for wide circular references then there may be some content-for-delay-populated-objects here
+			// after the array (but if it was configured for trees then there won't be any deferred object populations and we'll go straight to ArrayEnd)
 			var nextEntryType = ReadNextDataType();
+			while (nextEntryType != BinarySerialisationDataType.ArrayEnd)
+			{
+				if (nextEntryType != BinarySerialisationDataType.ObjectStart)
+					throw new InvalidOperationException($"After array elements, expected either {nameof(BinarySerialisationDataType.ArrayEnd)} or {nameof(BinarySerialisationDataType.ObjectStart)} (for deferred references)");
+				ReadNextObject(ignoreAnyInvalidTypes, toPopulateDeferredInstance: true);
+				nextEntryType = ReadNextDataType();
+			}
 			if (nextEntryType != BinarySerialisationDataType.ArrayEnd)
 				throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ArrayEnd)} was not encountered");
 			return items;

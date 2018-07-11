@@ -38,6 +38,7 @@
 		ReferenceID24,
 		ReferenceID32,
 		FieldName,
+		ObjectContentPostponed,
 		ObjectEnd,
 
 		ArrayStart,
