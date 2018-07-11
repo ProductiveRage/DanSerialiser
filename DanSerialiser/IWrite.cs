@@ -33,7 +33,7 @@ namespace DanSerialiser
 
 		void Null();
 
-		void ObjectStart<T>(T value);
+		void ObjectStart(object value);
 		void ObjectEnd();
 		void ReferenceId(int value);
 

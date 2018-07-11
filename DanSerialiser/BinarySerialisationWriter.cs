@@ -114,19 +114,16 @@ namespace DanSerialiser
 
 		public void ArrayStart(object value, Type elementType)
 		{
+			if (value == null)
+				throw new ArgumentNullException(nameof(value));
+			if (!(value is Array))
+				throw new ArgumentException($"If {nameof(value)} is not null then it must be an array");
 			if (elementType == null)
 				throw new ArgumentNullException(nameof(elementType));
-			if ((value != null) && !(value is Array))
-				throw new ArgumentException($"If {nameof(value)} is not null then it must be an array");
 
 			WriteByte((byte)BinarySerialisationDataType.ArrayStart);
-			WriteTypeName((value == null) ? null : elementType);
-			if (value != null)
-			{
-				// If the value is null then WriteTypeName will have written a representation of a null string and the BinaryReader will understand that this represents a
-				// null value (and so we don't need to write any length data here)
-				Int32(((Array)(object)value).Length);
-			}
+			WriteTypeName(elementType);
+			Int32(((Array)value).Length);
 		}
 
 		public void ArrayEnd()
@@ -139,10 +136,13 @@ namespace DanSerialiser
 			WriteByte((byte)BinarySerialisationDataType.Null);
 		}
 
-		public void ObjectStart<T>(T value)
+		public void ObjectStart(object value)
 		{
+			if (value == null)
+				throw new ArgumentNullException(nameof(value));
+
 			WriteByte((byte)BinarySerialisationDataType.ObjectStart);
-			WriteTypeName(value?.GetType());
+			WriteTypeName(value.GetType());
 		}
 
 		public void ObjectEnd()
