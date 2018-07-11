@@ -38,7 +38,7 @@ namespace DanSerialiser.CachedLookups
 			var bytesForStringAndReferenceID = new List<byte>();
 			using (var stream = new StreamThatAppendsBytesToList(bytesForStringAndReferenceID))
 			{
-				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse: true); // The supportReferenceReuse value doesn't make any difference here
+				var writer = new BinarySerialisationWriter(stream);
 				writer.String(type.AssemblyQualifiedName);
 			}
 			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
@@ -96,7 +96,7 @@ namespace DanSerialiser.CachedLookups
 			var bytesForStringAndReferenceID = new List<byte>();
 			using (var stream = new StreamThatAppendsBytesToList(bytesForStringAndReferenceID))
 			{
-				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse: true); // The supportReferenceReuse value doesn't make any difference here
+				var writer = new BinarySerialisationWriter(stream);
 				writer.String(BinaryReaderWriterShared.CombineTypeAndFieldName(fieldNameExistsMultipleTimesInHierarchy ? field.DeclaringType : null, field.Name));
 			}
 			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
@@ -145,7 +145,7 @@ namespace DanSerialiser.CachedLookups
 			var bytesForStringAndReferenceID = new List<byte>();
 			using (var stream = new StreamThatAppendsBytesToList(bytesForStringAndReferenceID))
 			{
-				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse: true); // The supportReferenceReuse value doesn't make any difference here
+				var writer = new BinarySerialisationWriter(stream);
 				writer.String(BinaryReaderWriterShared.CombineTypeAndFieldName(property.DeclaringType, BackingFieldHelpers.GetBackingFieldName(property.Name)));
 			}
 			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
@@ -162,7 +162,7 @@ namespace DanSerialiser.CachedLookups
 			var bytesForReferenceID = new List<byte>();
 			using (var stream = new StreamThatAppendsBytesToList(bytesForReferenceID))
 			{
-				var writer = new BinarySerialisationWriter(stream, supportReferenceReuse: true); // The supportReferenceReuse value doesn't make any difference here
+				var writer = new BinarySerialisationWriter(stream);
 				writer.VariableLengthInt32(
 					referenceID,
 					BinarySerialisationDataType.NameReferenceID8,
