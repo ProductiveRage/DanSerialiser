@@ -253,6 +253,8 @@ There is a way to tackle this kind of data; the "optimiseForWideCircularReferenc
 
 *(Note: There is no flag to tell the deserialisation process - whether you call the static **BinarySerialisation.Deserialise** method or if you instantiate a **BinarySerialisationReader** for a stream - because the serialised data contains information about how it is was written and whether the option was enabled)*
 
+I would recommend *not* enabling this option unless you come to find that you have to.
+
 ## Performance
 
 My primary goal with this library was to see if I could create something that fit the versioning plan that I had in mind. Performance is not the number one goal - but it also shouldn't be forgotten. It won't be as fast as [protobuf](https://github.com/google/protobuf/tree/master/csharp) / [protobuf-net](https://github.com/mgravell/protobuf-net) but it also shouldn't require their compromises\*. It should be at least comparable to obvious alternatives, such as the BinaryFormatter.
