@@ -1,0 +1,33 @@
+// * Summary *
+
+BenchmarkDotNet=v0.10.14, OS=Windows 8.1 (6.3.9600.0)
+AMD FX(tm)-8350 Eight-Core Processor, 1 CPU, 8 logical and 4 physical cores
+Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
+.NET Core SDK=2.1.300
+  [Host] : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+  Clr    : .NET Framework 4.6.1 (CLR 4.0.30319.42000), 64bit RyuJIT-v4.7.2650.0
+  Core   : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+
+
+                                                      Method |  Job | Runtime |      Mean |     Error |    StdDev |
+------------------------------------------------------------ |----- |-------- |----------:|----------:|----------:|
+                                            JsonNetSerialise |  Clr |     Clr | 150.48 ms | 1.0164 ms | 0.9010 ms | 2.8x slower
+                                          JsonNetDeserialise |  Clr |     Clr | 128.86 ms | 2.1108 ms | 1.8712 ms | 3.4x slower
+                                    BinaryFormatterSerialise |  Clr |     Clr |  86.14 ms | 1.0413 ms | 0.9740 ms | 1.6x slower
+                                  BinaryFormatterDeserialise |  Clr |     Clr | 126.07 ms | 0.8547 ms | 0.7137 ms | 3.4x slower
+                                           ProtoBufSerialise |  Clr |     Clr |  11.08 ms | 0.2123 ms | 0.2085 ms | 4.8x faster
+                                         ProtoBufDeserialise |  Clr |     Clr |  21.43 ms | 0.0683 ms | 0.0533 ms | 1.7x faster
+                                      DanSerialiserSerialise |  Clr |     Clr |  53.07 ms | 0.2024 ms | 0.1690 ms |
+   DanSerialiserSerialise_OptimisedForWideCircularReferences |  Clr |     Clr |  70.10 ms | 0.6726 ms | 0.6292 ms | 1.3x slower
+                                    DanSerialiserDeserialise |  Clr |     Clr |  37.42 ms | 0.6876 ms | 0.6432 ms |
+ DanSerialiserDeserialise_OptimisedForWideCircularReferences |  Clr |     Clr | 129.83 ms | 0.7201 ms | 0.6735 ms | 2.4x slower
+                                            JsonNetSerialise | Core |    Core |  94.39 ms | 0.8056 ms | 0.6727 ms | 2.1x slower
+                                          JsonNetDeserialise | Core |    Core | 128.48 ms | 0.5947 ms | 0.5272 ms | 3.5x slower
+                                    BinaryFormatterSerialise | Core |    Core | 102.03 ms | 0.9795 ms | 0.9162 ms | 2.2x slower
+                                  BinaryFormatterDeserialise | Core |    Core | 134.02 ms | 0.8240 ms | 0.7305 ms | 3.6x slower
+                                           ProtoBufSerialise | Core |    Core |  10.11 ms | 0.0346 ms | 0.0289 ms | 4.5x faster
+                                         ProtoBufDeserialise | Core |    Core |  20.19 ms | 0.1603 ms | 0.1421 ms | 1.8x faster
+                                      DanSerialiserSerialise | Core |    Core |  45.80 ms | 0.6506 ms | 0.6086 ms |
+   DanSerialiserSerialise_OptimisedForWideCircularReferences | Core |    Core |  61.84 ms | 0.4467 ms | 0.4178 ms | 1.4x slower
+                                    DanSerialiserDeserialise | Core |    Core |  37.08 ms | 0.1632 ms | 0.1274 ms |
+ DanSerialiserDeserialise_OptimisedForWideCircularReferences | Core |    Core | 127.16 ms | 1.4280 ms | 1.3358 ms | 2.8x slower

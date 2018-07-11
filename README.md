@@ -247,7 +247,11 @@ I like my data to be represented by immutable structures unless there's a really
     
 .. then these may be serialised / deserialised without issue.
 
-This works but I have seen it fail (with a stack overflow exception) if the object model has array properties that are very wide and where each element is the start of a chain that ends with a circular reference. The serialiser approaches data as if it is a tree and so this arrangement will effectively add layers to the stack trace for every element in the array. If these array elements are object references that have properties that are *also* arrays then the problem gets even worse, quickly! I've had some thoughts about ways to try to tackle structures such as this but I don't have anything that I'm happy with yet.
+For many cases, this will work without issue. However, there are some shapes of object model that don't fit nicely, such as when a large array exists where the elements are all the start of circular reference chains. The serialiser approaches data as if it is a tree and so this arrangement will effectively add layers to the stack trace for every element in the array. If these array elements are object references that have properties that are *also* arrays (whose elements are part of circular reference chains) then the problem gets even worse, quickly! You'll know that you have a problem because attempting to serialise the data will result in a stack overflow exception.
+
+There is a way to tackle this kind of data; the "optimiseForWideCircularReference" argument that exists on the static **BinarySerialisation**.Serialise method and as a constructor argument on the **BinarySerialisationWriter** - it defaults to false but, if set to true, then it will serialise array data in a "breadth first" manner such that the changes of a stack overflow are greatly reduced. Unfortunately, there is some additional analysis that the serialisation process must do and there are some optimisations that the deserialisation process can not apply and so using this option comes with a cost. The "Performance" section below has figures to compare the execution times when this option ("optimised for wide circular references") is enabled vs when it's not (when it is enabled, the serialisation and deserialisation processes are still faster than Json.NET and the BinaryFormatter but not by as much).
+
+*(Note: There is no flag to tell the deserialisation process - whether you call the static **BinarySerialisation.Deserialise** method or if you instantiate a **BinarySerialisationReader** for a stream - because the serialised data contains information about how it is was written and whether the option was enabled)*
 
 ## Performance
 
@@ -257,25 +261,38 @@ My primary goal with this library was to see if I could create something that fi
 
 There is a project in the repository that uses [BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) and sample data that matches the primary use case that I had in mind when I started this project. On my computer, the results are currently as follows:
 
-|                     Method |  Job | Runtime |      Mean |     Error |    StdDev | Compared to DanSerialiser |
-|--------------------------- |:----:|:-------:|----------:|----------:|----------:|---------------------------|
-|           JsonNetSerialise |  Clr |     Clr | 152.39 ms | 0.8945 ms | 0.7929 ms | 2.7x slower               |
-|         JsonNetDeserialise |  Clr |     Clr | 128.61 ms | 0.7112 ms | 0.6652 ms | 3.5x slower               |
-|   BinaryFormatterSerialise |  Clr |     Clr |  89.68 ms | 0.7623 ms | 0.6757 ms | 1.6x slower               |
-| BinaryFormatterDeserialise |  Clr |     Clr | 128.53 ms | 1.2025 ms | 1.1248 ms | 3.5x slower               |
-|          ProtoBufSerialise |  Clr |     Clr |  11.52 ms | 0.1714 ms | 0.1338 ms | **4.9x faster**           |
-|        ProtoBufDeserialise |  Clr |     Clr |  21.70 ms | 0.1375 ms | 0.1286 ms | **1.7x faster**           |
-|     DanSerialiserSerialise |  Clr |     Clr |  56.29 ms | 0.1879 ms | 0.1758 ms | -                         |
-|   DanSerialiserDeserialise |  Clr |     Clr |  37.09 ms | 0.7141 ms | 0.7333 ms | -                         |
-|           JsonNetSerialise | Core |    Core |  98.05 ms | 0.8354 ms | 0.7814 ms | 2.1x slower               |
-|         JsonNetDeserialise | Core |    Core | 129.66 ms | 0.3665 ms | 0.3249 ms | 3.7x slower               |
-|   BinaryFormatterSerialise | Core |    Core | 105.34 ms | 0.7633 ms | 0.7140 ms | 2.2x slower               |
-| BinaryFormatterDeserialise | Core |    Core | 135.73 ms | 0.8164 ms | 0.6818 ms | 3.8x slower               |
-|          ProtoBufSerialise | Core |    Core |  10.26 ms | 0.1192 ms | 0.0996 ms | **4.6x faster**           |
-|        ProtoBufDeserialise | Core |    Core |  21.35 ms | 0.1531 ms | 0.1358 ms | **1.7x faster**           |
-|     DanSerialiserSerialise | Core |    Core |  47.44 ms | 0.4564 ms | 0.4269 ms | -                         |
-|   DanSerialiserDeserialise | Core |    Core |  35.46 ms | 0.3907 ms | 0.3463 ms | -                         |
+|                                                            Method |  Job | Runtime |      Mean |     Error |    StdDev | Compared to DanSerialiser |
+|------------------------------------------------------------------ |:----:|:-------:|----------:|----------:|----------:|---------------------------|
+|                                                  JsonNetSerialise |  Clr |     Clr | 150.48 ms | 1.0164 ms | 0.9010 ms | 2.8x slower               |
+|                                          BinaryFormatterSerialise |  Clr |     Clr |  86.14 ms | 1.0413 ms | 0.9740 ms | 1.6x slower               |
+|   DanSerialiserSerialise (optimised for wide circular references) |  Clr |     Clr |  70.10 ms | 0.6726 ms | 0.6292 ms | 1.3x slower               |
+|                                            DanSerialiserSerialise |  Clr |     Clr |  53.07 ms | 0.2024 ms | 0.1690 ms | -                         |
+|                                                 ProtoBufSerialise |  Clr |     Clr |  11.08 ms | 0.2123 ms | 0.2085 ms | **4.8x faster**           |
 
-Initially, I imagined that getting with one order of magnitude of protobuf would be acceptable but I hadn't realised how close Json.NET would be in performance - approx. 13.2x / 9.6x times slower than protobuf to serialise the data on .NET 4.6.1 / .NET Core 2.1 and only 5.9x / 6.0x slower to deserialise it. Considering that Json.NET is so general purpose, I thought that that was impressive!
+|                                                            Method |  Job | Runtime |      Mean |     Error |    StdDev | Compared to DanSerialiser |
+|------------------------------------------------------------------ |:----:|:-------:|----------:|----------:|----------:|---------------------------|
+|                                                JsonNetDeserialise |  Clr |     Clr | 128.86 ms | 2.1108 ms | 1.8712 ms | 3.4x slower               |
+|                                        BinaryFormatterDeserialise |  Clr |     Clr | 126.07 ms | 0.8547 ms | 0.7137 ms | 3.4x slower               |
+| DanSerialiserDeserialise (optimised for wide circular references) |  Clr |     Clr | 129.83 ms | 0.7201 ms | 0.6735 ms | 2.4x slower               |
+|                                          DanSerialiserDeserialise |  Clr |     Clr |  37.42 ms | 0.6876 ms | 0.6432 ms | -                         |
+|                                               ProtoBufDeserialise |  Clr |     Clr |  21.43 ms | 0.0683 ms | 0.0533 ms | **1.7x faster**           |
+
+|                                                            Method |  Job | Runtime |      Mean |     Error |    StdDev | Compared to DanSerialiser |
+|------------------------------------------------------------------ |:----:|:-------:|----------:|----------:|----------:|---------------------------|
+|                                          BinaryFormatterSerialise | Core |    Core | 102.03 ms | 0.9795 ms | 0.9162 ms | 2.2x slower               |
+|                                                  JsonNetSerialise | Core |    Core |  94.39 ms | 0.8056 ms | 0.6727 ms | 2.1x slower               |
+|   DanSerialiserSerialise (optimised for wide circular references) | Core |    Core |  61.84 ms | 0.4467 ms | 0.4178 ms | 1.4x slower               |
+|                                            DanSerialiserSerialise | Core |    Core |  45.80 ms | 0.6506 ms | 0.6086 ms | -                         |
+|                                                 ProtoBufSerialise | Core |    Core |  10.11 ms | 0.0346 ms | 0.0289 ms | **4.5x faster**           |
+
+|                                                            Method |  Job | Runtime |      Mean |     Error |    StdDev | Compared to DanSerialiser |
+|------------------------------------------------------------------ |:----:|:-------:|----------:|----------:|----------:|---------------------------|
+|                                        BinaryFormatterDeserialise | Core |    Core | 134.02 ms | 0.8240 ms | 0.7305 ms | 3.6x slower               |
+|                                                JsonNetDeserialise | Core |    Core | 128.48 ms | 0.5947 ms | 0.5272 ms | 3.5x slower               |
+| DanSerialiserDeserialise (optimised for wide circular references) | Core |    Core | 127.16 ms | 1.4280 ms | 1.3358 ms | 2.8x slower               |
+|                                          DanSerialiserDeserialise | Core |    Core |  37.08 ms | 0.1632 ms | 0.1274 ms | -                         |
+|                                               ProtoBufDeserialise | Core |    Core |  20.19 ms | 0.1603 ms | 0.1421 ms | **1.8x faster**           |
+
+Initially, I imagined that getting with one order of magnitude of protobuf would be acceptable but I hadn't realised how close Json.NET would be in performance - approx. 13.6x / 9.3x times slower than protobuf to serialise the data on .NET 4.6.1 / .NET Core 2.1 and only 6.0x / 6.4x slower to deserialise it. Considering that Json.NET is so general purpose, I thought that that was impressive!
 
 I'm happy that *this* library is less than 5x as slow as protobuf in serialising the sample data and less than 2x as slow at deserialising.

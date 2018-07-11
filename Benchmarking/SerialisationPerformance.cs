@@ -29,7 +29,7 @@ namespace Benchmarking
 	{
 		private Product[] _products;
 		private string _jsonNetSerialisedData;
-		private byte[] _binaryFormatterSerialisedData, _protoBufSerialisedData, _danSerialiserSerialisedData;
+		private byte[] _binaryFormatterSerialisedData, _protoBufSerialisedData, _danSerialiserSerialisedData, _danSerialiserSerialisedDataOptimisedForWideCircularReferences;
 		private Product[] _warmUpDeserialisedProductsFromBinaryFormatter, _warmUpDeserialisedProductsFromProtoBuf, _warmUpDeserialisedProductsFromDanSerialiser;
 
 		[GlobalSetup]
@@ -49,6 +49,7 @@ namespace Benchmarking
 			_protoBufSerialisedData = ProtoBufSerialise();
 			_warmUpDeserialisedProductsFromProtoBuf = ProtoBufDeserialise();
 			_danSerialiserSerialisedData = DanSerialiserSerialise();
+			_danSerialiserSerialisedDataOptimisedForWideCircularReferences = DanSerialiserSerialise_OptimisedForWideCircularReferences();
 			_warmUpDeserialisedProductsFromDanSerialiser = DanSerialiserDeserialise();
 		}
 
@@ -105,13 +106,26 @@ namespace Benchmarking
 		[Benchmark]
 		public byte[] DanSerialiserSerialise()
 		{
-			return BinarySerialisation.Serialise(_products);
+			return BinarySerialisation.Serialise(_products, optimiseForWideCircularReference: false);
+		}
+
+
+		[Benchmark]
+		public byte[] DanSerialiserSerialise_OptimisedForWideCircularReferences()
+		{
+			return BinarySerialisation.Serialise(_products, optimiseForWideCircularReference: true);
 		}
 
 		[Benchmark]
 		public Product[] DanSerialiserDeserialise()
 		{
 			return BinarySerialisation.Deserialise<Product[]>(_danSerialiserSerialisedData);
+		}
+
+		[Benchmark]
+		public Product[] DanSerialiserDeserialise_OptimisedForWideCircularReferences()
+		{
+			return BinarySerialisation.Deserialise<Product[]>(_danSerialiserSerialisedDataOptimisedForWideCircularReferences);
 		}
 
 		private static void RegisterTypesWithProtoBufThatShareAssemblyAndNamespaceWith(Type sourceType)
