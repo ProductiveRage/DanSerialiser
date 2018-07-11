@@ -232,7 +232,8 @@ namespace DanSerialiser
 				{
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Push(value);
-					Serialise(field.Reader(value), field.Member.FieldType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, generatedMemberSetters, writer);
+					var fieldValue = field.Reader(value);
+					Serialise(fieldValue, ldValue?.GetType() ?? field.Member.FieldType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, generatedMemberSetters, writer);
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Pop();
 				}
@@ -244,7 +245,8 @@ namespace DanSerialiser
 				{
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Push(value);
-					Serialise(property.Reader(value), property.Member.PropertyType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, generatedMemberSetters, writer);
+					var propertyValue = property.Reader(value);
+					Serialise(propertyValue, propertyValue?.GetType() ?? property.Member.PropertyType, parentsIfReferenceReuseDisallowed, objectHistoryIfReferenceReuseAllowed, generatedMemberSetters, writer);
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Pop();
 				}
