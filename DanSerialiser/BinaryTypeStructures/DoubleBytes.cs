@@ -63,7 +63,7 @@ namespace DanSerialiser.BinaryTypeStructures
 				this.Byte2 = littleEndianBytes[2];
 				this.Byte3 = littleEndianBytes[3];
 				this.Byte4 = littleEndianBytes[4];
-				this.Byte5 = littleEndianBytes[4];
+				this.Byte5 = littleEndianBytes[5];
 				this.Byte6 = littleEndianBytes[6];
 				this.Byte7 = littleEndianBytes[7];
 			}

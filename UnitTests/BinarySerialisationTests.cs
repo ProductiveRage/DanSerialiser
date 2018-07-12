@@ -164,6 +164,15 @@ namespace UnitTests
 			AssertCloneMatchesOriginal(double.MaxValue);
 		}
 
+		/// <summary>
+		/// There was a bug in the DoubleBytes implementation that the test above didn't pick up - this is the value that made me realise
+		/// </summary>
+		[Fact]
+		public void DifferentDouble()
+		{
+			AssertCloneMatchesOriginal(63.85255);
+		}
+
 		[Fact]
 		public void Decimal()
 		{
