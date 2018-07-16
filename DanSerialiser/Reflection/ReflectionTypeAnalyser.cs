@@ -110,7 +110,7 @@ namespace DanSerialiser.Reflection
 			return null;
 		}
 
-		public (Action<object, object>[], FieldInfo[]) GetPropertySettersAndFieldsToConsiderToHaveBeenSet(Type typeToLookForPropertyOn, string fieldName, string typeNameIfRequired, Type fieldValueTypeIfAvailable)
+		public (PropertySetter[], FieldInfo[]) GetPropertySettersAndFieldsToConsiderToHaveBeenSet(Type typeToLookForPropertyOn, string fieldName, string typeNameIfRequired, Type fieldValueTypeIfAvailable)
 		{
 			if (typeToLookForPropertyOn == null)
 				throw new ArgumentNullException(nameof(typeToLookForPropertyOn));
@@ -118,7 +118,7 @@ namespace DanSerialiser.Reflection
 				throw new ArgumentException($"Null/blank {nameof(fieldName)} specified");
 
 			var fieldsToConsiderToHaveBeenSet = new List<FieldInfo>();
-			var propertySetters = new List<Action<object, object>>();
+			var propertySetters = new List<PropertySetter>();
 			var propertyName = BackingFieldHelpers.TryToGetNameOfPropertyRelatingToBackingField(fieldName) ?? fieldName;
 			while (typeToLookForPropertyOn != null)
 			{
@@ -231,12 +231,11 @@ namespace DanSerialiser.Reflection
 				.Compile();
 		}
 
-		private static Action<object, object> GetPropertyWriter(PropertyInfo property)
+		private static PropertySetter GetPropertyWriter(PropertyInfo property)
 		{
 			var sourceParameter = Expression.Parameter(typeof(object), "source");
 			var valueParameter = Expression.Parameter(typeof(object), "value");
-			return
-				Expression.Lambda<Action<object, object>>(
+			var setter = Expression.Lambda<Action<object, object>>(
 					Expression.Assign(
 						Expression.MakeMemberAccess(
 							Expression.Convert(sourceParameter, property.DeclaringType),
@@ -248,6 +247,7 @@ namespace DanSerialiser.Reflection
 					valueParameter
 				)
 				.Compile();
+			return new PropertySetter(property.PropertyType, setter);
 		}
 	}
 }
