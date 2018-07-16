@@ -110,15 +110,22 @@ namespace DanSerialiser.Reflection
 			return null;
 		}
 
-		public (PropertySetter[], FieldInfo[]) GetPropertySettersAndFieldsToConsiderToHaveBeenSet(Type typeToLookForPropertyOn, string fieldName, string typeNameIfRequired, Type fieldValueTypeIfAvailable)
+		/// <summary>
+		/// There may be cases where a value is deserialised for a field that does not exist on the destination type - this could happen if data from an old version of the type is
+		/// being deserialised into a new version of the type, in which case we need to check for any [Deprecated(replacedBy: ..)] properties that exist to provide a way to take
+		/// this value and set the [Deprecated] property/ies using the field that no longer exists. Note that it's also possible that the serialised data contains a field that
+		/// does not exist on the destination type because the serialised data is from a newer version of the type and the destination is an older version of that type that
+		/// has never had the field - in that case, this method wil return null.
+		/// </summary>
+		public DeprecatedPropertySettingDetails TryToGetPropertySettersAndFieldsToConsiderToHaveBeenSet(Type typeToLookForPropertyOn, string fieldName, string typeNameIfRequired, Type fieldValueTypeIfAvailable)
 		{
 			if (typeToLookForPropertyOn == null)
 				throw new ArgumentNullException(nameof(typeToLookForPropertyOn));
 			if (string.IsNullOrWhiteSpace(fieldName))
 				throw new ArgumentException($"Null/blank {nameof(fieldName)} specified");
 
-			var fieldsToConsiderToHaveBeenSet = new List<FieldInfo>();
-			var propertySetters = new List<PropertySetter>();
+			var propertySetters = new List<Tuple<PropertyInfo, Action<object, object>>>();
+			var fieldsToConsiderToHaveBeenSetViaDeprecatedProperties = new List<FieldInfo>();
 			var propertyName = BackingFieldHelpers.TryToGetNameOfPropertyRelatingToBackingField(fieldName) ?? fieldName;
 			while (typeToLookForPropertyOn != null)
 			{
@@ -138,7 +145,7 @@ namespace DanSerialiser.Reflection
 					{
 						// Try to find a field that the "ReplacedBy" value relates to (if we find it then we'll consider it to have been set because setting the
 						// deprecated property should set it))
-						propertySetters.Add(GetPropertyWriter(deprecatedProperty.Property));
+						propertySetters.Add(Tuple.Create(deprecatedProperty.Property, GetPropertyWriter(deprecatedProperty.Property)));
 						var field = typeToLookForPropertyOn.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags)
 							.Where(f => (f.Name == deprecatedProperty.ReplaceBy) && (f.DeclaringType == typeToLookForPropertyOn))
 							.FirstOrDefault();
@@ -162,13 +169,43 @@ namespace DanSerialiser.Reflection
 						{
 							// Although the field hasn't directly been set, it should have been set indirectly by setting the property value above (unless the [Deprecated]
 							// "ReplaceBy" value was lying)
-							fieldsToConsiderToHaveBeenSet.Add(field);
+							fieldsToConsiderToHaveBeenSetViaDeprecatedProperties.Add(field);
 						}
 					}
 				}
 				typeToLookForPropertyOn = typeToLookForPropertyOn.BaseType;
 			}
-			return (propertySetters.ToArray(), fieldsToConsiderToHaveBeenSet.ToArray());
+			if (!propertySetters.Any())
+				return null;
+
+			Type compatibleCommonPropertyTypeIfKnown = null;
+			foreach (var propertySetter in propertySetters)
+			{
+				if (compatibleCommonPropertyTypeIfKnown == null)
+					compatibleCommonPropertyTypeIfKnown = propertySetter.Item1.PropertyType;
+				else if (propertySetter.Item1.PropertyType != compatibleCommonPropertyTypeIfKnown)
+				{
+					if (compatibleCommonPropertyTypeIfKnown.IsAssignableFrom(propertySetter.Item1.PropertyType))
+					{
+						// If this property is of a more specific type than propertyTypeIfKnown but the current propertyTypeIfKnown could be satisfied by it then record
+						// this type going forward (any other properties will need to either be this type of be assignable to it otherwise we won't be able to deserialise
+						// a single value that can be used to populate all of the related properties - only for cases where there are multiple, obviously)
+						compatibleCommonPropertyTypeIfKnown = propertySetter.Item1.PropertyType;
+					}
+					else if (!propertySetter.Item1.PropertyType.IsAssignableFrom(compatibleCommonPropertyTypeIfKnown))
+					{
+						// If propertySetter.PropertyType is not the same as propertyTypeIfKnown and if propertyTypeIfKnown is not assignable from propertySetter.PropertyType
+						// and propertySetter.PropertyType is not assigned from propertyTypeIfKnown then we've come to an impossible situation - if there are multiple properties
+						// then there must be a single type that a value may be deserialised as that may be used to set ALL of the properties. Since there isn't, we have to throw.
+						throw new InvalidOperationException($"Type {typeToLookForPropertyOn.Name} has [Deprecated] properties that are all set by data for field {fieldName} but which have incompatible types");
+					}
+				}
+			}
+			return new DeprecatedPropertySettingDetails(
+				compatibleCommonPropertyTypeIfKnown, 
+				propertySetters.Select(p => p.Item2).ToArray(),
+				fieldsToConsiderToHaveBeenSetViaDeprecatedProperties.ToArray()
+			);
 		}
 
 		private static Func<object, object> GetFieldReader(FieldInfo field)
@@ -231,11 +268,11 @@ namespace DanSerialiser.Reflection
 				.Compile();
 		}
 
-		private static PropertySetter GetPropertyWriter(PropertyInfo property)
+		private static Action<object, object> GetPropertyWriter(PropertyInfo property)
 		{
 			var sourceParameter = Expression.Parameter(typeof(object), "source");
 			var valueParameter = Expression.Parameter(typeof(object), "value");
-			var setter = Expression.Lambda<Action<object, object>>(
+			return Expression.Lambda<Action<object, object>>(
 					Expression.Assign(
 						Expression.MakeMemberAccess(
 							Expression.Convert(sourceParameter, property.DeclaringType),
@@ -247,7 +284,6 @@ namespace DanSerialiser.Reflection
 					valueParameter
 				)
 				.Compile();
-			return new PropertySetter(property.PropertyType, setter);
 		}
 	}
 }

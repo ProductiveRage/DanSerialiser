@@ -11,7 +11,7 @@ namespace DanSerialiser.Reflection
 		private readonly ConcurrentDictionary<Type, Tuple<MemberAndReader<FieldInfo>[], MemberAndReader<PropertyInfo>[]>> _fieldAndPropertyCache;
 		private readonly ConcurrentDictionary<Type, FieldInfo[]> _requiredFieldCache;
 		private readonly ConcurrentDictionary<Tuple<Type, string, string>, MemberAndWriter<FieldInfo>> _fieldNameCache;
-		private readonly ConcurrentDictionary<Tuple<Type, string, string, Type>, (PropertySetter[], FieldInfo[])> _deprecatedPropertyCache;
+		private readonly ConcurrentDictionary<Tuple<Type, string, string, Type>, DeprecatedPropertySettingDetails> _deprecatedPropertyCache;
 		public CachingTypeAnalyser(IAnalyseTypesForSerialisation reader)
 		{
 			_reader = reader ?? throw new ArgumentNullException(nameof(reader));
@@ -19,7 +19,7 @@ namespace DanSerialiser.Reflection
 			_fieldAndPropertyCache = new ConcurrentDictionary<Type, Tuple<MemberAndReader<FieldInfo>[], MemberAndReader<PropertyInfo>[]>>();
 			_requiredFieldCache = new ConcurrentDictionary<Type, FieldInfo[]>();
 			_fieldNameCache = new ConcurrentDictionary<Tuple<Type, string, string>, MemberAndWriter<FieldInfo>>();
-			_deprecatedPropertyCache = new ConcurrentDictionary<Tuple<Type, string, string, Type>, (PropertySetter[], FieldInfo[])>();
+			_deprecatedPropertyCache = new ConcurrentDictionary<Tuple<Type, string, string, Type>, DeprecatedPropertySettingDetails>();
 		}
 
 		public Func<object> TryToGetUninitialisedInstanceBuilder(string typeName)
@@ -77,7 +77,7 @@ namespace DanSerialiser.Reflection
 			return result;
 		}
 
-		public (PropertySetter[], FieldInfo[]) GetPropertySettersAndFieldsToConsiderToHaveBeenSet(Type typeToLookForPropertyOn, string fieldName, string typeNameIfRequired, Type fieldValueTypeIfAvailable)
+		public DeprecatedPropertySettingDetails TryToGetPropertySettersAndFieldsToConsiderToHaveBeenSet(Type typeToLookForPropertyOn, string fieldName, string typeNameIfRequired, Type fieldValueTypeIfAvailable)
 		{
 			if (typeToLookForPropertyOn == null)
 				throw new ArgumentNullException(nameof(typeToLookForPropertyOn));
@@ -88,7 +88,7 @@ namespace DanSerialiser.Reflection
 			if (_deprecatedPropertyCache.TryGetValue(cacheKey, out var cachedResult))
 				return cachedResult;
 
-			var result = _reader.GetPropertySettersAndFieldsToConsiderToHaveBeenSet(typeToLookForPropertyOn, fieldName, typeNameIfRequired, fieldValueTypeIfAvailable);
+			var result = _reader.TryToGetPropertySettersAndFieldsToConsiderToHaveBeenSet(typeToLookForPropertyOn, fieldName, typeNameIfRequired, fieldValueTypeIfAvailable);
 			_deprecatedPropertyCache.TryAdd(cacheKey, result);
 			return result;
 		}

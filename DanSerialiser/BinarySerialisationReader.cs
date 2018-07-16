@@ -365,42 +365,16 @@ namespace DanSerialiser
 						// property that can map the old field onto a new field / property then we should try to set the [Deprecated] property's value to the value that we have.
 						// That [Deprecated] property's setter should then set a property / field on the new version of the type. If that is the case, then we can add that new
 						// property / field to the have-successfully-set list.
-						var (propertySetters, relatedFieldsThatHaveBeenSet) = _typeAnalyser.GetPropertySettersAndFieldsToConsiderToHaveBeenSet(typeIfAvailable, fieldName, typeNameIfRequired, fieldValue?.GetType());
-						Type propertyTypeIfKnown = null; // TODO: Move "propertyTypeIfKnown" logic into "GetPropertySettersAndFieldsToConsiderToHaveBeenSet" to avoid repeating it over and over
-						foreach (var propertySetter in propertySetters)
+						var deprecatedPropertySettingDetails = _typeAnalyser.TryToGetPropertySettersAndFieldsToConsiderToHaveBeenSet(typeIfAvailable, fieldName, typeNameIfRequired, fieldValue?.GetType());
+						if (deprecatedPropertySettingDetails != null)
 						{
-							propertySetter.Setter(valueIfTypeIsAvailable, fieldValue);
-							if (propertyTypeIfKnown == null)
-								propertyTypeIfKnown = propertySetter.PropertyType;
-							else if (propertySetter.PropertyType != propertyTypeIfKnown)
-							{
-								if (propertyTypeIfKnown.IsAssignableFrom(propertySetter.PropertyType))
-								{
-									// If this property is of a more specific type than propertyTypeIfKnown but the current propertyTypeIfKnown could be satisfied by it then record
-									// this type going forward (any other properties will need to either be this type of be assignable to it otherwise we won't be able to deserialise
-									// a single value that can be used to populate all of the related properties - only for cases where there are multiple, obviously)
-									propertyTypeIfKnown = propertySetter.PropertyType;
-								}
-								else if (!propertySetter.PropertyType.IsAssignableFrom(propertyTypeIfKnown))
-								{
-									// If propertySetter.PropertyType is not the same as propertyTypeIfKnown and if propertyTypeIfKnown is not assignable from propertySetter.PropertyType
-									// and propertySetter.PropertyType is not assigned from propertyTypeIfKnown then we've come to an impossible situation - if there are multiple properties
-									// then there must be a single type that a value may be deserialised as that may be used to set ALL of the properties. Since there isn't, we have to throw.
-									throw new InvalidOperationException($"Type {typeIfAvailable.Name} has [Deprecated] properties that are all set by data for field {fieldName} but which have incompatible types");
-								}
-							}
-						}
-						fieldsThatHaveBeenSet.AddRange(relatedFieldsThatHaveBeenSet);
-						if (propertyTypeIfKnown != null)
-						{
-							// TODO: When move "propertyTypeIfKnown" logic into "GetPropertySettersAndFieldsToConsiderToHaveBeenSet" then this "propertySetterLambdas" preparation should no longer be necessary
-							var propertySetterLambdas = new Action<object, object>[propertySetters.Length];
-							for (var i = 0; i < propertySetters.Length; i++)
-								propertySetterLambdas[i] = propertySetters[i].Setter;
+							foreach (var propertySetter in deprecatedPropertySettingDetails.PropertySetters)
+								propertySetter(valueIfTypeIsAvailable, fieldValue);
+							fieldsThatHaveBeenSet.AddRange(deprecatedPropertySettingDetails.RelatedFieldsThatHaveBeenSetViaTheDeprecatedProperties);
 							fieldSettingInformationForGeneratingTypeBuilder.Add(new BinarySerialisationReaderTypeReader.FieldSettingDetails(
 								fieldNameReferenceID,
-								propertyTypeIfKnown,
-								propertySetterLambdas
+								deprecatedPropertySettingDetails.CompatibleTypeToReadAs,
+								deprecatedPropertySettingDetails.PropertySetters
 							));
 						}
 					}
