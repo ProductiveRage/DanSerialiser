@@ -11,7 +11,7 @@ namespace DanSerialiser.Reflection
 		private readonly ConcurrentDictionary<Type, Tuple<MemberAndReader<FieldInfo>[], MemberAndReader<PropertyInfo>[]>> _fieldAndPropertyCache;
 		private readonly ConcurrentDictionary<Type, FieldInfo[]> _requiredFieldCache;
 		private readonly ConcurrentDictionary<Tuple<Type, string, string>, MemberAndWriter<FieldInfo>> _fieldNameCache;
-		private readonly ConcurrentDictionary<Tuple<Type, string, string, Type>, (Action<object, object>[], FieldInfo[])> _deprecatedPropertyCache;
+		private readonly ConcurrentDictionary<Tuple<Type, string, string, Type>, (PropertySetter[], FieldInfo[])> _deprecatedPropertyCache;
 		public CachingTypeAnalyser(IAnalyseTypesForSerialisation reader)
 		{
 			_reader = reader ?? throw new ArgumentNullException(nameof(reader));
@@ -19,7 +19,7 @@ namespace DanSerialiser.Reflection
 			_fieldAndPropertyCache = new ConcurrentDictionary<Type, Tuple<MemberAndReader<FieldInfo>[], MemberAndReader<PropertyInfo>[]>>();
 			_requiredFieldCache = new ConcurrentDictionary<Type, FieldInfo[]>();
 			_fieldNameCache = new ConcurrentDictionary<Tuple<Type, string, string>, MemberAndWriter<FieldInfo>>();
-			_deprecatedPropertyCache = new ConcurrentDictionary<Tuple<Type, string, string, Type>, (Action<object, object>[], FieldInfo[])>();
+			_deprecatedPropertyCache = new ConcurrentDictionary<Tuple<Type, string, string, Type>, (PropertySetter[], FieldInfo[])>();
 		}
 
 		public Func<object> TryToGetUninitialisedInstanceBuilder(string typeName)
@@ -77,7 +77,7 @@ namespace DanSerialiser.Reflection
 			return result;
 		}
 
-		public (Action<object, object>[], FieldInfo[]) GetPropertySettersAndFieldsToConsiderToHaveBeenSet(Type typeToLookForPropertyOn, string fieldName, string typeNameIfRequired, Type fieldValueTypeIfAvailable)
+		public (PropertySetter[], FieldInfo[]) GetPropertySettersAndFieldsToConsiderToHaveBeenSet(Type typeToLookForPropertyOn, string fieldName, string typeNameIfRequired, Type fieldValueTypeIfAvailable)
 		{
 			if (typeToLookForPropertyOn == null)
 				throw new ArgumentNullException(nameof(typeToLookForPropertyOn));

@@ -22,6 +22,8 @@ namespace DanSerialiser.Reflection
 			if (typeIfAvailable == null)
 				return null;
 
+			// TODO: Probably able to do something efficient for structs here.. default(T) somehow
+
 			// https://rogerjohansson.blog/2016/08/16/wire-writing-one-of-the-fastest-net-serializers/ suggested that calling a parameterless constructor will be faster
 			// than GetUninitializedObject. I've found it to be MARGINALLY faster but it's an interesting enough optimisation to leave in for now!
 			var parameterLessConstructor = typeIfAvailable.GetConstructor(BinaryReaderWriterShared.MemberRetrievalBindingFlags, null, Type.EmptyTypes, null);

@@ -17,7 +17,7 @@ namespace UnitTests
 			source.Child = source;
 			Assert.Throws<CircularReferenceException>(() =>
 			{
-				BinarySerialisation.Serialise(source, _referenceReuseStrategy);
+				BinarySerialisation.Serialise(source, new ISerialisationTypeConverter[0], _referenceReuseStrategy);
 			});
 		}
 
@@ -451,7 +451,7 @@ namespace UnitTests
 			var source = new ClassWithStaticProperty();
 			ClassWithStaticProperty.Count = 1;
 			// - Serialise that data (if fields were going to be serialised then the value of the field would be captured here)
-			var serialisedData = BinarySerialisation.Serialise(source, _referenceReuseStrategy);
+			var serialisedData = BinarySerialisation.Serialise(source, new ISerialisationTypeConverter[0], _referenceReuseStrategy);
 			// - Change the property to a different value
 			ClassWithStaticProperty.Count = 2;
 			// - Deserialise.. if this were to read a value for the property from the serialised data and set it then the property value would revert back to

@@ -12,16 +12,19 @@ namespace DanSerialiser
 	public sealed class BinarySerialisationReader
 	{
 		private readonly Stream _stream;
+		private readonly IDeserialisationTypeConverter[] _typeConverters;
 		private readonly IAnalyseTypesForSerialisation _typeAnalyser;
 		private readonly Dictionary<int, string> _nameReferences;
 		private readonly Dictionary<int, object> _objectReferences;
 		private readonly HashSet<int> _deferredInitialisationReferenceIDsAwaitingPopulation;
 		private readonly Dictionary<int, BinarySerialisationReaderTypeReader> _typeReaders;
 		private bool _haveEncounteredDeferredInitialisationObject;
-		public BinarySerialisationReader(Stream stream) : this(stream, DefaultTypeAnalyser.Instance) { }
-		internal BinarySerialisationReader(Stream stream, IAnalyseTypesForSerialisation typeAnalyser) // internal constructor may be used by unit tests
+		public BinarySerialisationReader(Stream stream) : this(stream, new IDeserialisationTypeConverter[0], DefaultTypeAnalyser.Instance) { }
+		public BinarySerialisationReader(Stream stream, IDeserialisationTypeConverter[] typeConverters) : this(stream, typeConverters, DefaultTypeAnalyser.Instance) { }
+		internal BinarySerialisationReader(Stream stream, IDeserialisationTypeConverter[] typeConverters, IAnalyseTypesForSerialisation typeAnalyser) // internal constructor may be used by unit tests
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
+			_typeConverters = typeConverters ?? throw new ArgumentNullException(nameof(typeConverters));
 			_typeAnalyser = typeAnalyser ?? throw new ArgumentNullException(nameof(typeAnalyser));
 
 			_nameReferences = new Dictionary<int, string>();
@@ -51,13 +54,27 @@ namespace DanSerialiser
 			// Note: As this is the top level "Read" call, if it is an object being deserialised and the type of that object is not available then the deserialisation attempt
 			// should fail, which is why ignoreAnyInvalidTypes is passed as false (that option only applies in cases where a nested object is being deserialised but the field
 			// that it would be used to set does not exist on the parent object - if there is no field to set, who cares if the value is of a type that is not available)
-			var result = Read(ignoreAnyInvalidTypes: false);
+			var result = Read(ignoreAnyInvalidTypes: false, targetTypeIfAvailable: typeof(T));
 			if (_deferredInitialisationReferenceIDsAwaitingPopulation.Count > 0)
 				throw new InvalidOperationException("There were deferred-initialisation references encountered in the data that did not get fully populated before the stream ended");
 			return (T)result;
 		}
 
-		internal object Read(bool ignoreAnyInvalidTypes)
+		internal object Read(bool ignoreAnyInvalidTypes, Type targetTypeIfAvailable)
+		{
+			var value = ReadBeforeApplyingAnyTransforms(ignoreAnyInvalidTypes);
+
+			// Give the type converters a crack at the current value - if any of them change the value then take that as the new value and don't consider any other converters
+			foreach (var typeConverter in _typeConverters)
+			{
+				var updatedValue = typeConverter.ConvertIfRequired(targetTypeIfAvailable, value);
+				if (!ReferenceEquals(updatedValue, targetTypeIfAvailable))
+					return updatedValue;
+			}
+			return value;
+		}
+
+		private object ReadBeforeApplyingAnyTransforms(bool ignoreAnyInvalidTypes)
 		{
 			var dataType = ReadNextDataType();
 			switch (dataType)
@@ -322,7 +339,7 @@ namespace DanSerialiser
 
 					// Note: If the field doesn't exist then parse the data but don't worry about any types not being available because we're not going to set anything to the value
 					// that we get back from the "Read" call (but we still need to parse that data to advance the reader to the next field or the end of the current object)
-					var fieldValue = Read(ignoreAnyInvalidTypes: (field == null));
+					var fieldValue = Read(ignoreAnyInvalidTypes: (field == null), targetTypeIfAvailable: field?.Member?.FieldType);
 
 					// Now that we have the value to set the field to IF IT EXISTS, try to set the field.. if it's a field that we've already identified on the type then it's easy.
 					// However, it may also have been a field on an older version of the type when it was serialised and now that it's deserialised, we'll need to check for any
@@ -337,6 +354,7 @@ namespace DanSerialiser
 						}
 						fieldSettingInformationForGeneratingTypeBuilder.Add(new BinarySerialisationReaderTypeReader.FieldSettingDetails(
 							fieldNameReferenceID,
+							field.Member.FieldType,
 							(field.WriterUnlessFieldShouldBeIgnored == null) ? new Action<object, object>[0] : new[] { field.WriterUnlessFieldShouldBeIgnored }
 						));
 					}
@@ -348,13 +366,43 @@ namespace DanSerialiser
 						// That [Deprecated] property's setter should then set a property / field on the new version of the type. If that is the case, then we can add that new
 						// property / field to the have-successfully-set list.
 						var (propertySetters, relatedFieldsThatHaveBeenSet) = _typeAnalyser.GetPropertySettersAndFieldsToConsiderToHaveBeenSet(typeIfAvailable, fieldName, typeNameIfRequired, fieldValue?.GetType());
+						Type propertyTypeIfKnown = null; // TODO: Move "propertyTypeIfKnown" logic into "GetPropertySettersAndFieldsToConsiderToHaveBeenSet" to avoid repeating it over and over
 						foreach (var propertySetter in propertySetters)
-							propertySetter(valueIfTypeIsAvailable, fieldValue);
+						{
+							propertySetter.Setter(valueIfTypeIsAvailable, fieldValue);
+							if (propertyTypeIfKnown == null)
+								propertyTypeIfKnown = propertySetter.PropertyType;
+							else if (propertySetter.PropertyType != propertyTypeIfKnown)
+							{
+								if (propertyTypeIfKnown.IsAssignableFrom(propertySetter.PropertyType))
+								{
+									// If this property is of a more specific type than propertyTypeIfKnown but the current propertyTypeIfKnown could be satisfied by it then record
+									// this type going forward (any other properties will need to either be this type of be assignable to it otherwise we won't be able to deserialise
+									// a single value that can be used to populate all of the related properties - only for cases where there are multiple, obviously)
+									propertyTypeIfKnown = propertySetter.PropertyType;
+								}
+								else if (!propertySetter.PropertyType.IsAssignableFrom(propertyTypeIfKnown))
+								{
+									// If propertySetter.PropertyType is not the same as propertyTypeIfKnown and if propertyTypeIfKnown is not assignable from propertySetter.PropertyType
+									// and propertySetter.PropertyType is not assigned from propertyTypeIfKnown then we've come to an impossible situation - if there are multiple properties
+									// then there must be a single type that a value may be deserialised as that may be used to set ALL of the properties. Since there isn't, we have to throw.
+									throw new InvalidOperationException($"Type {typeIfAvailable.Name} has [Deprecated] properties that are all set by data for field {fieldName} but which have incompatible types");
+								}
+							}
+						}
 						fieldsThatHaveBeenSet.AddRange(relatedFieldsThatHaveBeenSet);
-						fieldSettingInformationForGeneratingTypeBuilder.Add(new BinarySerialisationReaderTypeReader.FieldSettingDetails(
-							fieldNameReferenceID,
-							propertySetters
-						));
+						if (propertyTypeIfKnown != null)
+						{
+							// TODO: When move "propertyTypeIfKnown" logic into "GetPropertySettersAndFieldsToConsiderToHaveBeenSet" then this "propertySetterLambdas" preparation should no longer be necessary
+							var propertySetterLambdas = new Action<object, object>[propertySetters.Length];
+							for (var i = 0; i < propertySetters.Length; i++)
+								propertySetterLambdas[i] = propertySetters[i].Setter;
+							fieldSettingInformationForGeneratingTypeBuilder.Add(new BinarySerialisationReaderTypeReader.FieldSettingDetails(
+								fieldNameReferenceID,
+								propertyTypeIfKnown,
+								propertySetterLambdas
+							));
+						}
 					}
 				}
 				else
@@ -424,7 +472,7 @@ namespace DanSerialiser
 
 			var items = Array.CreateInstance(elementType, length);
 			for (var i = 0; i < items.Length; i++)
-				items.SetValue(Read(ignoreAnyInvalidTypes), i);
+				items.SetValue(Read(ignoreAnyInvalidTypes, elementType), i);
 
 			// If the BinarySerialisationWriter is configured to optimise for wide circular references then there may be some content-for-delay-populated-objects here
 			// after the array (but if it was configured for trees then there won't be any deferred object populations and we'll go straight to ArrayEnd)

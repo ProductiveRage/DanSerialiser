@@ -17,10 +17,16 @@ namespace DanSerialiser
 			_typeAnalyser = typeAnalyser ?? throw new ArgumentNullException(nameof(typeAnalyser));
 		}
 
-		public void Serialise<T>(T value, IWrite writer)
+		public void Serialise<T>(T value, IWrite writer) => Serialise(value, new ISerialisationTypeConverter[0], writer);
+
+		public void Serialise<T>(T value, ISerialisationTypeConverter[] typeConverters, IWrite writer)
 		{
 			if (writer == null)
 				throw new ArgumentNullException(nameof(writer));
+			if (typeConverters == null)
+				throw new ArgumentNullException(nameof(typeConverters));
+			if (typeConverters.Any(t => t == null))
+				throw new ArgumentException("Null reference encountered in " + nameof(typeConverters));
 
 			// We need to know the type that we're serialising and that's why there is a generic type param, so that the caller HAS to specify one even if
 			// they're passing null. If we don't have null then take the type from the value argument, otherwise use the type param (we should prefer the
@@ -34,6 +40,7 @@ namespace DanSerialiser
 				objectHistoryIfReferenceReuseAllowed: (writer.ReferenceReuseStrategy == ReferenceReuseOptions.NoReferenceReuse) ? null : new Dictionary<object, int>(ReferenceEqualityComparer.Instance),
 				deferredInitialisationObjectReferenceIDsIfSupported: (writer.ReferenceReuseStrategy == ReferenceReuseOptions.OptimiseForWideCircularReferences) ? new HashSet<int>() : null,
 				generatedMemberSetters: new Dictionary<Type, Action<object>>(),
+				typeConverters: typeConverters,
 				writer: writer
 			);
 		}
@@ -46,10 +53,23 @@ namespace DanSerialiser
 			Dictionary<object, int> objectHistoryIfReferenceReuseAllowed,
 			HashSet<int> deferredInitialisationObjectReferenceIDsIfSupported,
 			Dictionary<Type, Action<object>> generatedMemberSetters,
+			ISerialisationTypeConverter[] typeConverters,
 			IWrite writer)
 		{
 			if ((parentsIfReferenceReuseDisallowed != null) && parentsIfReferenceReuseDisallowed.Contains(value, ReferenceEqualityComparer.Instance))
 				throw new CircularReferenceException();
+
+			// Give the type converters a crack at the current value - if any of them change the value then take that as the new value and don't consider any other converters
+			foreach (var typeConverter in typeConverters)
+			{
+				var updatedValue = typeConverter.ConvertIfRequired(value);
+				if (!ReferenceEquals(updatedValue, value))
+				{
+					value = updatedValue;
+					type = value?.GetType() ?? typeof(object);
+					break;
+				}
+			}
 
 			// If the we've got a Nullable<> then unpack the internal value/type - if it's null then we'll get a null ObjectStart/ObjectEnd value which the BinarySerialisationReader
 			// will happily interpret (reading it as a null and setting the Nullable<> field) and if it's non-null then we'll serialise just the value itself (again, the reader will
@@ -161,6 +181,7 @@ namespace DanSerialiser
 					objectHistoryIfReferenceReuseAllowed,
 					deferredInitialisationObjectReferenceIDsIfSupported,
 					generatedMemberSetters,
+					typeConverters,
 					writer
 				);
 				return;
@@ -235,6 +256,7 @@ namespace DanSerialiser
 						objectHistoryIfReferenceReuseAllowed,
 						deferredInitialisationObjectReferenceIDs,
 						generatedMemberSetters,
+						typeConverters,
 						writer
 					);
 					if (parentsIfReferenceReuseDisallowed != null)
@@ -252,6 +274,7 @@ namespace DanSerialiser
 							objectHistoryIfReferenceReuseAllowed,
 							deferredInitialisationObjectReferenceIDsIfSupported,
 							generatedMemberSetters,
+							typeConverters,
 							writer
 						);
 					}
@@ -304,6 +327,7 @@ namespace DanSerialiser
 					objectHistoryIfReferenceReuseAllowed,
 					deferredInitialisationObjectReferenceIDsIfSupported,
 					generatedMemberSetters,
+					typeConverters,
 					writer
 				);
 			}
@@ -322,6 +346,7 @@ namespace DanSerialiser
 			Dictionary<object, int> objectHistoryIfReferenceReuseAllowed,
 			HashSet<int> deferredInitialisationObjectReferenceIDsIfSupported,
 			Dictionary<Type, Action<object>> generatedMemberSetters,
+			ISerialisationTypeConverter[] typeConverters,
 			IWrite writer)
 		{
 			// It may be possible for a "type generator" to be created for some types (generally simple types that won't require any nested Serialise calls that involve tracking
@@ -356,6 +381,7 @@ namespace DanSerialiser
 						objectHistoryIfReferenceReuseAllowed,
 						deferredInitialisationObjectReferenceIDsIfSupported,
 						generatedMemberSetters,
+						typeConverters,
 						writer
 					);
 					if (parentsIfReferenceReuseDisallowed != null)
@@ -378,6 +404,7 @@ namespace DanSerialiser
 						objectHistoryIfReferenceReuseAllowed,
 						deferredInitialisationObjectReferenceIDsIfSupported,
 						generatedMemberSetters,
+						typeConverters,
 						writer
 					);
 					if (parentsIfReferenceReuseDisallowed != null)
