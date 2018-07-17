@@ -238,7 +238,18 @@ namespace DanSerialiser
 			//   to be optimised for wide circular references) then we can't use these optimised type builders because sometimes we need to create new populated instances and
 			//   somtimes we have to populate initialised-but-unpopulated references)
 			if (!_haveEncounteredDeferredInitialisationObject && _typeReaders.TryGetValue(typeNameReferenceID, out var typeReader))
-				return typeReader.Read(this, nextEntryType, ignoreAnyInvalidTypes);
+			{
+				var instance = typeReader.GetUninitialisedInstance();
+				if (referenceID != null)
+				{
+					// If there is an Object Reference ID for the current object then we need to push the uninitialised instance into the objectReferences dictionary before
+					// trying to populate because there is a chance that properties on it will include a circular references back to this object and if there is no
+					// objectReferences entry then that will cause much confusion (see BinarySerialisationTests_SupportReferenceReUseInMostlyTreeLikeStructure's
+					// "CircularReferencesAreSupportedWhereTheSameTypeIsEncounteredMultipleTimes" test method for an example)
+					_objectReferences[referenceID.Value] = instance;
+				}
+				return typeReader.ReadInto(instance, this, nextEntryType, ignoreAnyInvalidTypes);
+			}
 
 			// Try to get a type builder for the type that we should be deserialising to. If ignoreAnyInvalidTypes is true then don't worry if we can't find the type that is
 			// specified because we don't care about the return value from this method, we're just parsing the data to progress to the next data that we DO care about.

@@ -12,12 +12,18 @@ namespace DanSerialiser.CachedLookups
 			_fields = fields ?? throw new ArgumentNullException(nameof(fields));
 		}
 
-		public object Read(BinarySerialisationReader reader, BinarySerialisationDataType nextEntryType, bool ignoreAnyInvalidTypes)
+		public object GetUninitialisedInstance()
 		{
+			return _instantiator();
+		}
+
+		public object ReadInto(object instance, BinarySerialisationReader reader, BinarySerialisationDataType nextEntryType, bool ignoreAnyInvalidTypes)
+		{
+			if (instance == null)
+				throw new ArgumentNullException(nameof(instance));
 			if (reader == null)
 				throw new ArgumentNullException(nameof(reader));
 
-			var instance = _instantiator();
 			foreach (var field in _fields)
 			{
 				if (nextEntryType != BinarySerialisationDataType.FieldName)

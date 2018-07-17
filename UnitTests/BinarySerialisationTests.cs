@@ -41,6 +41,28 @@ namespace UnitTests
 			Assert.Equal(clone, clone.Child);
 		}
 
+		/// <summary>
+		/// The BinarySerialisationReader has an optimisation that it applies when the same type is encountered multiple times (it performs less reflection / validation on the
+		/// serialised fields) but this was causing a problem if there were circular references within the type because the new instances were being constructed quickly but not
+		/// being added to the shared-object-references lookup. This test was failing before but will pass with the fix included in the changeset with it.
+		/// </summary>
+		[Fact]
+		public void CircularReferencesAreSupportedWhereTheSameTypeIsEncounteredMultipleTimes()
+		{
+			var source = new List<Node>();
+			var node = new Node();
+			node.Child = node;
+			source.Add(node);
+			node = new Node();
+			node.Child = node;
+			source.Add(node);
+
+			var clone = BinarySerialisationCloner.Clone(source, _referenceReuseStrategy);
+			Assert.Equal(2, clone.Count);
+			Assert.Equal(clone[0], clone[0].Child);
+			Assert.Equal(clone[1], clone[1].Child);
+		}
+
 		private sealed class Node
 		{
 			public Node Child { get; set; }
