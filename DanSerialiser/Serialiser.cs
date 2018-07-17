@@ -243,11 +243,11 @@ namespace DanSerialiser
 					newObjectReferencesFromArray = null;
 					deferredInitialisationObjectReferenceIDs = null;
 				}
+				if (parentsIfReferenceReuseDisallowed != null)
+					parentsIfReferenceReuseDisallowed.Push(value);
 				for (var i = 0; i < array.Length; i++)
 				{
 					var element = array.GetValue(i);
-					if (parentsIfReferenceReuseDisallowed != null)
-						parentsIfReferenceReuseDisallowed.Push(value);
 					Serialise(
 						element,
 						elementType,
@@ -259,9 +259,9 @@ namespace DanSerialiser
 						typeConverters,
 						writer
 					);
-					if (parentsIfReferenceReuseDisallowed != null)
-						parentsIfReferenceReuseDisallowed.Pop();
 				}
+				if (parentsIfReferenceReuseDisallowed != null)
+					parentsIfReferenceReuseDisallowed.Pop();
 				if (newObjectReferencesFromArray != null)
 				{
 					foreach (var deferredObject in newObjectReferencesFromArray.Values)
