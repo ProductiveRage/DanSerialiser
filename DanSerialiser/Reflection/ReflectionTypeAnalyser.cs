@@ -10,6 +10,8 @@ namespace DanSerialiser.Reflection
 {
 	internal sealed class ReflectionTypeAnalyser : IAnalyseTypesForSerialisation
 	{
+		private static readonly MethodInfo _getDefaultMethod = typeof(ReflectionTypeAnalyser).GetMethod(nameof(GetDefault), BindingFlags.NonPublic | BindingFlags.Static);
+
 		public static ReflectionTypeAnalyser Instance { get; } = new ReflectionTypeAnalyser();
 		private ReflectionTypeAnalyser() { }
 
@@ -22,7 +24,18 @@ namespace DanSerialiser.Reflection
 			if (typeIfAvailable == null)
 				return null;
 
-			// TODO: Probably able to do something efficient for structs here.. default(T) somehow
+			// If it's a struct then we can avoid anything complicated like searching for a constructor or calling GetUninitializedObject because structs are designed to
+			// be easily instantiated in an uninitialised state (since they can never be null) - we just call default(T)
+			if (typeIfAvailable.IsValueType)
+			{
+				return Expression.Lambda<Func<object>>(
+					Expression.Convert(
+						Expression.Call(_getDefaultMethod.MakeGenericMethod(typeIfAvailable)),
+						typeof(object)
+					)
+				)
+				.Compile();
+			}
 
 			// https://rogerjohansson.blog/2016/08/16/wire-writing-one-of-the-fastest-net-serializers/ suggested that calling a parameterless constructor will be faster
 			// than GetUninitializedObject. I've found it to be MARGINALLY faster but it's an interesting enough optimisation to leave in for now!
@@ -38,6 +51,8 @@ namespace DanSerialiser.Reflection
 
 			return () => FormatterServices.GetUninitializedObject(typeIfAvailable);
 		}
+
+		private static T GetDefault<T>() => default(T);
 
 		public Tuple<MemberAndReader<FieldInfo>[], MemberAndReader<PropertyInfo>[]> GetFieldsAndProperties(Type type)
 		{
