@@ -106,26 +106,21 @@ namespace DanSerialiser
 					return ReadNextInt64();
 
 				case BinarySerialisationDataType.UInt16:
-					return BitConverter.ToUInt16(ReadNext(sizeof(UInt16)), 0);
+					return (new UInt16Bytes(ReadNext(Int16Bytes.BytesRequired))).Value;
 				case BinarySerialisationDataType.UInt32:
-					return BitConverter.ToUInt32(ReadNext(sizeof(UInt32)), 0);
+					return (new UInt32Bytes(ReadNext(Int32Bytes.BytesRequired))).Value;
 				case BinarySerialisationDataType.UInt64:
-					return BitConverter.ToUInt64(ReadNext(sizeof(UInt64)), 0);
+					return (new UInt64Bytes(ReadNext(Int64Bytes.BytesRequired))).Value;
 
 				case BinarySerialisationDataType.Single:
-					return BitConverter.ToSingle(ReadNext(sizeof(Single)), 0);
+					return (new SingleBytes(ReadNext(SingleBytes.BytesRequired))).Value;
 				case BinarySerialisationDataType.Double:
-					return (new DoubleBytes(ReadNext(8))).Value;
+					return (new DoubleBytes(ReadNext(DoubleBytes.BytesRequired))).Value;
 				case BinarySerialisationDataType.Decimal:
-					// BitConverter does not deal with decimal (there is no GetBytes overloads for it and no ToDecimal method) so BinaryWriter used decimal.GetBits, which
-					// returns four int values and so we need to do the opposite here
-					var partialValues = new int[4];
-					for (var i = 0; i < 4; i++)
-						partialValues[i] = ReadNextInt();
-					return new decimal(partialValues);
+					return (new DecimalBytes(ReadNext(DecimalBytes.BytesRequired))).Value;
 
 				case BinarySerialisationDataType.Char:
-					return BitConverter.ToChar(ReadNext(sizeof(Char)), 0);
+					return (new CharBytes(ReadNext(CharBytes.BytesRequired))).Value;
 				case BinarySerialisationDataType.String:
 					return ReadNextString();
 
@@ -142,22 +137,22 @@ namespace DanSerialiser
 
 		private short ReadNextInt16()
 		{
-			return (new Int16Bytes(ReadNext(2))).Value;
+			return (new Int16Bytes(ReadNext(Int16Bytes.BytesRequired))).Value;
 		}
 
 		private int ReadNextInt24()
 		{
-			return (new Int24Bytes(ReadNext(3))).Value;
+			return (new Int24Bytes(ReadNext(Int24Bytes.BytesRequired))).Value;
 		}
 
 		private int ReadNextInt()
 		{
-			return (new Int32Bytes(ReadNext(4))).Value;
+			return (new Int32Bytes(ReadNext(Int32Bytes.BytesRequired))).Value;
 		}
 
 		private long ReadNextInt64()
 		{
-			return ((long)ReadNext() << 56) + ((long)ReadNext() << 48) + ((long)ReadNext() << 40) + ((long)ReadNext() << 32) + ((long)ReadNext() << 24) + ((long)ReadNext() << 16) + ((long)ReadNext() << 8) + ReadNext();
+			return (new Int64Bytes(ReadNext(Int64Bytes.BytesRequired))).Value;
 		}
 
 		private string ReadNextString()
@@ -174,7 +169,12 @@ namespace DanSerialiser
 				length = ReadNextInt();
 			else
 				throw new Exception("Unexpected BinarySerialisationDataType for String length: " + dataType);
-			return (length == -1) ? null : Encoding.UTF8.GetString(ReadNext(length));
+
+			if (length == -1)
+				return null;
+			if (length == 0)
+				return "";
+			return Encoding.UTF8.GetString(ReadNext(length));
 		}
 
 		private DateTime ReadNextDateTime()

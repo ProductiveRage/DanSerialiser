@@ -4,21 +4,15 @@ using System.Runtime.InteropServices;
 namespace DanSerialiser.BinaryTypeStructures
 {
 	/// <summary>
-	/// Ingenious way to avoid having to call BitConverter.GetBytes for a double by relying on the fact that .NET represents a double as eight consecutive bytes in memory and
-	/// that a struct with an explicit arrangement of fields can expose this data if there is a double field with offset zero AND byte fields that go from offsets zero to
-	/// seven. Alas, I did not concoct this idea myself, I found it while looking through the source code for MessagePack, specifically this file:
-	/// 
-	///   https://github.com/msgpack/msgpack-cli/blob/5fb2430b7e05c5958d23a096c800107fe35ba48e/src/MsgPack/Float64Bits.cs
-	/// 
-	/// .. which is licensed under the Apache License Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0) and "Copyright (C) 2010-2016 FUJIWARA, Yusuke"
+	/// Similar approach as DoubleBytes
 	/// </summary>
 	[StructLayout(LayoutKind.Explicit)]
-	internal struct DoubleBytes
+	internal struct UInt64Bytes
 	{
 		public const int BytesRequired = 8;
 
 		[FieldOffset(0)]
-		public readonly double Value;
+		public readonly ulong Value;
 
 		[FieldOffset(0)]
 		private readonly Byte Byte0;
@@ -44,20 +38,20 @@ namespace DanSerialiser.BinaryTypeStructures
 		[FieldOffset(7)]
 		private readonly Byte Byte7;
 
-		public DoubleBytes(double value)
+		public UInt64Bytes(ulong value)
 		{
-			this = default(DoubleBytes); // Have to do this to avoid "Field 'Byte{x}' must be fully assigned before control is returned to the caller" errors
+			this = default(UInt64Bytes); // Have to do this to avoid "Field 'Byte{x}' must be fully assigned before control is returned to the caller" errors
 			this.Value = value;
 		}
 
-		public DoubleBytes(byte[] littleEndianBytes)
+		public UInt64Bytes(byte[] littleEndianBytes)
 		{
 			if (littleEndianBytes == null)
 				throw new ArgumentNullException(nameof(littleEndianBytes));
 			if (littleEndianBytes.Length != 8)
 				throw new ArgumentException($"There must be precisely eight bytes in the {nameof(littleEndianBytes)} bytes array");
 
-			this = default(DoubleBytes); // Have to do this to avoid "Field 'Value' must be fully assigned before control is returned to the caller" error
+			this = default(UInt64Bytes); // Have to do this to avoid "Field 'Value' must be fully assigned before control is returned to the caller" error
 			if (BitConverter.IsLittleEndian)
 			{
 				this.Byte0 = littleEndianBytes[0];
@@ -85,9 +79,9 @@ namespace DanSerialiser.BinaryTypeStructures
 		public byte[] GetLittleEndianBytesWithDataType()
 		{
 			if (BitConverter.IsLittleEndian)
-				return new[] { (byte)BinarySerialisationDataType.Double, Byte0, Byte1, Byte2, Byte3, Byte4, Byte5, Byte6, Byte7 };
+				return new[] { (byte)BinarySerialisationDataType.UInt64, Byte0, Byte1, Byte2, Byte3, Byte4, Byte5, Byte6, Byte7 };
 			else
-				return new[] { (byte)BinarySerialisationDataType.Double, Byte7, Byte6, Byte5, Byte4, Byte3, Byte2, Byte1, Byte0 };
+				return new[] { (byte)BinarySerialisationDataType.UInt64, Byte7, Byte6, Byte5, Byte4, Byte3, Byte2, Byte1, Byte0 };
 		}
 	}
 }

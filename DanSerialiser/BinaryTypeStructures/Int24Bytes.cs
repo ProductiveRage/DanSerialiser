@@ -9,6 +9,8 @@ namespace DanSerialiser.BinaryTypeStructures
 	[StructLayout(LayoutKind.Explicit)]
 	internal struct Int24Bytes
 	{
+		public const int BytesRequired = 3;
+
 		[FieldOffset(0)]
 		public readonly int Value;
 

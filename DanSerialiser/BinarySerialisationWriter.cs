@@ -65,13 +65,12 @@ namespace DanSerialiser
 		}
 		public void Int64(long value)
 		{
-			WriteByte((byte)BinarySerialisationDataType.Int64);
-			Int64WithoutDataType(value);
+			WriteBytes((new Int64Bytes(value)).GetLittleEndianBytesWithDataType());
 		}
+
 		public void Single(float value)
 		{
-			WriteByte((byte)BinarySerialisationDataType.Single);
-			WriteBytes(BitConverter.GetBytes(value));
+			WriteBytes((new SingleBytes(value)).GetLittleEndianBytesWithDataType());
 		}
 		public void Double(double value)
 		{
@@ -79,32 +78,25 @@ namespace DanSerialiser
 		}
 		public void Decimal(decimal value)
 		{
-			// BitConverter's "GetBytes" method doesn't support decimal so use "decimal.GetBits" that returns four int values
-			WriteByte((byte)BinarySerialisationDataType.Decimal);
-			foreach (var partialValue in decimal.GetBits(value))
-				Int32WithoutDataType(partialValue);
+			WriteBytes((new DecimalBytes(value)).GetLittleEndianBytesWithDataType());
 		}
 
 		public void UInt16(ushort value)
 		{
-			WriteByte((byte)BinarySerialisationDataType.UInt16);
-			WriteBytes(BitConverter.GetBytes(value));
+			WriteBytes((new UInt16Bytes(value)).GetLittleEndianBytesWithDataType());
 		}
 		public void UInt32(uint value)
 		{
-			WriteByte((byte)BinarySerialisationDataType.UInt32);
-			WriteBytes(BitConverter.GetBytes(value));
+			WriteBytes((new UInt32Bytes(value)).GetLittleEndianBytesWithDataType());
 		}
 		public void UInt64(ulong value)
 		{
-			WriteByte((byte)BinarySerialisationDataType.UInt64);
-			WriteBytes(BitConverter.GetBytes(value));
+			WriteBytes((new UInt64Bytes(value)).GetLittleEndianBytesWithDataType());
 		}
 
 		public void Char(char value)
 		{
-			WriteByte((byte)BinarySerialisationDataType.Char);
-			WriteBytes(BitConverter.GetBytes(value));
+			WriteBytes((new CharBytes(value)).GetLittleEndianBytesWithDataType());
 		}
 		public void String(string value)
 		{
@@ -120,7 +112,7 @@ namespace DanSerialiser
 			// "under the hood a .NET DateTime is essentially a tick count plus a DateTimeKind"
 			// - "http://mark-dot-net.blogspot.com/2014/04/roundtrip-serialization-of-datetimes-in.html"
 			WriteByte((byte)BinarySerialisationDataType.DateTime);
-			Int64WithoutDataType(value.Ticks);
+			WriteBytes((new Int64Bytes(value.Ticks)).GetLittleEndianBytesWithoutDataType());
 			WriteByte((byte)value.Kind);
 		}
 
@@ -342,40 +334,16 @@ namespace DanSerialiser
 				WriteBytes((new Int32Bytes(value)).GetLittleEndianBytesWithDataType(int32));
 		}
 
-		private void Int64WithoutDataType(long value)
-		{
-			WriteBytes(
-				(byte)(value >> 56),
-				(byte)(value >> 48),
-				(byte)(value >> 40),
-				(byte)(value >> 32),
-				(byte)(value >> 24),
-				(byte)(value >> 16),
-				(byte)(value >> 8),
-				(byte)value
-			);
-		}
-
-		private void Int16WithoutDataType(short value)
-		{
-			WriteBytes((new Int16Bytes(value)).GetLittleEndianBytesWithoutDataType());
-		}
-
-		private void Int24WithoutDataType(int value)
-		{
-			WriteBytes((new Int24Bytes(value)).GetLittleEndianBytesWithoutDataType());
-		}
-
-		private void Int32WithoutDataType(int value)
-		{
-			WriteBytes((new Int32Bytes(value)).GetLittleEndianBytesWithoutDataType());
-		}
-
 		private void StringWithoutDataType(string value)
 		{
 			if (value == null)
 			{
 				Int32(-1);
+				return;
+			}
+			if (value == "")
+			{
+				Int32(0);
 				return;
 			}
 
@@ -400,22 +368,6 @@ namespace DanSerialiser
 		private void WriteBytes(byte b0, byte b1)
 		{
 			WriteBytes(new[] { b0, b1 });
-		}
-		private void WriteBytes(byte b0, byte b1, byte b2)
-		{
-			WriteBytes(new[] { b0, b1, b2 });
-		}
-		private void WriteBytes(byte b0, byte b1, byte b2, byte b3)
-		{
-			WriteBytes(new[] { b0, b1, b2, b3 });
-		}
-		private void WriteBytes(byte b0, byte b1, byte b2, byte b3, byte b4, byte b5, byte b6, byte b7)
-		{
-			WriteBytes(new[] { b0, b1, b2, b3, b4, b5, b6, b7 });
-		}
-		private void WriteBytes(byte b0, byte b1, byte b2, byte b3, byte b4, byte b5, byte b6, byte b7, byte b8)
-		{
-			WriteBytes(new[] { b0, b1, b2, b3, b4, b5, b6, b7, b8 });
 		}
 	}
 }
