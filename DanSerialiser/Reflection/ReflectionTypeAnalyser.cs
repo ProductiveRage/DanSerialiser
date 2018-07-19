@@ -15,6 +15,21 @@ namespace DanSerialiser.Reflection
 		public static ReflectionTypeAnalyser Instance { get; } = new ReflectionTypeAnalyser();
 		private ReflectionTypeAnalyser() { }
 
+		/// <summary>
+		/// This will throw an exception if unable to resolve the type (it will never return null)
+		/// </summary>
+		public Type GetType(string typeName)
+		{
+			if (string.IsNullOrWhiteSpace(typeName))
+				throw new ArgumentException($"Null/blank {nameof(typeName)} specified");
+
+			// Some real world serialisation testing showed that sometimes calling Type.GetType inside ReadNextArray in the BinarySerialisationReader was taking a lot of
+			// the processing time (it was particularly noticeable one time and less so others.. I'm not sure why) and so IAnalyseTypesForSerialisation has a GetType method
+			// so that the caching implementation of it can avoid the repeated Type.GetType calls (http://higherlogics.blogspot.com/2010/05/cost-of-typegettype.html suggests
+			// that I'm not the only one to have noticed this!)
+			return Type.GetType(typeName, throwOnError: true);
+		}
+
 		public Func<object> TryToGetUninitialisedInstanceBuilder(string typeName)
 		{
 			if (string.IsNullOrWhiteSpace(typeName))

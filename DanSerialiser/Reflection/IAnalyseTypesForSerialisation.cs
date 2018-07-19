@@ -5,6 +5,11 @@ namespace DanSerialiser.Reflection
 {
 	internal interface IAnalyseTypesForSerialisation
 	{
+		/// <summary>
+		/// This will throw an exception if unable to resolve the type (it will never return null)
+		/// </summary>
+		Type GetType(string typeName);
+
 		Func<object> TryToGetUninitialisedInstanceBuilder(string typeName);
 		Tuple<MemberAndReader<FieldInfo>[], MemberAndReader<PropertyInfo>[]> GetFieldsAndProperties(Type type);
 		FieldInfo[] GetAllFieldsThatShouldBeSet(Type type);

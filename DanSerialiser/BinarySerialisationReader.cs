@@ -450,7 +450,7 @@ namespace DanSerialiser
 			if (elementTypeName == null)
 				throw new InvalidOperationException("Null array element type names should not exist in object data since there is a Null binary serialisation data type");
 
-			var elementType = Type.GetType(elementTypeName, throwOnError: true);
+			var elementType = _typeAnalyser.GetType(elementTypeName); // These lookups will be cached by the_typeAnalyser, which can help (vs calling Type.GetType every time)
 			var lengthDataType = ReadNextDataType();
 			int length;
 			if (lengthDataType == BinarySerialisationDataType.Int32_8)
