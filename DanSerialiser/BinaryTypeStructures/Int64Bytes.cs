@@ -48,8 +48,8 @@ namespace DanSerialiser.BinaryTypeStructures
 		{
 			if (littleEndianBytes == null)
 				throw new ArgumentNullException(nameof(littleEndianBytes));
-			if (littleEndianBytes.Length != 8)
-				throw new ArgumentException($"There must be precisely eight bytes in the {nameof(littleEndianBytes)} bytes array");
+			if (littleEndianBytes.Length != BytesRequired)
+				throw new ArgumentException($"There must be precisely {BytesRequired} bytes in the {nameof(littleEndianBytes)} bytes array");
 
 			this = default(Int64Bytes); // Have to do this to avoid "Field 'Value' must be fully assigned before control is returned to the caller" error
 			if (BitConverter.IsLittleEndian)
