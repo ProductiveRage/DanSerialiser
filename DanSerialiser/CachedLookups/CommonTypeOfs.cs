@@ -24,5 +24,6 @@ namespace DanSerialiser.CachedLookups
 		public static readonly Type Char = typeof(Char);
 		public static readonly Type String = typeof(String);
 		public static readonly Type DateTime = typeof(DateTime);
+		public static readonly Type Object = typeof(Object);
 	}
 }

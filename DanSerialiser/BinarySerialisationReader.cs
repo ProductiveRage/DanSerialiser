@@ -360,13 +360,22 @@ namespace DanSerialiser
 					{
 						if (field.WriterUnlessFieldShouldBeIgnored != null)
 						{
-							field.WriterUnlessFieldShouldBeIgnored(valueIfTypeIsAvailable, fieldValue);
+							// The WriterUnlessFieldShouldBeIgnored has to take a "ref" argument in order to update structs but this will cause a problem if valueIfTypeIsAvailable
+							// is an object reference that isn't just the base object type (we'll need to create a reference that IS type "object" to pass in - but it will be the
+							// same reference and so it doesn't matter that we're setting the field on it indirectly)
+							if ((typeIfAvailable == CommonTypeOfs.Object) || typeIfAvailable.IsValueType)
+								field.WriterUnlessFieldShouldBeIgnored(ref valueIfTypeIsAvailable, fieldValue);
+							else
+							{
+								object refForUpdate = valueIfTypeIsAvailable;
+								field.WriterUnlessFieldShouldBeIgnored(ref refForUpdate, fieldValue);
+							}
 							fieldsThatHaveBeenSet.Add(field.Member);
 						}
 						fieldSettingInformationForGeneratingTypeBuilder.Add(new BinarySerialisationReaderTypeReader.FieldSettingDetails(
 							fieldNameReferenceID,
 							field.Member.FieldType,
-							(field.WriterUnlessFieldShouldBeIgnored == null) ? new Action<object, object>[0] : new[] { field.WriterUnlessFieldShouldBeIgnored }
+							(field.WriterUnlessFieldShouldBeIgnored == null) ? new MemberUpdater[0] : new[] { field.WriterUnlessFieldShouldBeIgnored }
 						));
 					}
 					else if (valueIfTypeIsAvailable != null)
@@ -380,7 +389,7 @@ namespace DanSerialiser
 						if (deprecatedPropertySettingDetails != null)
 						{
 							foreach (var propertySetter in deprecatedPropertySettingDetails.PropertySetters)
-								propertySetter(valueIfTypeIsAvailable, fieldValue);
+								propertySetter(ref valueIfTypeIsAvailable, fieldValue);
 							fieldsThatHaveBeenSet.AddRange(deprecatedPropertySettingDetails.RelatedFieldsThatHaveBeenSetViaTheDeprecatedProperties);
 							fieldSettingInformationForGeneratingTypeBuilder.Add(new BinarySerialisationReaderTypeReader.FieldSettingDetails(
 								fieldNameReferenceID,

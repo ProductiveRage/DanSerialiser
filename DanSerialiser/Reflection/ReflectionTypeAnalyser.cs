@@ -124,7 +124,7 @@ namespace DanSerialiser.Reflection
 			if (string.IsNullOrWhiteSpace(fieldName))
 				throw new ArgumentException($"Null/blank {nameof(fieldName)} specified");
 
-			var propertySetters = new List<Tuple<PropertyInfo, Action<object, object>>>();
+			var propertySetters = new List<Tuple<PropertyInfo, MemberUpdater>>();
 			var fieldsToConsiderToHaveBeenSetViaDeprecatedProperties = new List<FieldInfo>();
 			var propertyName = BackingFieldHelpers.TryToGetNameOfPropertyRelatingToBackingField(fieldName) ?? fieldName;
 			while (typeToLookForPropertyOn != null)
@@ -225,21 +225,61 @@ namespace DanSerialiser.Reflection
 				.Compile();
 		}
 
-		private static Action<object, object> GetFieldWriter(FieldInfo field)
+		private static MemberUpdater GetFieldWriter(FieldInfo field)
 		{
-			if (field.DeclaringType.IsValueType)
-				return (source, value) => field.SetValue(source, value); // TODO: The below needs some tweaking to work with structs
+			return field.DeclaringType.IsValueType
+				? GetFieldWriterForValueType(field)
+				: GetFieldWriterForReferenceType(field);
+		}
 
+		private static MemberUpdater GetFieldWriterForValueType(FieldInfo field)
+		{
+			var dynamicMethod = new DynamicMethod(
+				name: "Set" + field.Name,
+				returnType: null,
+				parameterTypes: new[] { typeof(object).MakeByRefType(), typeof(object) },
+				m: field.DeclaringType.Module,
+				skipVisibility: true
+			);
+
+			var gen = dynamicMethod.GetILGenerator();
+
+			// var typedSource = (T)source;
+			var typedSource = gen.DeclareLocal(field.DeclaringType);
+			gen.Emit(OpCodes.Ldarg_0);
+			gen.Emit(OpCodes.Ldind_Ref);
+			gen.Emit(OpCodes.Unbox_Any, field.DeclaringType);
+			gen.Emit(OpCodes.Stloc_0);
+
+			// typedSource.Id = (TField)id;
+			gen.Emit(OpCodes.Ldloca_S, typedSource);
+			gen.Emit(OpCodes.Ldarg_1);
+			gen.Emit(OpCodes.Unbox_Any, field.FieldType);
+			gen.Emit(OpCodes.Stfld, field);
+
+			// source = typedSource;
+			gen.Emit(OpCodes.Ldarg_0);
+			gen.Emit(OpCodes.Ldloc_0);
+			gen.Emit(OpCodes.Box, field.DeclaringType);
+			gen.Emit(OpCodes.Stind_Ref);
+			gen.Emit(OpCodes.Ret);
+
+			return (MemberUpdater)dynamicMethod.CreateDelegate(typeof(MemberUpdater));
+		}
+
+		private static MemberUpdater GetFieldWriterForReferenceType(FieldInfo field)
+		{
 			// Can't set readonly fields using LINQ Expressions, need  to resort to emitting IL
 			var method = new DynamicMethod(
 				name: "Set" + field.Name,
 				returnType: null,
-				parameterTypes: new[] { typeof(object), typeof(object) },
+				parameterTypes: new[] { typeof(object).MakeByRefType(), typeof(object) },
 				m: field.DeclaringType.Module,
 				skipVisibility: true
 			);
 			var gen = method.GetILGenerator();
 			gen.Emit(OpCodes.Ldarg_0);
+			gen.Emit(OpCodes.Ldind_Ref);
 			gen.Emit(OpCodes.Castclass, field.DeclaringType);
 			gen.Emit(OpCodes.Ldarg_1);
 			if (field.FieldType.IsValueType)
@@ -248,7 +288,7 @@ namespace DanSerialiser.Reflection
 				gen.Emit(OpCodes.Castclass, field.FieldType);
 			gen.Emit(OpCodes.Stfld, field);
 			gen.Emit(OpCodes.Ret);
-			return (Action<object, object>)method.CreateDelegate(typeof(Action<object, object>));
+			return (MemberUpdater)method.CreateDelegate(typeof(MemberUpdater));
 		}
 
 		private static Func<object, object> GetPropertyReader(PropertyInfo property)
@@ -268,11 +308,11 @@ namespace DanSerialiser.Reflection
 				.Compile();
 		}
 
-		private static Action<object, object> GetPropertyWriter(PropertyInfo property)
+		private static MemberUpdater GetPropertyWriter(PropertyInfo property)
 		{
-			var sourceParameter = Expression.Parameter(typeof(object), "source");
+			var sourceParameter = Expression.Parameter(typeof(object).MakeByRefType(), "source");
 			var valueParameter = Expression.Parameter(typeof(object), "value");
-			return Expression.Lambda<Action<object, object>>(
+			return Expression.Lambda<MemberUpdater>(
 					Expression.Assign(
 						Expression.MakeMemberAccess(
 							Expression.Convert(sourceParameter, property.DeclaringType),

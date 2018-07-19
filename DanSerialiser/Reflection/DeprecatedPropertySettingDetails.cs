@@ -12,7 +12,7 @@ namespace DanSerialiser.Reflection
 	/// </summary>
 	internal sealed class DeprecatedPropertySettingDetails
 	{
-		public DeprecatedPropertySettingDetails(Type compatibleTypeToReadAs, Action<object, object>[] propertySetters, FieldInfo[] relatedFieldsThatHaveBeenSetViaTheDeprecatedProperties)
+		public DeprecatedPropertySettingDetails(Type compatibleTypeToReadAs, MemberUpdater[] propertySetters, FieldInfo[] relatedFieldsThatHaveBeenSetViaTheDeprecatedProperties)
 		{
 			CompatibleTypeToReadAs = compatibleTypeToReadAs ?? throw new ArgumentNullException(nameof(compatibleTypeToReadAs));
 			PropertySetters = propertySetters ?? throw new ArgumentNullException(nameof(propertySetters));
@@ -20,7 +20,7 @@ namespace DanSerialiser.Reflection
 		}
 
 		public Type CompatibleTypeToReadAs { get; }
-		public Action<object, object>[] PropertySetters { get; }
+		public MemberUpdater[] PropertySetters { get; }
 		public FieldInfo[] RelatedFieldsThatHaveBeenSetViaTheDeprecatedProperties { get; }
 	}
 }
