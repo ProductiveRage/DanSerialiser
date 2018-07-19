@@ -78,9 +78,9 @@ namespace DanSerialiser.CachedLookups
 			var currentType = serialisationTargetType;
 			while (currentType != null)
 			{
-				if (currentType != serialisationTargetType)
+				if (currentType != field.DeclaringType)
 				{
-					if (currentType.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags).Any(f => f.Name == field.Name))
+					if (currentType.GetFields(BinaryReaderWriterShared.MemberRetrievalBindingFlags | BindingFlags.DeclaredOnly).Any(f => f.Name == field.Name))
 					{
 						fieldNameExistsMultipleTimesInHierarchy = true;
 						break;
