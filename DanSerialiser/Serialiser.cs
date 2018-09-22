@@ -356,7 +356,7 @@ namespace DanSerialiser
 			// instead of enumerating fields below but if it's case 1 or 2 then we'll have to do that work (but if it's case 1 then we'll try to find out whether it's
 			// possible to create a type generator at the bottom of this method).
 			var valueType = value.GetType();
-			var haveTriedToGenerateMemberSetterBefore = generatedMemberSetters.TryGetValue(type, out var memberSetter);
+			var haveTriedToGenerateMemberSetterBefore = generatedMemberSetters.TryGetValue(valueType, out var memberSetter);
 			if (haveTriedToGenerateMemberSetterBefore && (memberSetter != null))
 			{
 				memberSetter(value);
@@ -419,7 +419,7 @@ namespace DanSerialiser
 			// .. but if we HAVEN'T tried to create a type generator before then ask the writer if it's able to do so (this is done after the first time that an instance of
 			// the type has been fully serialised so that the writer has a chance to create any Name Reference IDs that it might want to use for the member names and potentially
 			// have done some other forms of caching)
-			generatedMemberSetters[type] = writer.TryToGenerateMemberSetter(type);
+			generatedMemberSetters[valueType] = writer.TryToGenerateMemberSetter(valueType);
 		}
 
 		private void PrepareArrayObjectReferences(object element, Type elementType, Dictionary<object, int> objectHistoryIfReferenceReuseAllowed, Dictionary<int, object> newObjectReferencesFromArray, IWrite writer)

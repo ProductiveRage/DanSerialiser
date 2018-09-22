@@ -499,6 +499,28 @@ namespace UnitTests
 			Assert.Equal(0, clone.Id);
 		}
 
+		/// <summary>
+		/// This confirms a fix for a bug around the 'optimised member setter' logic used when serialising arrays - we need to be careful to look for a member setter that
+		/// corresponds to the type of the element and not the type of the array element (because the actual instance may be a more specific type than the array and we
+		/// want to ensure that we set any additional fields - or that we don't use a quick-member-setter if it's not applicable to the more specific type)
+		/// </summary>
+		[Fact]
+		public void MemberSetterCacheTargetsMostSpecificTypeForArrayElements()
+		{
+			var source = new EmptyThingBase[]
+			{
+				new ThingWithWrappedStringName(new WrappedString("abc")),
+				new ThingWithWrappedStringName(new WrappedString("xyz"))
+			};
+			var clone = BinarySerialisationCloner.Clone(source, _referenceReuseStrategy);
+			Assert.NotNull(clone);
+			Assert.Equal(2, clone.Length);
+			Assert.IsType<ThingWithWrappedStringName>(clone[0]);
+			Assert.Equal("abc", ((ThingWithWrappedStringName)clone[0]).Name?.Value);
+			Assert.IsType<ThingWithWrappedStringName>(clone[1]);
+			Assert.Equal("xyz", ((ThingWithWrappedStringName)clone[1]).Name?.Value);
+		}
+
 		private T AssertCloneMatchesOriginalAndReturnClone<T>(T value)
 		{
 			var clone = BinarySerialisationCloner.Clone(value, _referenceReuseStrategy);
@@ -615,5 +637,19 @@ namespace UnitTests
 		private enum DefaultTypeEnum { Value1, Value2 }
 
 		private enum ByteEnum : byte { Value1, Value2 }
+
+		public sealed class WrappedString
+		{
+			public WrappedString(string value) => Value = value;
+			public string Value { get; }
+		}
+
+		private sealed class ThingWithWrappedStringName : EmptyThingBase
+		{
+			public ThingWithWrappedStringName(WrappedString name) => Name = name;
+			public WrappedString Name { get; }
+		}
+
+		private abstract class EmptyThingBase { }
 	}
 }
