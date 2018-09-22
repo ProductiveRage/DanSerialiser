@@ -2,9 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <Version>2.4.2.0</Version>
     <PackageId>DanSerialiser</PackageId>
     <PackageTitle>DanSerialiser</PackageTitle>
-    <PackageVersion>2.4.0.0</PackageVersion>
     <Authors>ProductiveRage</Authors>
     <PackageLicenseUrl>https://github.com/ProductiveRage/DanSerialiser/blob/master/LICENSE</PackageLicenseUrl>
     <PackageProjectUrl>https://github.com/ProductiveRage/DanSerialiser</PackageProjectUrl>
