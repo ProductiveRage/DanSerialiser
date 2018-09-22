@@ -8,7 +8,7 @@ namespace DanSerialiser
 	{
 		private const string TYPE_NAME = "TypeName";
 		private const string FIELD_NAME = "FieldName";
-		public FieldNotPresentInSerialisedDataException(string typeName, string fieldName) : base()
+		public FieldNotPresentInSerialisedDataException(string typeName, string fieldName) : base($"Field not found in serialised data - '{fieldName}' for type {typeName}")
 		{
 			if (string.IsNullOrWhiteSpace(typeName))
 				throw new ArgumentException($"Null/blank {nameof(typeName)} specified");
