@@ -505,7 +505,30 @@ namespace UnitTests
 		/// want to ensure that we set any additional fields - or that we don't use a quick-member-setter if it's not applicable to the more specific type)
 		/// </summary>
 		[Fact]
-		public void MemberSetterCacheTargetsMostSpecificTypeForArrayElements()
+		public void MemberSetterCacheTargetsMostSpecificTypeForArrayElementsWhereMostSpecificTypeIsNotEligibleForOptimisedMemberSetter()
+		{
+			var source = new EmptyThingBase[]
+			{
+				new ThingWithWrappedStringName(new WrappedString("abc")),
+				new ThingWithWrappedStringName(new WrappedString("xyz"))
+			};
+			var clone = BinarySerialisationCloner.Clone(source, _referenceReuseStrategy);
+			Assert.NotNull(clone);
+			Assert.Equal(2, clone.Length);
+			Assert.IsType<ThingWithWrappedStringName>(clone[0]);
+			Assert.Equal("abc", ((ThingWithWrappedStringName)clone[0]).Name?.Value);
+			Assert.IsType<ThingWithWrappedStringName>(clone[1]);
+			Assert.Equal("xyz", ((ThingWithWrappedStringName)clone[1]).Name?.Value);
+		}
+
+		/// <summary>
+		/// While investigating the fix that the test above confirms, I found that there was a variation on it - the test above is for the case where the array element
+		/// type is one that the SharedGeneratedMemberSetters is able to produce an 'optimised member setter' for but the specialised type that each element of the array
+		/// actually consists of is NOT one that a member setter can be produced for. This test covers the case where the specialised type IS one that a member setter
+		/// may be prepared for.
+		/// </summary>
+		[Fact]
+		public void MemberSetterCacheTargetsMostSpecificTypeForArrayElementsWhereMostSpecificTypeIsEligibleForOptimisedMemberSetter()
 		{
 			var source = new EmptyThingBase[]
 			{
@@ -642,6 +665,12 @@ namespace UnitTests
 		{
 			public WrappedString(string value) => Value = value;
 			public string Value { get; }
+		}
+
+		private sealed class ThingWithStringName : EmptyThingBase
+		{
+			public ThingWithStringName(string name) => Name = name;
+			public string Name { get; }
 		}
 
 		private sealed class ThingWithWrappedStringName : EmptyThingBase

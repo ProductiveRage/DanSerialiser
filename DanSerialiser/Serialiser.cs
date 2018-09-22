@@ -322,7 +322,6 @@ namespace DanSerialiser
 				// to be recorded - in which case, the populatingDeferredObject will be true.
 				SerialiseObjectFieldsAndProperties(
 					value,
-					type,
 					parentsIfReferenceReuseDisallowed,
 					objectHistoryIfReferenceReuseAllowed,
 					deferredInitialisationObjectReferenceIDsIfSupported,
@@ -341,7 +340,6 @@ namespace DanSerialiser
 
 		private void SerialiseObjectFieldsAndProperties(
 			object value,
-			Type type,
 			Stack<object> parentsIfReferenceReuseDisallowed,
 			Dictionary<object, int> objectHistoryIfReferenceReuseAllowed,
 			HashSet<int> deferredInitialisationObjectReferenceIDsIfSupported,
@@ -368,7 +366,7 @@ namespace DanSerialiser
 			for (var i = 0; i < fields.Length; i++)
 			{
 				var field = fields[i];
-				if (writer.FieldName(field.Member, type))
+				if (writer.FieldName(field.Member, valueType))
 				{
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Push(value);
@@ -391,7 +389,7 @@ namespace DanSerialiser
 			for (var i = 0; i < properties.Length; i++)
 			{
 				var property = properties[i];
-				if (writer.PropertyName(property.Member, type))
+				if (writer.PropertyName(property.Member, valueType))
 				{
 					if (parentsIfReferenceReuseDisallowed != null)
 						parentsIfReferenceReuseDisallowed.Push(value);
