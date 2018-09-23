@@ -28,6 +28,30 @@ namespace DanSerialiser
 			if (typeConverters.Any(t => t == null))
 				throw new ArgumentException("Null reference encountered in " + nameof(typeConverters));
 
+			Stack<object> parentsIfReferenceReuseDisallowed;
+			Dictionary<object, int> objectHistoryIfReferenceReuseAllowed;
+			HashSet<int> deferredInitialisationObjectReferenceIDsIfSupported;
+			if (writer.ReferenceReuseStrategy == ReferenceReuseOptions.NoReferenceReuse)
+			{
+				parentsIfReferenceReuseDisallowed = new Stack<object>();
+				objectHistoryIfReferenceReuseAllowed = null;
+				deferredInitialisationObjectReferenceIDsIfSupported = null;
+			}
+			else if (writer.ReferenceReuseStrategy == ReferenceReuseOptions.SupportReferenceReUseInMostlyTreeLikeStructure)
+			{
+				parentsIfReferenceReuseDisallowed = null;
+				objectHistoryIfReferenceReuseAllowed = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
+				deferredInitialisationObjectReferenceIDsIfSupported = null;
+			}
+			else if (writer.ReferenceReuseStrategy == ReferenceReuseOptions.OptimiseForWideCircularReferences)
+			{
+				parentsIfReferenceReuseDisallowed = null;
+				objectHistoryIfReferenceReuseAllowed = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
+				deferredInitialisationObjectReferenceIDsIfSupported = new HashSet<int>();
+			}
+			else
+				throw new NotSupportedException($"{nameof(writer)} has unsupported {nameof(writer.ReferenceReuseStrategy)}: {writer.ReferenceReuseStrategy}");
+
 			// We need to know the type that we're serialising and that's why there is a generic type param, so that the caller HAS to specify one even if
 			// they're passing null. If we don't have null then take the type from the value argument, otherwise use the type param (we should prefer the
 			// value's type because it may be more specific - eg. could call this with a T of object and a value that is a string, in which case we want
@@ -35,10 +59,10 @@ namespace DanSerialiser
 			Serialise(
 				value,
 				value?.GetType() ?? typeof(T),
-				populatingDeferredObject: false,
-				parentsIfReferenceReuseDisallowed: (writer.ReferenceReuseStrategy == ReferenceReuseOptions.NoReferenceReuse) ? new Stack<object>() : null,
-				objectHistoryIfReferenceReuseAllowed: (writer.ReferenceReuseStrategy == ReferenceReuseOptions.NoReferenceReuse) ? null : new Dictionary<object, int>(ReferenceEqualityComparer.Instance),
-				deferredInitialisationObjectReferenceIDsIfSupported: (writer.ReferenceReuseStrategy == ReferenceReuseOptions.OptimiseForWideCircularReferences) ? new HashSet<int>() : null,
+				false, // populatingDeferredObject is always false at the top level, it may become true in some nested calls, depending upon configuration
+				parentsIfReferenceReuseDisallowed,
+				objectHistoryIfReferenceReuseAllowed,
+				deferredInitialisationObjectReferenceIDsIfSupported,
 				generatedMemberSetters: new Dictionary<Type, Action<object>>(),
 				typeConverters: typeConverters,
 				writer: writer
