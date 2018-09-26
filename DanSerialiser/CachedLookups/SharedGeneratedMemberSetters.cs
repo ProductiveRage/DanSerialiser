@@ -10,8 +10,43 @@ namespace DanSerialiser.CachedLookups
 	internal static class SharedGeneratedMemberSetters
 	{
 		private static readonly Type _writerType = typeof(BinarySerialisationWriter);
-		private static readonly MethodInfo _writeByteMethod = _writerType.GetMethod("WriteByte", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(byte) }, null);
-		private static readonly MethodInfo _writeBytesMethod = _writerType.GetMethod("WriteBytes", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(byte[]) }, null);
+		private static readonly MethodInfo
+			_writeByteMethod, _writeBytesMethod,
+			_writeBooleanValueMethod,
+			_writeByteValueMethod, _writeSByteValueMethod,
+			_writeInt16ValueMethod, _writeInt32ValueMethod, _writeInt64ValueMethod, _writeUInt16ValueMethod, _writeUInt32ValueMethod, _writeUInt64ValueMethod,
+			_writeSingleValueMethod, _writeDoubleValueMethod, _writeDecimalValueMethod,
+			_writeDateTimeValueMethod,
+			_writeCharValueMethod, _writeStringValueMethod,
+			_writeArrayStartMethod, _writeArrayEndMethod;
+		static SharedGeneratedMemberSetters()
+		{
+			_writerType = typeof(BinarySerialisationWriter);
+
+			// Private methods (these write bytes directly, without headers)
+			_writeByteMethod = _writerType.GetMethod("WriteByte", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(byte) }, null) ?? throw new Exception("Could not find 'WriteByte'");
+			_writeBytesMethod = _writerType.GetMethod("WriteBytes", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(byte[]) }, null) ?? throw new Exception("Could not find 'WriteBytes'");
+
+			// Public methods (these write header bytes and then the serialised value)
+			_writeBooleanValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Boolean), new[] { typeof(Boolean) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Boolean));
+			_writeByteValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Byte), new[] { typeof(Byte) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Byte));
+			_writeSByteValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.SByte), new[] { typeof(SByte) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.SByte));
+			_writeInt16ValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Int16), new[] { typeof(Int16) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Int16));
+			_writeInt32ValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Int32), new[] { typeof(Int32) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Int32));
+			_writeInt64ValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Int64), new[] { typeof(Int64) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Int64));
+			_writeUInt16ValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.UInt16), new[] { typeof(UInt16) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.UInt16));
+			_writeUInt32ValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.UInt32), new[] { typeof(UInt32) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.UInt32));
+			_writeUInt64ValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.UInt64), new[] { typeof(UInt64) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.UInt64));
+			_writeSingleValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Single), new[] { typeof(Single) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Single));
+			_writeDoubleValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Double), new[] { typeof(Double) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Double));
+			_writeDecimalValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Decimal), new[] { typeof(Decimal) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Decimal));
+			_writeDateTimeValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.DateTime), new[] { typeof(DateTime) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.DateTime));
+			_writeCharValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Char), new[] { typeof(Char) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Char));
+			_writeStringValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.String), new[] { typeof(String) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.String));
+			_writeArrayStartMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ArrayStart), new[] { typeof(object), typeof(Type) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ArrayStart));
+			_writeArrayEndMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ArrayEnd), Type.EmptyTypes) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ArrayEnd));
+		}
+
 		public static Action<object, BinarySerialisationWriter> TryToGenerateMemberSetter(Type type)
 		{
 			if (type == null)
@@ -116,44 +151,38 @@ namespace DanSerialiser.CachedLookups
 
 		private static MethodInfo TryToGetWriterMethodToSerialiseType(Type type)
 		{
-			string fieldWriterMethodName;
 			if (type == CommonTypeOfs.Boolean)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.Boolean);
+				return _writeBooleanValueMethod;
 			else if (type == CommonTypeOfs.Byte)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.Byte);
+				return _writeByteValueMethod;
 			else if (type == CommonTypeOfs.SByte)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.SByte);
+				return _writeSByteValueMethod;
 			else if (type == CommonTypeOfs.Int16)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.Int16);
+				return _writeInt16ValueMethod;
 			else if (type == CommonTypeOfs.Int32)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.Int32);
+				return _writeInt32ValueMethod;
 			else if (type == CommonTypeOfs.Int64)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.Int64);
+				return _writeInt64ValueMethod;
 			else if (type == CommonTypeOfs.UInt16)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.UInt16);
+				return _writeUInt16ValueMethod;
 			else if (type == CommonTypeOfs.UInt32)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.UInt32);
+				return _writeUInt32ValueMethod;
 			else if (type == CommonTypeOfs.UInt64)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.UInt64);
+				return _writeUInt64ValueMethod;
 			else if (type == CommonTypeOfs.Single)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.Single);
+				return _writeSingleValueMethod;
 			else if (type == CommonTypeOfs.Double)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.Double);
+				return _writeDoubleValueMethod;
 			else if (type == CommonTypeOfs.Decimal)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.Decimal);
+				return _writeDecimalValueMethod;
 			else if (type == CommonTypeOfs.Char)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.Char);
+				return _writeCharValueMethod;
 			else if (type == CommonTypeOfs.String)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.String);
+				return _writeStringValueMethod;
 			else if (type == CommonTypeOfs.DateTime)
-				fieldWriterMethodName = nameof(BinarySerialisationWriter.DateTime);
+				return _writeDateTimeValueMethod;
 			else
 				return null;
-
-			var fieldWriterMethod = _writerType.GetMethod(fieldWriterMethodName, new[] { type });
-			if (fieldWriterMethod == null)
-				throw new Exception("Unable to identify writer method '" + fieldWriterMethodName + "'");
-			return fieldWriterMethod;
 		}
 	}
 }
