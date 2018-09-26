@@ -116,6 +116,21 @@ namespace DanSerialiser
 			WriteByte((byte)value.Kind);
 		}
 
+		// TimeSpan is similar to DateTime - the Serialiser could serialise it without special handling but it's a common type and we should be able to do it faster with special code
+		// and it will expand the types that SharedGeneratedMemberSetters can deal with
+		public void TimeSpan(TimeSpan value)
+		{
+			WriteByte((byte)BinarySerialisationDataType.TimeSpan);
+			WriteBytes((new Int64Bytes(value.Ticks)).GetLittleEndianBytesWithoutDataType());
+		}
+
+		// Same again for Guid as for DateTime and TimeSpan (could serialise without but there are benefits to handling it as a special that hopefully outweight the costs of extra code)
+		public void Guid(Guid value)
+		{
+			WriteByte((byte)BinarySerialisationDataType.Guid);
+			WriteBytes(value.ToByteArray());
+		}
+
 		public void ArrayStart(object value, Type elementType)
 		{
 			if (value == null)

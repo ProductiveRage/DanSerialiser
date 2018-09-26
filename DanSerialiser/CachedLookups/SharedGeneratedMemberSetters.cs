@@ -16,8 +16,9 @@ namespace DanSerialiser.CachedLookups
 			_writeByteValueMethod, _writeSByteValueMethod,
 			_writeInt16ValueMethod, _writeInt32ValueMethod, _writeInt64ValueMethod, _writeUInt16ValueMethod, _writeUInt32ValueMethod, _writeUInt64ValueMethod,
 			_writeSingleValueMethod, _writeDoubleValueMethod, _writeDecimalValueMethod,
-			_writeDateTimeValueMethod,
+			_writeDateTimeValueMethod, _writeTimeSpanValueMethod,
 			_writeCharValueMethod, _writeStringValueMethod,
+			_writeGuidValueMethod,
 			_writeArrayStartMethod, _writeArrayEndMethod;
 		static SharedGeneratedMemberSetters()
 		{
@@ -41,8 +42,10 @@ namespace DanSerialiser.CachedLookups
 			_writeDoubleValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Double), new[] { typeof(Double) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Double));
 			_writeDecimalValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Decimal), new[] { typeof(Decimal) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Decimal));
 			_writeDateTimeValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.DateTime), new[] { typeof(DateTime) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.DateTime));
+			_writeTimeSpanValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.TimeSpan), new[] { typeof(TimeSpan) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.TimeSpan));
 			_writeCharValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Char), new[] { typeof(Char) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Char));
 			_writeStringValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.String), new[] { typeof(String) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.String));
+			_writeGuidValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Guid), new[] { typeof(Guid) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Guid));
 			_writeArrayStartMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ArrayStart), new[] { typeof(object), typeof(Type) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ArrayStart));
 			_writeArrayEndMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ArrayEnd), Type.EmptyTypes) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ArrayEnd));
 		}
@@ -181,6 +184,10 @@ namespace DanSerialiser.CachedLookups
 				return _writeStringValueMethod;
 			else if (type == CommonTypeOfs.DateTime)
 				return _writeDateTimeValueMethod;
+			else if (type == CommonTypeOfs.TimeSpan)
+				return _writeTimeSpanValueMethod;
+			else if (type == CommonTypeOfs.Guid)
+				return _writeGuidValueMethod;
 			else
 				return null;
 		}

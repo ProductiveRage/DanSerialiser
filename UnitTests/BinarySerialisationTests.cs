@@ -208,6 +208,12 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public void DateTime() => AssertCloneMatchesOriginal(new DateTime(2018, 9, 26, 23, 11, 59, DateTimeKind.Local));
+
+		[Fact]
+		public void TimeSpan() => AssertCloneMatchesOriginal(new TimeSpan(26, 23, 12, 15, 123));
+
+		[Fact]
 		public void EnumWithDifferentBaseType()
 		{
 			AssertCloneMatchesOriginal(ByteEnum.Value2);

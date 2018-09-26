@@ -126,6 +126,11 @@ namespace DanSerialiser
 
 				case BinarySerialisationDataType.DateTime:
 					return ReadNextDateTime();
+				case BinarySerialisationDataType.TimeSpan:
+					return ReadNextTimeSpan();
+
+				case BinarySerialisationDataType.Guid:
+					return ReadNextGuid();
 
 				case BinarySerialisationDataType.ArrayStart:
 					return ReadNextArray(ignoreAnyInvalidTypes);
@@ -177,10 +182,11 @@ namespace DanSerialiser
 			return Encoding.UTF8.GetString(ReadNext(length));
 		}
 
-		private DateTime ReadNextDateTime()
-		{
-			return new DateTime(ReadNextInt64(), (DateTimeKind)ReadNext());
-		}
+		private DateTime ReadNextDateTime() => new DateTime(ReadNextInt64(), (DateTimeKind)ReadNext());
+
+		private TimeSpan ReadNextTimeSpan() => TimeSpan.FromTicks(ReadNextInt64());
+
+		private Guid ReadNextGuid() => new Guid(ReadNext(16));
 
 		private object ReadNextObject(bool ignoreAnyInvalidTypes, bool toPopulateDeferredInstance)
 		{

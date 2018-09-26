@@ -27,6 +27,9 @@ namespace DanSerialiser
 		void String(string value);
 
 		void DateTime(DateTime value);
+		void TimeSpan(TimeSpan value);
+
+		void Guid(Guid value);
 
 		void ArrayStart(object value, Type elementType);
 		void ArrayEnd();
