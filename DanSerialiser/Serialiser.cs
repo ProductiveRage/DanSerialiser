@@ -186,6 +186,17 @@ namespace DanSerialiser
 				writer.DateTime((DateTime)value);
 				return;
 			}
+			if (type == CommonTypeOfs.TimeSpan)
+			{
+				writer.TimeSpan((TimeSpan)value);
+				return;
+			}
+
+			if (type == CommonTypeOfs.Guid)
+			{
+				writer.Guid((Guid)value);
+				return;
+			}
 
 			// For Object and Array types, if we've got a null reference then write a Null value (having this null check here avoids the type.IsEnum and type.IsArray checks
 			// for cases where we DO have a null reference(
@@ -485,7 +496,7 @@ namespace DanSerialiser
 			}
 		}
 
-		private static bool IsTreatedAsPrimitive(Type type) => type.IsPrimitive || (type == CommonTypeOfs.DateTime) || (type == CommonTypeOfs.String);
+		private static bool IsTreatedAsPrimitive(Type type) => type.IsPrimitive || (type == CommonTypeOfs.DateTime) || (type == CommonTypeOfs.TimeSpan) || (type == CommonTypeOfs.String) || (type == CommonTypeOfs.Guid);
 
 		// Courtesy of https://stackoverflow.com/a/41169463/3813189
 		private sealed class ReferenceEqualityComparer : IEqualityComparer<object>
