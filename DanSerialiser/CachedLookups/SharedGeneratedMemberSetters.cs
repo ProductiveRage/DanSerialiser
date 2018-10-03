@@ -55,11 +55,6 @@ namespace DanSerialiser.CachedLookups
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
 
-			if (_writeByteMethod == null)
-				throw new Exception("Unable to identify writer method 'WriteByte'");
-			if (_writeBytesMethod == null)
-				throw new Exception("Unable to identify writer method 'WriteBytes'");
-
 			// If there are any fields or properties whose types don't match the TypeWillWorkWithTypeGenerator conditions then don't try to make a type generator (there will be
 			// potential complications such as checking for circular / reused references that can't be handled by a simple type generator)
 			var fields = DefaultTypeAnalyser.Instance.GetAllFieldsThatShouldBeSet(type);
