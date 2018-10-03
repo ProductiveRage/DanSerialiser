@@ -72,11 +72,8 @@ namespace DanSerialiser.CachedLookups
 				if (fieldNameBytes == null)
 					return null;
 
-				// Try to get a BinarySerialisationWriter method to call to serialise the value (if it's a Nullable then unwrap the underlying type and try to find a method
-				// for that - we'll have to include some null-checking to the member setter if we do this, see a litte further down..)
-				var nullableTypeInner = GetUnderlyingNullableTypeIfApplicable(field.FieldType);
-				var fieldWriterMethod = TryToGetWriterMethodToSerialiseType(nullableTypeInner ?? field.FieldType);
-				if (fieldWriterMethod == null)
+				var valueWriterIfPossibleToGenerate = TryToGetValueWriterForField(field, typedSource, writerParameter);
+				if (valueWriterIfPossibleToGenerate == null)
 					return null;
 
 				// Generate the write-FieldName-to-stream method call
@@ -88,46 +85,8 @@ namespace DanSerialiser.CachedLookups
 					)
 				);
 
-				// Generate the write-Field-value-to-stream method call
-				if ((nullableTypeInner != null) || !field.FieldType.IsValueType)
-				{
-					// If this is a Nullable value then we need to check for is-null and then either write a null object or write the underlying value (Nullable<T> gets magic
-					// treatment by the compiler and so we don't have to write the data as a Nullable<T>, we can write either null or T)
-					// 2018-07-01: Now that there is a "Null" method on IWrite, we need to apply the same logic to reference type fields (it's cheaper to write a single Null
-					// byte for a null Object - which would otherwise be two bytes of ObjectStart, ObjectEnd - or a null Array - which would otherwise be an ArrayStart byte,
-					// the bytes for a null String and an ArrayEnd - or a null String - which would have required three bytes for the String data type and then a length of
-					// minus one encoded as an Int32_16 data type and two bytes for a -1 length)
-					var ifNull = Expression.Call(
-						writerParameter,
-						nameof(BinarySerialisationWriter.Null),
-						typeArguments: Type.EmptyTypes
-					);
-					var ifNotNull = Expression.Call(
-						writerParameter,
-						fieldWriterMethod,
-						Expression.Convert(
-							Expression.MakeMemberAccess(typedSource, field),
-							nullableTypeInner ?? field.FieldType
-						)
-					);
-					statements.Add(Expression.IfThenElse(
-						Expression.Equal(
-							Expression.MakeMemberAccess(typedSource, field),
-							Expression.Constant(null, field.FieldType)
-						),
-						ifNull,
-						ifNotNull
-					));
-				}
-				else
-				{
-					// For non-Nullable values, we just write the value straight out using the identifier writer method
-					statements.Add(Expression.Call(
-						writerParameter,
-						fieldWriterMethod,
-						Expression.MakeMemberAccess(typedSource, field)
-					));
-				}
+				// Write out the value-serialising expression
+				statements.Add(valueWriterIfPossibleToGenerate);
 			}
 
 			// Group all of the field setters together into one call
@@ -138,6 +97,117 @@ namespace DanSerialiser.CachedLookups
 					writerParameter
 				)
 				.Compile();
+		}
+
+		private static Expression TryToGetValueWriterForField(FieldInfo field, ParameterExpression typedSource, ParameterExpression writerParameter)
+		{
+			if (field.FieldType.IsArray && (field.FieldType.GetArrayRank() == 1))
+			{
+				// Note: There is some duplication of logic between here and the Serialiser class - namely that we call ArrayStart, then write the elements, then call ArrayEnd
+				var elementType = field.FieldType.GetElementType();
+				var current = Expression.Parameter(elementType, "current");
+				var valueWriterForFieldElementType = TryToGetValueWriterForType(elementType, current, writerParameter);
+				if (valueWriterForFieldElementType == null)
+					return null;
+
+				var arrayValue = Expression.MakeMemberAccess(typedSource, field);
+				var ifNull = Expression.Call(
+					writerParameter,
+					nameof(BinarySerialisationWriter.Null),
+					typeArguments: Type.EmptyTypes
+				);
+				var arrayLength = Expression.MakeMemberAccess(arrayValue, typeof(Array).GetProperty(nameof(Array.Length)));
+				var index = Expression.Parameter(typeof(int), "i");
+				var breakLabel = Expression.Label("break");
+				var ifNotNull = Expression.Block(
+					Expression.Call(writerParameter, _writeArrayStartMethod, arrayValue, Expression.Constant(elementType)),
+					Expression.Block(
+						new[] { index, current },
+						Expression.Assign(index, Expression.Constant(0)),
+						Expression.Loop(
+							Expression.IfThenElse(
+								Expression.LessThan(index, arrayLength),
+								Expression.Block(
+									Expression.Assign(current, Expression.ArrayAccess(arrayValue, index)),
+									valueWriterForFieldElementType,
+									Expression.Assign(index, Expression.Add(index, Expression.Constant(1)))
+								),
+								Expression.Break(breakLabel)
+							),
+							breakLabel
+						)
+					),
+					Expression.Call(writerParameter, _writeArrayEndMethod)
+				);
+				return Expression.IfThenElse(
+					Expression.Equal(arrayValue, Expression.Constant(null, field.FieldType)),
+					ifNull,
+					ifNotNull
+				);
+			}
+
+			if (field.FieldType.IsEnum)
+			{
+				// Note: There is some duplication of logic between here and the Serialiser class (that we write the underlying value)
+				var underlyingType = field.FieldType.GetEnumUnderlyingType();
+				var enumValue = Expression.MakeMemberAccess(typedSource, field);
+				return TryToGetValueWriterForType(
+					underlyingType,
+					Expression.Convert(enumValue, underlyingType),
+					writerParameter
+				);
+			}
+
+			return TryToGetValueWriterForType(field.FieldType, Expression.MakeMemberAccess(typedSource, field), writerParameter);
+		}
+
+		private static Expression TryToGetValueWriterForType(Type type, Expression value, ParameterExpression writerParameter)
+		{
+			// Try to get a BinarySerialisationWriter method to call to serialise the value (if it's a Nullable then unwrap the underlying type and try to find a method
+			// for that - we'll have to include some null-checking to the member setter if we do this, see a litte further down..)
+			//if (field.FieldType.IsArray)
+			var nullableTypeInner = GetUnderlyingNullableTypeIfApplicable(type);
+			var fieldWriterMethod = TryToGetWriterMethodToSerialiseType(nullableTypeInner ?? type);
+			if (fieldWriterMethod == null)
+				return null;
+
+			// Generate the write-Field-value-to-stream method call
+			if ((nullableTypeInner != null) || !type.IsValueType)
+			{
+				// If this is a Nullable value then we need to check for is-null and then either write a null object or write the underlying value (Nullable<T> gets magic
+				// treatment by the compiler and so we don't have to write the data as a Nullable<T>, we can write either null or T)
+				// 2018-07-01: Now that there is a "Null" method on IWrite, we need to apply the same logic to reference type fields (it's cheaper to write a single Null
+				// byte for a null Object - which would otherwise be two bytes of ObjectStart, ObjectEnd - or a null Array - which would otherwise be an ArrayStart byte,
+				// the bytes for a null String and an ArrayEnd - or a null String - which would have required three bytes for the String data type and then a length of
+				// minus one encoded as an Int32_16 data type and two bytes for a -1 length)
+				var ifNull = Expression.Call(
+					writerParameter,
+					nameof(BinarySerialisationWriter.Null),
+					typeArguments: Type.EmptyTypes
+				);
+				var ifNotNull = Expression.Call(
+					writerParameter,
+					fieldWriterMethod,
+					Expression.Convert(
+						value,
+						nullableTypeInner ?? type
+					)
+				);
+				return Expression.IfThenElse(
+					Expression.Equal(value, Expression.Constant(null, type)),
+					ifNull,
+					ifNotNull
+				);
+			}
+			else
+			{
+				// For non-Nullable values, we just write the value straight out using the identifier writer method
+				return Expression.Call(
+					writerParameter,
+					fieldWriterMethod,
+					value
+				);
+			}
 		}
 
 		private static Type GetUnderlyingNullableTypeIfApplicable(Type type)
