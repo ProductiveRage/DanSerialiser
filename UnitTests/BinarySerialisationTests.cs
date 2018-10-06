@@ -6,6 +6,14 @@ using Xunit;
 
 namespace UnitTests
 {
+	public sealed class BinarySerialisationTests_SpeedyButLimited : BinarySerialisationTests
+	{
+		public BinarySerialisationTests_SpeedyButLimited() : base(ReferenceReuseOptions.SpeedyButLimited) { }
+
+		// The "SpeedyButLimited" option doesn't detect OR handle circular references - so there are no tests for them because the only test would be to see if we get a stack overflow
+		// and the xnit runner won't handle that (it will terminate the process when the stack overflow occurs and then the test will be marked neither as a pass or a fail)
+	}
+
 	public sealed class BinarySerialisationTests_NoReferenceReuse : BinarySerialisationTests
 	{
 		public BinarySerialisationTests_NoReferenceReuse() : base(ReferenceReuseOptions.NoReferenceReuse) { }
@@ -528,9 +536,9 @@ namespace UnitTests
 		}
 
 		/// <summary>
-		/// While investigating the fix that the test above confirms, I found that there was a variation on it - the test above is for the case where the array element
-		/// type is one that the SharedGeneratedMemberSetters is able to produce an 'optimised member setter' for but the specialised type that each element of the array
-		/// actually consists of is NOT one that a member setter can be produced for. This test covers the case where the specialised type IS one that a member setter
+		/// While investigating the fix that the test above confirms, I found that there was a variation on it - the test above is for the case where the array element type
+		/// is one that the BinarySerialisationCompiledMemberSetters is able to produce an 'optimised member setter' for but the specialised type that each element of the
+		/// array actually consists of is NOT one that a member setter can be produced for. This test covers the case where the specialised type IS one that a member setter
 		/// may be prepared for.
 		/// </summary>
 		[Fact]
