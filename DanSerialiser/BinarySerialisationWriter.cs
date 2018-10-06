@@ -243,15 +243,31 @@ namespace DanSerialiser
 			return WritePropertyNameBytesIfWantoSerialiseField(property);
 		}
 
+		/// <summary>
+		/// This will return a compiled 'member setter' for the specified type, if it's possible to create one. A member setter takes an instance of an object and writes the data
+		/// for the fields and properties to the writer. It does not write the ObjectStart and ObjectEnd data since the caller takes responsibility for those because reference
+		/// tracking is handled by the caller and it may need to inject a ReferenceID after the ObjectStart data. When reference tracking is enabled, only limited types may have
+		/// a member setter generated for them because reference tracking is not possible for the field and property values that the member setter writes (and so the only types
+		/// that member setters may be provided for will have fields and properties that are all primitive-like values, such as	genuine primitives and strings and DateTime and
+		/// the other types that IWrite handles and that can never result in circular references). This will return null if a member setter could not be provided for the type.
+		/// </summary>
 		public Action<object> TryToGenerateMemberSetter(Type type)
 		{
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
 
-			var memberSetter = SharedGeneratedMemberSetters.TryToGenerateMemberSetter(type);
-			if (memberSetter == null)
+			// The SharedGeneratedMemberSetters.TryToGenerateMemberSetter method has a facility to take existing member setters and use them for fields or properties on the current
+			// type in order to create a more complex member setter - one that can set values other than primitive-esque data types. This would bypass any reference tracking and is
+			// not currently enabled (so the "valueWriterRetriever" delegate always returns null). Since reference tracking is not required for struct instances, it may seem reasonable
+			// to change this behaviour to allow forming more complex member setters for types whose members are all primitive-like OR structs but structs can have fields that are
+			// reference types and reference-tracking IS required for those values and so more analysis would be required in order to be sure that it was safe (structs with reference
+			// fields could form part of a circular reference loop and we need to be aware of those, which we can't be if reference tracking is not available).
+			var memberSetterAndFieldsSet = SharedGeneratedMemberSetters.TryToGenerateMemberSetter(type, _typeAnalyser, t => null);
+			if (memberSetterAndFieldsSet == null)
 				return null;
-			return value => memberSetter(value, this);
+
+			var compiledMemberSetter = memberSetterAndFieldsSet.MemberSetter.Compile();
+			return value => compiledMemberSetter(value, this);
 		}
 
 		private void WriteTypeName(Type typeIfValueIsNotNull)

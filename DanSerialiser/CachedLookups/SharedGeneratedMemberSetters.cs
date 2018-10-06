@@ -19,7 +19,8 @@ namespace DanSerialiser.CachedLookups
 			_writeDateTimeValueMethod, _writeTimeSpanValueMethod,
 			_writeCharValueMethod, _writeStringValueMethod,
 			_writeGuidValueMethod,
-			_writeArrayStartMethod, _writeArrayEndMethod;
+			_writeArrayStartMethod, _writeArrayEndMethod,
+			_writeObjectStartMethod, _writeObjectEndMethod;
 		static SharedGeneratedMemberSetters()
 		{
 			_writerType = typeof(BinarySerialisationWriter);
@@ -48,16 +49,39 @@ namespace DanSerialiser.CachedLookups
 			_writeGuidValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Guid), new[] { typeof(Guid) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Guid));
 			_writeArrayStartMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ArrayStart), new[] { typeof(object), typeof(Type) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ArrayStart));
 			_writeArrayEndMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ArrayEnd), Type.EmptyTypes) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ArrayEnd));
+			_writeObjectStartMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ObjectStart), new[] { typeof(object) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ObjectStart));
+			_writeObjectEndMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ObjectEnd), Type.EmptyTypes) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ObjectEnd));
 		}
 
-		public static Action<object, BinarySerialisationWriter> TryToGenerateMemberSetter(Type type)
+		public delegate void ValueWriter(object source, BinarySerialisationWriter writer);
+
+		/// <summary>
+		/// This may return null if no ValueWriter is available
+		/// </summary>
+		public delegate Expression<ValueWriter> ValueWriterRetriever(Type type);
+
+		/// <summary>
+		/// A member setter is a delegate that takes an instance and writes the data for fields and properties to a BinarySerialisationWriter. Note that it will not write the
+		/// ObjectStart and ObjectEnd data because the caller should be responsible for tracking references (if the caller is configured to track references), which is tied to
+		/// the ObjectStart data. If the caller is tracking references (to either reuse references that appear multiple times in the source data or to identify any circular
+		/// references while performing serialisation) then member setters should only be generated for types whose fields and properties are types that do not support reference
+		/// reuse, such as primitives and strings. Fields and properties that are primitives or strings or DateTime or TimeSpan or GUIDs (or one-dimensional arrays of any of those
+		/// types) can be handled entirely by code within this method but it's also possible to provide member setters for other field or property types via the valueWriterRetriever
+		/// argument - again, if the caller is tracking references then it should only pass through member setters via valueWriterRetriever that are for non-reference types, such as
+		/// structs) because generating nested member setters in this manner will prevent any reference tracking.
+		/// </summary>
+		public static MemberSetterDetails TryToGenerateMemberSetter(Type type, IAnalyseTypesForSerialisation typeAnalyser, ValueWriterRetriever valueWriterRetriever)
 		{
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
+			if (typeAnalyser == null)
+				throw new ArgumentNullException(nameof(typeAnalyser));
+			if (valueWriterRetriever == null)
+				throw new ArgumentNullException(nameof(valueWriterRetriever));
 
 			// If there are any fields or properties whose types don't match the TypeWillWorkWithTypeGenerator conditions then don't try to make a type generator (there will be
 			// potential complications such as checking for circular / reused references that can't be handled by a simple type generator)
-			var fields = DefaultTypeAnalyser.Instance.GetAllFieldsThatShouldBeSet(type);
+			var fields = typeAnalyser.GetAllFieldsThatShouldBeSet(type);
 
 			var sourceParameter = Expression.Parameter(typeof(object), "untypedSource");
 			var writerParameter = Expression.Parameter(_writerType, "writer");
@@ -66,13 +90,14 @@ namespace DanSerialiser.CachedLookups
 			{
 				Expression.Assign(typedSource, Expression.Convert(sourceParameter, typedSource.Type))
 			};
+			var fieldsSet = new List<BinarySerialisationWriterCachedNames.CachedNameData>();
 			foreach (var field in fields)
 			{
-				var fieldNameBytes = BinarySerialisationWriterCachedNames.GetFieldNameBytesIfWantoSerialiseField(field, type)?.OnlyAsReferenceID;
+				var fieldNameBytes = BinarySerialisationWriterCachedNames.GetFieldNameBytesIfWantoSerialiseField(field, type);
 				if (fieldNameBytes == null)
 					return null;
 
-				var valueWriterIfPossibleToGenerate = TryToGetValueWriterForField(field, typedSource, writerParameter);
+				var valueWriterIfPossibleToGenerate = TryToGetValueWriterForField(field, typedSource, writerParameter, valueWriterRetriever);
 				if (valueWriterIfPossibleToGenerate == null)
 					return null;
 
@@ -81,32 +106,34 @@ namespace DanSerialiser.CachedLookups
 					Expression.Call(
 						writerParameter,
 						_writeBytesMethod,
-						Expression.Constant(new[] { (byte)BinarySerialisationDataType.FieldName }.Concat(fieldNameBytes).ToArray())
+						Expression.Constant(new[] { (byte)BinarySerialisationDataType.FieldName }.Concat(fieldNameBytes.OnlyAsReferenceID).ToArray())
 					)
 				);
 
 				// Write out the value-serialising expression
 				statements.Add(valueWriterIfPossibleToGenerate);
+				fieldsSet.Add(fieldNameBytes);
 			}
 
 			// Group all of the field setters together into one call
-			return
-				Expression.Lambda<Action<object, BinarySerialisationWriter>>(
+			return new MemberSetterDetails(
+				Expression.Lambda<ValueWriter>(
 					Expression.Block(new[] { typedSource }, statements),
 					sourceParameter,
 					writerParameter
-				)
-				.Compile();
+				),
+				fieldsSet.ToArray()
+			);
 		}
 
-		private static Expression TryToGetValueWriterForField(FieldInfo field, ParameterExpression typedSource, ParameterExpression writerParameter)
+		private static Expression TryToGetValueWriterForField(FieldInfo field, ParameterExpression typedSource, ParameterExpression writerParameter, ValueWriterRetriever valueWriterRetriever)
 		{
 			if (field.FieldType.IsArray && (field.FieldType.GetArrayRank() == 1))
 			{
 				// Note: There is some duplication of logic between here and the Serialiser class - namely that we call ArrayStart, then write the elements, then call ArrayEnd
 				var elementType = field.FieldType.GetElementType();
 				var current = Expression.Parameter(elementType, "current");
-				var valueWriterForFieldElementType = TryToGetValueWriterForType(elementType, current, writerParameter);
+				var valueWriterForFieldElementType = TryToGetValueWriterForType(elementType, current, writerParameter, valueWriterRetriever);
 				if (valueWriterForFieldElementType == null)
 					return null;
 
@@ -154,60 +181,75 @@ namespace DanSerialiser.CachedLookups
 				return TryToGetValueWriterForType(
 					underlyingType,
 					Expression.Convert(enumValue, underlyingType),
-					writerParameter
+					writerParameter,
+					valueWriterRetriever
 				);
 			}
 
-			return TryToGetValueWriterForType(field.FieldType, Expression.MakeMemberAccess(typedSource, field), writerParameter);
+			return TryToGetValueWriterForType(field.FieldType, Expression.MakeMemberAccess(typedSource, field), writerParameter, valueWriterRetriever);
 		}
 
-		private static Expression TryToGetValueWriterForType(Type type, Expression value, ParameterExpression writerParameter)
+		private static Expression TryToGetValueWriterForType(Type type, Expression value, ParameterExpression writerParameter, ValueWriterRetriever valueWriterRetriever)
 		{
-			// Try to get a BinarySerialisationWriter method to call to serialise the value (if it's a Nullable then unwrap the underlying type and try to find a method
-			// for that - we'll have to include some null-checking to the member setter if we do this, see a litte further down..)
-			//if (field.FieldType.IsArray)
+			// Try to get a BinarySerialisationWriter method to call to serialise the value
+			// - If it's a Nullable then unwrap the underlying type and try to find a method for that and then we'll have to include some null-checking to the member setter
+			//   if we identify a method that will write out the underlying type
 			var nullableTypeInner = GetUnderlyingNullableTypeIfApplicable(type);
 			var fieldWriterMethod = TryToGetWriterMethodToSerialiseType(nullableTypeInner ?? type);
-			if (fieldWriterMethod == null)
-				return null;
-
-			// Generate the write-Field-value-to-stream method call
-			if ((nullableTypeInner != null) || !type.IsValueType)
+			Expression individualMemberSetterForNonNullValue;
+			if (fieldWriterMethod != null)
 			{
-				// If this is a Nullable value then we need to check for is-null and then either write a null object or write the underlying value (Nullable<T> gets magic
-				// treatment by the compiler and so we don't have to write the data as a Nullable<T>, we can write either null or T)
-				// 2018-07-01: Now that there is a "Null" method on IWrite, we need to apply the same logic to reference type fields (it's cheaper to write a single Null
-				// byte for a null Object - which would otherwise be two bytes of ObjectStart, ObjectEnd - or a null Array - which would otherwise be an ArrayStart byte,
-				// the bytes for a null String and an ArrayEnd - or a null String - which would have required three bytes for the String data type and then a length of
-				// minus one encoded as an Int32_16 data type and two bytes for a -1 length)
-				var ifNull = Expression.Call(
-					writerParameter,
-					nameof(BinarySerialisationWriter.Null),
-					typeArguments: Type.EmptyTypes
-				);
-				var ifNotNull = Expression.Call(
+				// When writing a non-null value from a Nullable<> then we need to write the underlying value - Nullable<T> gets magic treatment from the compiler and we
+				// want to achieve the same sort of thing, which means that (in cases where the Nullable<T> is not null) we write the value AS THE UNDERLYING TYPE into
+				// the field (we DON'T write the value AS NULLABLE<T> into the field). If we're not dealing with a Nullable<T> then we CAN use the value to directly
+				// set the field.
+				individualMemberSetterForNonNullValue = Expression.Call(
 					writerParameter,
 					fieldWriterMethod,
-					Expression.Convert(
-						value,
-						nullableTypeInner ?? type
-					)
-				);
-				return Expression.IfThenElse(
-					Expression.Equal(value, Expression.Constant(null, type)),
-					ifNull,
-					ifNotNull
+					(nullableTypeInner == null) ? value : Expression.Convert(value, nullableTypeInner)
 				);
 			}
 			else
 			{
-				// For non-Nullable values, we just write the value straight out using the identifier writer method
-				return Expression.Call(
-					writerParameter,
-					fieldWriterMethod,
-					value
+				// Since we weren't able to find a BinarySerialisationWriter method for the value, see if the valueWriterRetriever lookup can provide a member setter that
+				// was generated earlier. If not then we're out of options and have to give up. If we CAN get one then we'll use that (we'll have to bookend it with Object
+				// Start and End calls so that it describes the complete data for a non-reference-tracked instance)
+				var preBuiltMemberSetter = valueWriterRetriever(nullableTypeInner ?? type);
+				if (preBuiltMemberSetter == null)
+					return null;
+
+				// The preBuiltMemberSetter will be an expression that takes an object argument and so we will need to cast the value to an object if it is a value type
+				// (boxing it). 2018-10-06: It would be worth considering changing the ValueWriter signature in the future so that it doesn't have to take an object so
+				// that we could avoid this boxing for value types.
+				var valueForSourceArgumentOfNestedMemberSetter = (nullableTypeInner == null) ? value : Expression.Convert(value, nullableTypeInner);
+				var valueForSourceArgumentAsObjectOfNestedMemberSetter = value.Type.IsValueType
+					? Expression.Convert(valueForSourceArgumentOfNestedMemberSetter, typeof(object))
+					: valueForSourceArgumentOfNestedMemberSetter;
+				individualMemberSetterForNonNullValue = Expression.Block(
+					Expression.Call(writerParameter, _writeObjectStartMethod, valueForSourceArgumentAsObjectOfNestedMemberSetter),
+					Expression.Invoke(
+						preBuiltMemberSetter,
+						valueForSourceArgumentAsObjectOfNestedMemberSetter,
+						writerParameter
+					),
+					Expression.Call(writerParameter, _writeObjectEndMethod)
 				);
 			}
+
+			// If we're not dealing with a type that may be null then there is nothing more to do!
+			if (type.IsValueType && (nullableTypeInner == null))
+				return individualMemberSetterForNonNullValue;
+
+			// If we ARE dealing with a may-be-null value (a Nullable<T> or reference type) then the member-setting expression needs wrapping in an if-null-call-"Null"-
+			// method-on-BinarySerialisationWriter check
+			// 2018-07-01: The "Null" method on IWrite was added because it's cheaper to write a single Null byte. Otherwise, a null Object would have been written as
+			// two for ObjectStart, ObjectEnd; a null Array would have been written as be an ArrayStart byte, the bytes for a null String (for the element type) and
+			// an ArrayEnd; a null String would have required three bytes to specify the String data type and then a length of minus one encoded as an Int32_16.
+			return Expression.IfThenElse(
+				Expression.Equal(value, Expression.Constant(null, type)),
+				Expression.Call(writerParameter, nameof(BinarySerialisationWriter.Null), typeArguments: Type.EmptyTypes),
+				individualMemberSetterForNonNullValue
+			);
 		}
 
 		private static Type GetUnderlyingNullableTypeIfApplicable(Type type)
@@ -255,6 +297,18 @@ namespace DanSerialiser.CachedLookups
 				return _writeGuidValueMethod;
 			else
 				return null;
+		}
+
+		public sealed class MemberSetterDetails
+		{
+			public MemberSetterDetails(Expression<ValueWriter> memberSetter, BinarySerialisationWriterCachedNames.CachedNameData[] fieldsSet)
+			{
+				MemberSetter = memberSetter;
+				FieldsSet = fieldsSet;
+
+			}
+			public Expression<ValueWriter> MemberSetter { get; }
+			public BinarySerialisationWriterCachedNames.CachedNameData[] FieldsSet { get; }
 		}
 	}
 }
