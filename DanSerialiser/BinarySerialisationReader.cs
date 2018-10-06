@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using DanSerialiser.BinaryTypeStructures;
 using DanSerialiser.CachedLookups;
+using DanSerialiser.Exceptions;
 using DanSerialiser.Reflection;
 
 namespace DanSerialiser

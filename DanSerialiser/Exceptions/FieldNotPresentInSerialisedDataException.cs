@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.Serialization;
 
-namespace DanSerialiser
+namespace DanSerialiser.Exceptions
 {
 	[Serializable]
 	public sealed class FieldNotPresentInSerialisedDataException : Exception
