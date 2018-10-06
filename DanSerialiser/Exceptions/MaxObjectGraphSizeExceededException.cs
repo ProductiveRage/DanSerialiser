@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.Serialization;
 
-namespace DanSerialiser.Exceptions
+namespace DanSerialiser
 {
 	[Serializable]
 	public sealed class MaxObjectGraphSizeExceededException : Exception

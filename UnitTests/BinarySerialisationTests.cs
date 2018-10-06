@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using DanSerialiser;
-using DanSerialiser.Exceptions;
-using DanSerialiser.TypeConverters;
 using Xunit;
 
 namespace UnitTests

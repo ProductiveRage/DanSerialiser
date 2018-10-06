@@ -7,7 +7,6 @@ using System.Text;
 using DanSerialiser.BinaryTypeStructures;
 using DanSerialiser.CachedLookups;
 using DanSerialiser.Reflection;
-using DanSerialiser.TypeConverters;
 
 namespace DanSerialiser
 {

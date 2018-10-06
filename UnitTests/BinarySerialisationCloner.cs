@@ -1,5 +1,4 @@
 ﻿using DanSerialiser;
-using DanSerialiser.TypeConverters;
 
 namespace UnitTests
 {

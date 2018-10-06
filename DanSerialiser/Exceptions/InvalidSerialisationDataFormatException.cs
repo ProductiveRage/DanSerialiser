@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.Serialization;
 
-namespace DanSerialiser.Exceptions
+namespace DanSerialiser
 {
 	/// <summary>
 	/// This will be thrown by the deserialisation process if the data being consumed does not match expectations / requirements - this will relate to a generic

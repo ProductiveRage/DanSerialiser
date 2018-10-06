@@ -1,5 +1,4 @@
 ﻿using System;
-using DanSerialiser.Exceptions;
 using DanSerialiser.Reflection;
 
 namespace DanSerialiser.CachedLookups

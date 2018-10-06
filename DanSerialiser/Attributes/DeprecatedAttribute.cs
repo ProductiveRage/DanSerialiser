@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DanSerialiser.Attributes
+namespace DanSerialiser
 {
 	/// <summary>
 	/// This attribute should be used in scenarios where a property on a type is being replaced but it is desirable that when the new type is serialised, that data may be deserialised

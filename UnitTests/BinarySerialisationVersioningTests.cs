@@ -4,8 +4,6 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using DanSerialiser;
-using DanSerialiser.Attributes;
-using DanSerialiser.Exceptions;
 using Xunit;
 
 namespace UnitTests

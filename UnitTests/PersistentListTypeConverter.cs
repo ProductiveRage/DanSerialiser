@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
-using DanSerialiser.TypeConverters;
+using DanSerialiser;
 
 namespace UnitTests
 {

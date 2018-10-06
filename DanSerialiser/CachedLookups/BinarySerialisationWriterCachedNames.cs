@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
-using DanSerialiser.Attributes;
 
 namespace DanSerialiser.CachedLookups
 {

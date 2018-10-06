@@ -5,8 +5,6 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
-using DanSerialiser.Attributes;
-using DanSerialiser.Exceptions;
 
 namespace DanSerialiser.Reflection
 {
