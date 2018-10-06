@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Linq.Expressions;
 using DanSerialiser.Reflection;
 using static DanSerialiser.CachedLookups.BinarySerialisationCompiledMemberSetters;
 using static DanSerialiser.CachedLookups.BinarySerialisationWriterCachedNames;
@@ -36,10 +35,10 @@ namespace DanSerialiser.CachedLookups
 	/// </summary>
 	internal static class BinarySerialisationDeepCompiledMemberSetters
 	{
-		private static ConcurrentDictionary<Type, (ReadOnlyDictionary<Type, ValueWriter>, IEnumerable<CachedNameData>)> _cache;
+		private static ConcurrentDictionary<Type, (ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>, IEnumerable<CachedNameData>)> _cache;
 		static BinarySerialisationDeepCompiledMemberSetters()
 		{
-			_cache = new ConcurrentDictionary<Type, (ReadOnlyDictionary<Type, ValueWriter>, IEnumerable<CachedNameData>)>();
+			_cache = new ConcurrentDictionary<Type, (ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>, IEnumerable<CachedNameData>)>();
 		}
 
 		/// <summary>
@@ -49,7 +48,7 @@ namespace DanSerialiser.CachedLookups
 		/// for that type (this can also save the Serialiser some work because it will know not to bother trying). The member setters will write data that uses Field Name
 		/// Reference IDs, so the Serialiser will have to use the return CachedNameData list to write FieldNamePreLoad content ahead of the serialised object data.
 		/// </summary>
-		public static (ReadOnlyDictionary<Type, ValueWriter>, IEnumerable<CachedNameData>) GetMemberSettersFor(Type serialisationTargetType)
+		public static (ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>, IEnumerable<CachedNameData>) GetMemberSettersFor(Type serialisationTargetType)
 		{
 			if (serialisationTargetType == null)
 				throw new ArgumentNullException(nameof(serialisationTargetType));
@@ -57,18 +56,18 @@ namespace DanSerialiser.CachedLookups
 			if (_cache.TryGetValue(serialisationTargetType, out var memberSetterData))
 				return memberSetterData;
 
-			var memberSetters = new Dictionary<Type, Expression<ValueWriter>>();
+			var memberSetters = new Dictionary<Type, MemberSetterDetails>();
 			var fieldNamesToDeclare = new List<CachedNameData>();
 			GenerateMemberSettersForTypeIfPossible(serialisationTargetType, new HashSet<Type>(), memberSetters, fieldNamesToDeclare);
-			var compiledMemberSetters = new ReadOnlyDictionary<Type, ValueWriter>(
-				memberSetters.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.Compile())
+			var compiledMemberSetters = new ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>(
+				memberSetters.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.GetCompiledMemberSetter())
 			);
 			memberSetterData = (compiledMemberSetters, fieldNamesToDeclare);
 			_cache.TryAdd(serialisationTargetType, memberSetterData);
 			return memberSetterData;
 		}
 
-		private static void GenerateMemberSettersForTypeIfPossible(Type type, HashSet<Type> typesEncountered, Dictionary<Type, Expression<ValueWriter>> memberSetters, List<CachedNameData> fieldNamesToDeclare)
+		private static void GenerateMemberSettersForTypeIfPossible(Type type, HashSet<Type> typesEncountered, Dictionary<Type, MemberSetterDetails> memberSetters, List<CachedNameData> fieldNamesToDeclare)
 		{
 			// Leave primitive-like values to the BinarySerialisationWriter's specialised methods (Boolean, String, DateTime, etc..)
 			if (Serialiser.IsTreatedAsPrimitive(type))
@@ -107,12 +106,12 @@ namespace DanSerialiser.CachedLookups
 			var memberSetterDetails = TryToGenerateMemberSetter(
 				type,
 				DefaultTypeAnalyser.Instance,
-				t => memberSetters.TryGetValue(t, out var valueWriter) ? valueWriter : null
+				t => memberSetters.TryGetValue(t, out var valueWriter) ? valueWriter?.MemberSetter : null
 			);
 			if (memberSetterDetails != null)
 			{
 				fieldNamesToDeclare.AddRange(memberSetterDetails.FieldsSet);
-				memberSetters.Add(type, memberSetterDetails.MemberSetter);
+				memberSetters.Add(type, memberSetterDetails);
 			}
 			else
 			{
