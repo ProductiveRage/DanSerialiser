@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -71,7 +72,14 @@ namespace DanSerialiserAnalyser
 				// Ensure that this is the [Deprecated] attribute from DanSerialiser and not one from somewhere else (if can't resolve it then presume that there is
 				// a problem with the code and wait until it all compiles properly)
 				// Note: Don't need to check that argument name since [Deprecated] only has one ctor signature that takes a single argument (which is "replacedBy")
-				if ((context.SemanticModel.GetSymbolInfo(deprecatedAttribute).Symbol as IMethodSymbol)?.ContainingNamespace?.Name != "DanSerialiser")
+				var namespaceSegments = new List<string>();
+				var containingNamespace = (context.SemanticModel.GetSymbolInfo(deprecatedAttribute).Symbol as IMethodSymbol)?.ContainingNamespace;
+				while (!string.IsNullOrEmpty(containingNamespace?.Name))
+				{
+					namespaceSegments.Insert(0, containingNamespace.Name);
+					containingNamespace = containingNamespace.ContainingNamespace;
+				}
+				if (string.Join(".", namespaceSegments) != "DanSerialiser.Attributes")
 					continue;
 
 				// The "replacedBy" value must indicate a Field or Property. Technically, it would be ok to specify the name with a string literal or with a string

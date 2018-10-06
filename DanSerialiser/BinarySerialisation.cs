@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using DanSerialiser.TypeConverters;
 
 namespace DanSerialiser
 {

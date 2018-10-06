@@ -1,4 +1,4 @@
-﻿namespace DanSerialiser
+﻿namespace DanSerialiser.TypeConverters
 {
 	/// <summary>
 	/// During the serialisation process, it may be desirable to transform some values before serialising them - for example, large linked lists could result in

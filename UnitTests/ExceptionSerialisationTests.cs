@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Xml.Serialization;
 using DanSerialiser;
+using DanSerialiser.Exceptions;
 using Xunit;
 
 namespace UnitTests

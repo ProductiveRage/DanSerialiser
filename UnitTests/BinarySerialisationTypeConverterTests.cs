@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.Linq;
 using DanSerialiser;
+using DanSerialiser.TypeConverters;
 using Xunit;
 
 namespace UnitTests

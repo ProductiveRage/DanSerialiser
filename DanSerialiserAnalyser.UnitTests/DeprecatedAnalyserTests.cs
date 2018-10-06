@@ -11,7 +11,7 @@ namespace DanSerialiserAnalyser.UnitTests
 		public void IdealUsageForTargetProperty()
 		{
 			var testContent = @"
-				using DanSerialiser;
+				using DanSerialiser.Attributes;
 
 				namespace TestCase
 				{
@@ -31,7 +31,7 @@ namespace DanSerialiserAnalyser.UnitTests
 		public void IdealUsageForTargetField()
 		{
 			var testContent = @"
-				using DanSerialiser;
+				using DanSerialiser.Attributes;
 
 				namespace TestCase
 				{
@@ -51,7 +51,7 @@ namespace DanSerialiserAnalyser.UnitTests
 		public void NoArguments()
 		{
 			var testContent = @"
-				using DanSerialiser;
+				using DanSerialiser.Attributes;
 
 				namespace TestCase
 				{
@@ -71,7 +71,7 @@ namespace DanSerialiserAnalyser.UnitTests
 		public void NoArgumentsWithBrackets()
 		{
 			var testContent = @"
-				using DanSerialiser;
+				using DanSerialiser.Attributes;
 
 				namespace TestCase
 				{
@@ -94,7 +94,7 @@ namespace DanSerialiserAnalyser.UnitTests
 		public void SpecifyingThePropertyByStringIsNotOk()
 		{
 			var testContent = @"
-				using DanSerialiser;
+				using DanSerialiser.Attributes;
 
 				namespace TestCase
 				{
@@ -125,7 +125,7 @@ namespace DanSerialiserAnalyser.UnitTests
 		public void ReplacedByNameofTargetMustBeProperty()
 		{
 			var testContent = @"
-				using DanSerialiser;
+				using DanSerialiser.Attributes;
 
 				namespace TestCase
 				{
@@ -160,7 +160,7 @@ namespace DanSerialiserAnalyser.UnitTests
 		public void ReplacedByNameofTargetMustBePropertyOnSameClass()
 		{
 			var testContent = @"
-				using DanSerialiser;
+				using DanSerialiser.Attributes;
 
 				namespace TestCase
 				{

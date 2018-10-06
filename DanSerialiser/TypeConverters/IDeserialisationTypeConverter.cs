@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DanSerialiser
+namespace DanSerialiser.TypeConverters
 {
 	/// <summary>
 	/// If any values were transformed by ISerialisationTypeConverter implementations during the serialisation process then it is almost certain that implementations

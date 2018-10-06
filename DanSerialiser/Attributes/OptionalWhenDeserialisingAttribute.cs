@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DanSerialiser
+namespace DanSerialiser.Attributes
 {
 	/// <summary>
 	/// Ordinarily, when deserialising, if there are any members that can not have a value set then the deserialisation will be considered a failure and a FieldNotPresentInSerialisedDataException
