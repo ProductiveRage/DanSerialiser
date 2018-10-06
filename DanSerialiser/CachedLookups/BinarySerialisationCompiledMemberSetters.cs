@@ -7,7 +7,7 @@ using DanSerialiser.Reflection;
 
 namespace DanSerialiser.CachedLookups
 {
-	internal static class SharedGeneratedMemberSetters
+	internal static class BinarySerialisationCompiledMemberSetters
 	{
 		private static readonly Type _writerType = typeof(BinarySerialisationWriter);
 		private static readonly MethodInfo
@@ -21,7 +21,7 @@ namespace DanSerialiser.CachedLookups
 			_writeGuidValueMethod,
 			_writeArrayStartMethod, _writeArrayEndMethod,
 			_writeObjectStartMethod, _writeObjectEndMethod;
-		static SharedGeneratedMemberSetters()
+		static BinarySerialisationCompiledMemberSetters()
 		{
 			_writerType = typeof(BinarySerialisationWriter);
 

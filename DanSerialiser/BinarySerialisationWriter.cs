@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using DanSerialiser.BinaryTypeStructures;
@@ -105,8 +106,8 @@ namespace DanSerialiser
 		}
 
 		// There's nothing inherently special or awkward about DateTime that the Serialiser couldn't serialise it like any other type (by recording all of its fields' values) but it's
-		// such a common type that it seems like optimising it a little wouldn't hurt AND having it as an IWrite method means that the SharedGeneratedMemberSetters can make use of it,
-		// which broadens the range of types that it can generate (and that makes things faster when the same types are serialised over and over again)
+		// such a common type that it seems like optimising it a little wouldn't hurt AND having it as an IWrite method means that the BinarySerialisationCompiledMemberSetters can make
+		// use of it, which broadens the range of types that it can generate (and that makes things faster when the same types are serialised over and over again)
 		public void DateTime(DateTime value)
 		{
 			// "under the hood a .NET DateTime is essentially a tick count plus a DateTimeKind"
@@ -243,6 +244,29 @@ namespace DanSerialiser
 			return WritePropertyNameBytesIfWantoSerialiseField(property);
 		}
 
+		public Dictionary<Type, Action<object>> PrepareForSerialisation(Type serialisationTargetType, ISerialisationTypeConverter[] typeConverters)
+		{
+			if (serialisationTargetType == null)
+				throw new ArgumentNullException(nameof(serialisationTargetType));
+			if (typeConverters == null)
+				throw new ArgumentNullException(nameof(typeConverters));
+
+			// TODO: Explain
+			if ((ReferenceReuseStrategy != ReferenceReuseOptions.SpeedyButLimited) || (typeConverters.Length > 0))
+				return new Dictionary<Type, Action<object>>();
+
+			var memberSetterData = SpeedyBinarySerialisationWriterMemberSetters.GetAvailableMemberSettersFor(serialisationTargetType);
+			foreach (var field in memberSetterData.Item2)
+			{
+				_stream.WriteByte((byte)BinarySerialisationDataType.FieldNamePreLoad);
+				WriteBytes(field.AsStringAndReferenceID);
+			}
+			return memberSetterData.Item1.ToDictionary(
+				entry => entry.Key,
+				entry => (entry.Value == null) ? null : (Action<object>)(source => entry.Value(source, this))
+			);
+		}
+
 		/// <summary>
 		/// This will return a compiled 'member setter' for the specified type, if it's possible to create one. A member setter takes an instance of an object and writes the data
 		/// for the fields and properties to the writer. It does not write the ObjectStart and ObjectEnd data since the caller takes responsibility for those because reference
@@ -256,13 +280,13 @@ namespace DanSerialiser
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
 
-			// The SharedGeneratedMemberSetters.TryToGenerateMemberSetter method has a facility to take existing member setters and use them for fields or properties on the current
-			// type in order to create a more complex member setter - one that can set values other than primitive-esque data types. This would bypass any reference tracking and is
-			// not currently enabled (so the "valueWriterRetriever" delegate always returns null). Since reference tracking is not required for struct instances, it may seem reasonable
-			// to change this behaviour to allow forming more complex member setters for types whose members are all primitive-like OR structs but structs can have fields that are
-			// reference types and reference-tracking IS required for those values and so more analysis would be required in order to be sure that it was safe (structs with reference
-			// fields could form part of a circular reference loop and we need to be aware of those, which we can't be if reference tracking is not available).
-			var memberSetterAndFieldsSet = SharedGeneratedMemberSetters.TryToGenerateMemberSetter(type, _typeAnalyser, t => null);
+			// The BinarySerialisationCompiledMemberSetters.TryToGenerateMemberSetter method has a facility to take existing member setters and use them for fields or properties
+			// on the current type in order to create a more complex member setter - one that can set values other than primitive-esque data types. This would bypass any reference
+			// tracking and is not currently enabled (so the "valueWriterRetriever" delegate always returns null). Since reference tracking is not required for struct instances, it
+			// may seem reasonable to change this behaviour to allow forming more complex member setters for types whose members are all primitive-like OR structs but structs can
+			// have fields that are reference types and reference-tracking IS required for those values and so more analysis would be required in order to be sure that it was safe
+			// (structs with reference fields could form part of a circular reference loop and we need to be aware of those, which we can't be if reference tracking is not available).
+			var memberSetterAndFieldsSet = BinarySerialisationCompiledMemberSetters.TryToGenerateMemberSetter(type, _typeAnalyser, t => null);
 			if (memberSetterAndFieldsSet == null)
 				return null;
 
