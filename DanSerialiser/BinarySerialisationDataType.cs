@@ -41,6 +41,16 @@
 		ReferenceID24 = 26,
 		ReferenceID32 = 27,
 		FieldName = 28,
+		/// <summary>
+		/// This is field name data for a type that will appear later - ordinarily, the first time that a field is present in the content, the field name will be included along with
+		/// a Name Reference ID (and then subsequent appearances of that field will specify only the Name Reference ID) but sometimes it may be desirable to list all of the field names
+		/// first and then only use Name Reference IDs within the object data. If this is the case then the FieldNamePreLoad entries will always be at the start of the content and they
+		/// may not appear again once the object data begins.
+		/// </summary>
+		FieldNamePreLoad = 33,
+		/// <summary>
+		/// This indicates that the reference should be instantiated but left unitialised for now and that the member data will appear later (against the same Reference ID)
+		/// </summary>
 		ObjectContentPostponed = 29,
 		ObjectEnd = 30,
 		ArrayStart = 31,
