@@ -1,4 +1,5 @@
 ﻿using System;
+using DanSerialiser.Exceptions;
 using DanSerialiser.Reflection;
 
 namespace DanSerialiser.CachedLookups
@@ -28,9 +29,9 @@ namespace DanSerialiser.CachedLookups
 			foreach (var field in _fields)
 			{
 				if (nextEntryType != BinarySerialisationDataType.FieldName)
-					throw new InvalidOperationException("Unexpected data type encountered while processing fields in BinarySerialisationReaderTypeReader: " + nextEntryType);
+					throw new InvalidSerialisationDataFormatException("Unexpected data type encountered while processing fields in BinarySerialisationReaderTypeReader: " + nextEntryType);
 				if (reader.ReadNextNameReferenceID(reader.ReadNextDataType()) != field.FieldNameReferenceID)
-					throw new Exception($"Fields appeared out of order while being processed by BinarySerialisationReaderTypeReader");
+					throw new InvalidSerialisationDataFormatException($"Fields appeared out of order while being processed by BinarySerialisationReaderTypeReader");
 
 				var value = reader.Read(ignoreAnyInvalidTypes, field.FieldType);
 				foreach (var setter in field.Setters)
@@ -38,7 +39,7 @@ namespace DanSerialiser.CachedLookups
 				nextEntryType = reader.ReadNextDataType();
 			}
 			if (nextEntryType != BinarySerialisationDataType.ObjectEnd)
-				throw new InvalidOperationException("Unexpected data type encountered after processed fields in BinarySerialisationReaderTypeReader: " + nextEntryType);
+				throw new InvalidSerialisationDataFormatException("Unexpected data type encountered after processed fields in BinarySerialisationReaderTypeReader: " + nextEntryType);
 			return instance;
 		}
 

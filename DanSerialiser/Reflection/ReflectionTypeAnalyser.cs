@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
 using DanSerialiser.Attributes;
+using DanSerialiser.Exceptions;
 
 namespace DanSerialiser.Reflection
 {
@@ -228,7 +229,7 @@ namespace DanSerialiser.Reflection
 						// If propertySetter.PropertyType is not the same as propertyTypeIfKnown and if propertyTypeIfKnown is not assignable from propertySetter.PropertyType
 						// and propertySetter.PropertyType is not assigned from propertyTypeIfKnown then we've come to an impossible situation - if there are multiple properties
 						// then there must be a single type that a value may be deserialised as that may be used to set ALL of the properties. Since there isn't, we have to throw.
-						throw new InvalidOperationException($"Type {typeToLookForPropertyOn.Name} has [Deprecated] properties that are all set by data for field {fieldName} but which have incompatible types");
+						throw new InvalidSerialisationDataFormatException($"Type {typeToLookForPropertyOn.Name} has [Deprecated] properties that are all set by data for field {fieldName} but which have incompatible types");
 					}
 				}
 			}

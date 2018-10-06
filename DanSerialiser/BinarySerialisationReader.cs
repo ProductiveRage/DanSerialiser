@@ -58,7 +58,7 @@ namespace DanSerialiser
 			// that it would be used to set does not exist on the parent object - if there is no field to set, who cares if the value is of a type that is not available)
 			var result = Read(ignoreAnyInvalidTypes: false, targetTypeIfAvailable: typeof(T));
 			if (_deferredInitialisationReferenceIDsAwaitingPopulation.Count > 0)
-				throw new InvalidOperationException("There were deferred-initialisation references encountered in the data that did not get fully populated before the stream ended");
+				throw new InvalidSerialisationDataFormatException("There were deferred-initialisation references encountered in the data that did not get fully populated before the stream ended");
 			return (T)result;
 		}
 
@@ -82,7 +82,7 @@ namespace DanSerialiser
 			switch (dataType)
 			{
 				default:
-					throw new Exception("Unexpected BinarySerialisationDataType: " + dataType);
+					throw new InvalidSerialisationDataFormatException("Unexpected BinarySerialisationDataType: " + dataType);
 
 				case BinarySerialisationDataType.Null:
 					return null;
@@ -175,7 +175,7 @@ namespace DanSerialiser
 			else if (dataType == BinarySerialisationDataType.Int32)
 				length = ReadNextInt();
 			else
-				throw new Exception("Unexpected BinarySerialisationDataType for String length: " + dataType);
+				throw new InvalidSerialisationDataFormatException("Unexpected BinarySerialisationDataType for String length: " + dataType);
 
 			if (length == -1)
 				return null;
@@ -194,7 +194,7 @@ namespace DanSerialiser
 		{
 			var typeName = ReadNextTypeName(out var typeNameReferenceID);
 			if (typeName == null)
-				throw new InvalidOperationException("Null type names should not exist in object data since there is a Null binary serialisation data type");
+				throw new InvalidSerialisationDataFormatException("Null type names should not exist in object data since there is a Null binary serialisation data type");
 
 			// If the next value is a Reference ID then the writer had supportReferenceReuse and all object definitions for reference types (except strings) will start with a
 			// Reference ID that will either be a new ID (followed by the object data) or an existing ID (followed by ObjectEnd)
@@ -214,7 +214,7 @@ namespace DanSerialiser
 			if (referenceID != null)
 			{
 				if (referenceID < 0)
-					throw new Exception("Encountered negative Reference ID, invalid:" + referenceID);
+					throw new InvalidSerialisationDataFormatException("Encountered negative Reference ID, invalid:" + referenceID);
 				if (_objectReferences.TryGetValue(referenceID.Value, out alreadyEncounteredReference))
 				{
 					// This is an existing Reference ID so ensure that it's followed by ObjectEnd and return the existing reference.. unless it is an object reference that was
@@ -224,7 +224,7 @@ namespace DanSerialiser
 					{
 						nextEntryType = ReadNextDataType();
 						if (nextEntryType != BinarySerialisationDataType.ObjectEnd)
-							throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered after reused reference");
+							throw new InvalidSerialisationDataFormatException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} was not encountered after reused reference");
 						return alreadyEncounteredReference;
 					}
 					else
@@ -290,17 +290,17 @@ namespace DanSerialiser
 			if (nextEntryType == BinarySerialisationDataType.ObjectContentPostponed)
 			{
 				if (referenceID == null)
-					throw new InvalidOperationException(nameof(BinarySerialisationDataType.ObjectContentPostponed) + " should always appear with a ReferenceID");
+					throw new InvalidSerialisationDataFormatException(nameof(BinarySerialisationDataType.ObjectContentPostponed) + " should always appear with a ReferenceID");
 				nextEntryType = ReadNextDataType();
 				if (nextEntryType != BinarySerialisationDataType.ObjectEnd)
-					throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} after {nameof(BinarySerialisationDataType.ObjectContentPostponed)} but encountered {nextEntryType}");
+					throw new InvalidSerialisationDataFormatException($"Expected {nameof(BinarySerialisationDataType.ObjectEnd)} after {nameof(BinarySerialisationDataType.ObjectContentPostponed)} but encountered {nextEntryType}");
 				_deferredInitialisationReferenceIDsAwaitingPopulation.Add(referenceID.Value);
 				return valueIfTypeIsAvailable;
 			}
 			else if (toPopulateDeferredInstance)
 			{
 				if (referenceID == null)
-					throw new InvalidOperationException($"There should always be a ReferenceID when {nameof(toPopulateDeferredInstance)} is true");
+					throw new InvalidSerialisationDataFormatException($"There should always be a ReferenceID when {nameof(toPopulateDeferredInstance)} is true");
 				_deferredInitialisationReferenceIDsAwaitingPopulation.Remove(referenceID.Value);
 			}
 
@@ -348,7 +348,7 @@ namespace DanSerialiser
 					{
 						fieldNameReferenceID = ReadNextNameReferenceID(nextEntryType);
 						if (!_nameReferences.TryGetValue(fieldNameReferenceID, out rawFieldNameInformation))
-							throw new Exception("Invalid NameReferenceID: " + fieldNameReferenceID);
+							throw new InvalidSerialisationDataFormatException("Invalid NameReferenceID: " + fieldNameReferenceID);
 					}
 					BinaryReaderWriterShared.SplitCombinedTypeAndFieldName(rawFieldNameInformation, out var typeNameIfRequired, out var fieldName);
 
@@ -408,7 +408,7 @@ namespace DanSerialiser
 					}
 				}
 				else
-					throw new InvalidOperationException("Unexpected data type encountered while enumerating object properties: " + nextEntryType);
+					throw new InvalidSerialisationDataFormatException("Unexpected data type encountered while enumerating object properties: " + nextEntryType);
 				nextEntryType = ReadNextDataType();
 			}
 		}
@@ -417,7 +417,7 @@ namespace DanSerialiser
 		{
 			var typeName = ReadNextTypeName(out var typeNameReferenceID);
 			if (typeName == null)
-				throw new InvalidOperationException("Null type names should not exist in object data since there is a Null binary serialisation data type");
+				throw new InvalidSerialisationDataFormatException("Null type names should not exist in object data since there is a Null binary serialisation data type");
 
 			int referenceID;
 			var nextEntryType = ReadNextDataType();
@@ -430,11 +430,11 @@ namespace DanSerialiser
 			else if (nextEntryType == BinarySerialisationDataType.ReferenceID32)
 				referenceID = ReadNext();
 			else
-				throw new InvalidOperationException("Expected Object Reference ID for " + nameof(BinarySerialisationDataType.ObjectContentPostponed));
+				throw new InvalidSerialisationDataFormatException("Expected Object Reference ID for " + nameof(BinarySerialisationDataType.ObjectContentPostponed));
 			if (referenceID < 0)
-				throw new Exception("Encountered negative Reference ID, invalid:" + referenceID);
+				throw new InvalidSerialisationDataFormatException("Encountered negative Reference ID, invalid:" + referenceID);
 			if (_objectReferences.ContainsKey(referenceID))
-				throw new InvalidOperationException($"Don't expect {nameof(BinarySerialisationDataType.ObjectContentPostponed)} for object reference that has already been populated");
+				throw new InvalidSerialisationDataFormatException($"Don't expect {nameof(BinarySerialisationDataType.ObjectContentPostponed)} for object reference that has already been populated");
 
 		}
 
@@ -449,14 +449,14 @@ namespace DanSerialiser
 			else if (specifiedDataType == BinarySerialisationDataType.NameReferenceID8)
 				return ReadNext();
 			else
-				throw new Exception("Unexpected " + specifiedDataType + " (expected a Name Reference ID)");
+				throw new InvalidSerialisationDataFormatException("Unexpected " + specifiedDataType + " (expected a Name Reference ID)");
 		}
 
 		private object ReadNextArray(bool ignoreAnyInvalidTypes)
 		{
 			var elementTypeName = ReadNextTypeName(out var typeNameReferenceID);
 			if (elementTypeName == null)
-				throw new InvalidOperationException("Null array element type names should not exist in object data since there is a Null binary serialisation data type");
+				throw new InvalidSerialisationDataFormatException("Null array element type names should not exist in object data since there is a Null binary serialisation data type");
 
 			var elementType = _typeAnalyser.GetType(elementTypeName); // These lookups will be cached by the_typeAnalyser, which can help (vs calling Type.GetType every time)
 			var lengthDataType = ReadNextDataType();
@@ -470,7 +470,7 @@ namespace DanSerialiser
 			else if (lengthDataType == BinarySerialisationDataType.Int32)
 				length = ReadNextInt();
 			else
-				throw new Exception("Unexpected BinarySerialisationDataType for Array length: " + lengthDataType);
+				throw new InvalidSerialisationDataFormatException("Unexpected BinarySerialisationDataType for Array length: " + lengthDataType);
 
 			var items = Array.CreateInstance(elementType, length);
 			for (var i = 0; i < items.Length; i++)
@@ -482,12 +482,12 @@ namespace DanSerialiser
 			while (nextEntryType != BinarySerialisationDataType.ArrayEnd)
 			{
 				if (nextEntryType != BinarySerialisationDataType.ObjectStart)
-					throw new InvalidOperationException($"After array elements, expected either {nameof(BinarySerialisationDataType.ArrayEnd)} or {nameof(BinarySerialisationDataType.ObjectStart)} (for deferred references)");
+					throw new InvalidSerialisationDataFormatException($"After array elements, expected either {nameof(BinarySerialisationDataType.ArrayEnd)} or {nameof(BinarySerialisationDataType.ObjectStart)} (for deferred references)");
 				ReadNextObject(ignoreAnyInvalidTypes, toPopulateDeferredInstance: true);
 				nextEntryType = ReadNextDataType();
 			}
 			if (nextEntryType != BinarySerialisationDataType.ArrayEnd)
-				throw new InvalidOperationException($"Expected {nameof(BinarySerialisationDataType.ArrayEnd)} was not encountered");
+				throw new InvalidSerialisationDataFormatException($"Expected {nameof(BinarySerialisationDataType.ArrayEnd)} was not encountered");
 			return items;
 		}
 
@@ -508,7 +508,7 @@ namespace DanSerialiser
 			{
 				typeNameReferenceID = ReadNextNameReferenceID(nextEntryType);
 				if (!_nameReferences.TryGetValue(typeNameReferenceID, out var typeName))
-					throw new Exception("Invalid NameReferenceID: " + typeNameReferenceID);
+					throw new InvalidSerialisationDataFormatException("Invalid NameReferenceID: " + typeNameReferenceID);
 				return typeName;
 			}
 		}
@@ -522,7 +522,7 @@ namespace DanSerialiser
 					return dataType;
 
 				if (ReadNextDataType() != BinarySerialisationDataType.String)
-					throw new Exception("Expected String value after FieldNamePreLoad");
+					throw new InvalidSerialisationDataFormatException("Expected String value after FieldNamePreLoad");
 				var rawFieldNameInformation = ReadNextString();
 				var fieldNameReferenceID = ReadNextNameReferenceID(ReadNextDataType());
 				_nameReferences[fieldNameReferenceID] = rawFieldNameInformation;
@@ -538,7 +538,7 @@ namespace DanSerialiser
 		{
 			var value = _stream.ReadByte(); // Returns -1 if no data or the byte cast to an int if there IS data
 			if (value == -1)
-				throw new InvalidOperationException("Insufficient data to read (presume invalid content)");
+				throw new InvalidSerialisationDataFormatException("Insufficient data to read (presume invalid content)");
 			return (byte)value;
 		}
 
@@ -546,7 +546,7 @@ namespace DanSerialiser
 		{
 			var values = new byte[numberOfBytes];
 			if (_stream.Read(values, 0, numberOfBytes) < numberOfBytes) // Returns number of bytes read (less than numberOfBytes if insufficient data)
-				throw new InvalidOperationException("Insufficient data to read (presume invalid content)");
+				throw new InvalidSerialisationDataFormatException("Insufficient data to read (presume invalid content)");
 			return values;
 		}
 	}
