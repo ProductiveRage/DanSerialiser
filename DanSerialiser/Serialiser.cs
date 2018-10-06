@@ -331,7 +331,7 @@ namespace DanSerialiser
 				return;
 			}
 
-			writer.ObjectStart(value);
+			writer.ObjectStart(value.GetType());
 			bool recordedAsOtherReference, recordedAsPostponedReference;
 			if ((objectHistoryIfReferenceReuseAllowed != null) && IsApplicableToObjectHistory(type))
 			{

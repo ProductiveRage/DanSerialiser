@@ -160,13 +160,13 @@ namespace DanSerialiser
 			WriteByte((byte)BinarySerialisationDataType.Null);
 		}
 
-		public void ObjectStart(object value)
+		public void ObjectStart(Type type)
 		{
-			if (value == null)
-				throw new ArgumentNullException(nameof(value));
+			if (type == null)
+				throw new ArgumentNullException(nameof(type));
 
 			WriteByte((byte)BinarySerialisationDataType.ObjectStart);
-			WriteTypeName(value.GetType());
+			WriteTypeName(type);
 		}
 
 		public void ObjectEnd()
@@ -313,7 +313,7 @@ namespace DanSerialiser
 			if (memberSetterAndFieldsSet == null)
 				return null;
 
-			var compiledMemberSetter = memberSetterAndFieldsSet.MemberSetter.Compile();
+			var compiledMemberSetter = memberSetterAndFieldsSet.GetCompiledMemberSetter();
 			return value => compiledMemberSetter(value, this);
 		}
 

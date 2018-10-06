@@ -49,16 +49,14 @@ namespace DanSerialiser.CachedLookups
 			_writeGuidValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Guid), new[] { typeof(Guid) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Guid));
 			_writeArrayStartMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ArrayStart), new[] { typeof(object), typeof(Type) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ArrayStart));
 			_writeArrayEndMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ArrayEnd), Type.EmptyTypes) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ArrayEnd));
-			_writeObjectStartMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ObjectStart), new[] { typeof(object) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ObjectStart));
+			_writeObjectStartMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ObjectStart), new[] { typeof(Type) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ObjectStart));
 			_writeObjectEndMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ObjectEnd), Type.EmptyTypes) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ObjectEnd));
 		}
-
-		public delegate void ValueWriter(object source, BinarySerialisationWriter writer);
 
 		/// <summary>
 		/// This may return null if no ValueWriter is available
 		/// </summary>
-		public delegate Expression<ValueWriter> ValueWriterRetriever(Type type);
+		public delegate LambdaExpression ValueWriterRetriever(Type type);
 
 		/// <summary>
 		/// A member setter is a delegate that takes an instance and writes the data for fields and properties to a BinarySerialisationWriter. Note that it will not write the
@@ -83,13 +81,9 @@ namespace DanSerialiser.CachedLookups
 			// potential complications such as checking for circular / reused references that can't be handled by a simple type generator)
 			var fields = typeAnalyser.GetAllFieldsThatShouldBeSet(type);
 
-			var sourceParameter = Expression.Parameter(typeof(object), "untypedSource");
+			var sourceParameter = Expression.Parameter(type, "source");
 			var writerParameter = Expression.Parameter(_writerType, "writer");
-			var typedSource = Expression.Variable(type, "source");
-			var statements = new List<Expression>
-			{
-				Expression.Assign(typedSource, Expression.Convert(sourceParameter, typedSource.Type))
-			};
+			var statements = new List<Expression>();
 			var fieldsSet = new List<BinarySerialisationWriterCachedNames.CachedNameData>();
 			foreach (var field in fields)
 			{
@@ -97,7 +91,7 @@ namespace DanSerialiser.CachedLookups
 				if (fieldNameBytes == null)
 					return null;
 
-				var valueWriterIfPossibleToGenerate = TryToGetValueWriterForField(field, typedSource, writerParameter, valueWriterRetriever);
+				var valueWriterIfPossibleToGenerate = TryToGetValueWriterForField(field, sourceParameter, writerParameter, valueWriterRetriever);
 				if (valueWriterIfPossibleToGenerate == null)
 					return null;
 
@@ -117,8 +111,9 @@ namespace DanSerialiser.CachedLookups
 
 			// Group all of the field setters together into one call
 			return new MemberSetterDetails(
-				Expression.Lambda<ValueWriter>(
-					Expression.Block(new[] { typedSource }, statements),
+				type,
+				Expression.Lambda(
+					Expression.Block(statements),
 					sourceParameter,
 					writerParameter
 				),
@@ -218,18 +213,11 @@ namespace DanSerialiser.CachedLookups
 				if (preBuiltMemberSetter == null)
 					return null;
 
-				// The preBuiltMemberSetter will be an expression that takes an object argument and so we will need to cast the value to an object if it is a value type
-				// (boxing it). 2018-10-06: It would be worth considering changing the ValueWriter signature in the future so that it doesn't have to take an object so
-				// that we could avoid this boxing for value types.
-				var valueForSourceArgumentOfNestedMemberSetter = (nullableTypeInner == null) ? value : Expression.Convert(value, nullableTypeInner);
-				var valueForSourceArgumentAsObjectOfNestedMemberSetter = value.Type.IsValueType
-					? Expression.Convert(valueForSourceArgumentOfNestedMemberSetter, typeof(object))
-					: valueForSourceArgumentOfNestedMemberSetter;
 				individualMemberSetterForNonNullValue = Expression.Block(
-					Expression.Call(writerParameter, _writeObjectStartMethod, valueForSourceArgumentAsObjectOfNestedMemberSetter),
+					Expression.Call(writerParameter, _writeObjectStartMethod, Expression.Constant(type)),
 					Expression.Invoke(
 						preBuiltMemberSetter,
-						valueForSourceArgumentAsObjectOfNestedMemberSetter,
+						(nullableTypeInner == null) ? value : Expression.Convert(value, nullableTypeInner),
 						writerParameter
 					),
 					Expression.Call(writerParameter, _writeObjectEndMethod)
@@ -301,13 +289,36 @@ namespace DanSerialiser.CachedLookups
 
 		public sealed class MemberSetterDetails
 		{
-			public MemberSetterDetails(Expression<ValueWriter> memberSetter, BinarySerialisationWriterCachedNames.CachedNameData[] fieldsSet)
+			private readonly Type _type;
+			public MemberSetterDetails(Type type, LambdaExpression memberSetter, BinarySerialisationWriterCachedNames.CachedNameData[] fieldsSet)
 			{
-				MemberSetter = memberSetter;
-				FieldsSet = fieldsSet;
+				if (memberSetter == null)
+					throw new ArgumentNullException(nameof(memberSetter));
+				if ((memberSetter.Parameters.Count != 2)|| (memberSetter.Parameters[0].Type != type) || (memberSetter.Parameters[1].Type != typeof(BinarySerialisationWriter)))
+					throw new ArgumentException($"The {nameof(memberSetter)} lambda expression must have two parameters - {type} and {nameof(BinarySerialisationWriter)}");
 
+				_type = type ?? throw new ArgumentNullException(nameof(type));
+				MemberSetter = memberSetter;
+				FieldsSet = fieldsSet ?? throw new ArgumentNullException(nameof(fieldsSet));
 			}
-			public Expression<ValueWriter> MemberSetter { get; }
+
+			public LambdaExpression MemberSetter { get; }
+			public Action<object, BinarySerialisationWriter> GetCompiledMemberSetter()
+			{
+				var sourceParameter = Expression.Parameter(typeof(object), "source");
+				var writerParameter = Expression.Parameter(typeof(BinarySerialisationWriter), "writer");
+				return
+					Expression.Lambda<Action<object, BinarySerialisationWriter>>(
+						Expression.Invoke(
+							MemberSetter,
+							Expression.Convert(sourceParameter, _type),
+							writerParameter
+						),
+						sourceParameter,
+						writerParameter
+					)
+					.Compile();
+			}
 			public BinarySerialisationWriterCachedNames.CachedNameData[] FieldsSet { get; }
 		}
 	}
