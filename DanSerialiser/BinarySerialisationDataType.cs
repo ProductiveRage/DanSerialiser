@@ -2,52 +2,48 @@
 {
 	internal enum BinarySerialisationDataType : byte
 	{
-		Boolean,
-		Byte,
-		SByte,
+		Boolean = 0,
+		Byte = 1,
+		SByte = 2,
 
-		Int16,
-		Int32_8,
-		Int32_16,
-		Int32_24,
-		Int32,
-		Int64,
+		Int16 = 3,
+		Int32_8 = 4,
+		Int32_16 = 5,
+		Int32_24 = 6,
+		Int32 = 7,
+		Int64 = 8,
 
-		UInt16,
-		UInt32,
-		UInt64,
+		UInt16 = 9,
+		UInt32 = 10,
+		UInt64 = 11,
 
-		Single,
-		Double,
-		Decimal,
+		Single = 12,
+		Double = 13,
+		Decimal = 14,
 
-		Char,
-		String,
+		Char = 15,
+		String = 16,
 
-		DateTime,
+		DateTime = 17,
+		TimeSpan = 36,
 
-		Null,
+		Guid = 37,
 
-		ObjectStart,
-		NameReferenceID8,
-		NameReferenceID16,
-		NameReferenceID24,
-		NameReferenceID32,
-		ReferenceID8,
-		ReferenceID16,
-		ReferenceID24,
-		ReferenceID32,
-		FieldName,
-		ObjectContentPostponed,
-		ObjectEnd,
+		Null = 18,
 
-		ArrayStart,
-		ArrayEnd,
-
-		// 2018-09-26 DWR: New values should go at the end of the enum list so that existing enum values don't change (eg. if TimeSpan was added under
-		// DateTime, to try to group the values together, then everything after it would get a underlying new byte value - this could be worked around
-		// by explicitly setting each value but that feels error prone and so I'll do it this way instead)
-		TimeSpan,
-		Guid
+		ObjectStart = 19,
+		NameReferenceID8 = 20,
+		NameReferenceID16 = 21,
+		NameReferenceID24 = 22,
+		NameReferenceID32 = 23,
+		ReferenceID8 = 24,
+		ReferenceID16 = 25,
+		ReferenceID24 = 26,
+		ReferenceID32 = 27,
+		FieldName = 28,
+		ObjectContentPostponed = 29,
+		ObjectEnd = 30,
+		ArrayStart = 31,
+		ArrayEnd = 32
 	}
 }
