@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using DanSerialiser.BinaryTypeStructures;
@@ -17,6 +18,7 @@ namespace DanSerialiser
 		private readonly Dictionary<Tuple<FieldInfo, Type>, BinarySerialisationWriterCachedNames.CachedNameData> _encounteredFields;
 		private readonly Dictionary<PropertyInfo, BinarySerialisationWriterCachedNames.CachedNameData> _encounteredProperties;
 		private readonly Dictionary<Tuple<MemberInfo, Type>, bool> _shouldSerialiseMemberCache;
+		private bool _haveStartedSerialising;
 		/// <summary>
 		/// The default configuration for a BinarySerialisationWriter is to encourage the serialiser to treat the data as a tree-like structure and to traverse each branch to its
 		/// end - if the object model has large arrays whose elements are the starts of circular reference chains then this can cause a stack overflow exception. If the value that
@@ -38,6 +40,8 @@ namespace DanSerialiser
 			_encounteredFields = new Dictionary<Tuple<FieldInfo, Type>, BinarySerialisationWriterCachedNames.CachedNameData>();
 			_encounteredProperties = new Dictionary<PropertyInfo, BinarySerialisationWriterCachedNames.CachedNameData>();
 			_shouldSerialiseMemberCache = new Dictionary<Tuple<MemberInfo, Type>, bool>();
+
+			_haveStartedSerialising = false;
 		}
 
 		public ReferenceReuseOptions ReferenceReuseStrategy { get; }
@@ -244,6 +248,48 @@ namespace DanSerialiser
 		}
 
 		/// <summary>
+		/// Some writer configurations may perform some upfront analysis based upon the type being serialised. This method should be called by the Serialiser before it starts any
+		/// other serialisation process. This will return a dictionary of optimised 'member setters' that the Serialiser may use (a member setter is a delegate that will write the
+		/// field and property content for an instance - writing the ObjectStart and ObjectEnd content is the Serialiser's responsibility because that is related to reference-tracking,
+		/// which is also the Serialiser's responsibility). Note that this dictionary may include entries that have a null value to indicate that it was not possible generate a member
+		/// setter for that type (this may save the Serialiser from calling TryToGenerateMemberSetter for that type later on because it knows that null will be returned). When this
+		/// method is called, it will always return a new Dictionary reference and so the caller is free to take ownership of it and mutate it if it wants to. It is not mandatory for
+		/// the Serialiser to call this method (and it's not mandatory for it to use the returned dictionary) but it is highly recommended. This should always be called before any
+		/// other serialisation methods, calling it after starting serialisation of data will result in an exception being thrown.
+		/// </summary>
+		public Dictionary<Type, Action<object>> PrepareForSerialisation(Type serialisationTargetType, ISerialisationTypeConverter[] typeConverters)
+		{
+			if (serialisationTargetType == null)
+				throw new ArgumentNullException(nameof(serialisationTargetType));
+			if (typeConverters == null)
+				throw new ArgumentNullException(nameof(typeConverters));
+
+			if (_haveStartedSerialising)
+				throw new Exception(nameof(PrepareForSerialisation) + " must be called before any other serialisation commences");
+
+			// The "BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor" method will allow optimised member setters to be generated for more types (which could make
+			// the serialisation process much faster) but it may only be used if particular compromises can be made:
+			//  - Reference tracking must be disabled (this means that circular references will result in a stack overflow)
+			//  - The DefaultTypeAnalyser must be used (because the member setters are cached for reuse and they are generated using the DefaultTypeAnalyser and they may not
+			//    be applicable to cases where a different type analyser is required)
+			//  - No type converters are used (because these may change the shape of the data during the serialisation process but GetMemberSettersFor needs the data to be remain
+			//    in its original form)
+			if ((ReferenceReuseStrategy != ReferenceReuseOptions.SpeedyButLimited) || (_typeAnalyser != DefaultTypeAnalyser.Instance) || (typeConverters.Length > 0))
+				return new Dictionary<Type, Action<object>>();
+
+			var memberSetterData = BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor(serialisationTargetType);
+			foreach (var field in memberSetterData.Item2)
+			{
+				WriteByte((byte)BinarySerialisationDataType.FieldNamePreLoad);
+				WriteBytes(field.AsStringAndReferenceID);
+			}
+			return memberSetterData.Item1.ToDictionary(
+				entry => entry.Key,
+				entry => (entry.Value == null) ? null : (Action<object>)(source => entry.Value(source, this))
+			);
+		}
+
+		/// <summary>
 		/// This will return a compiled 'member setter' for the specified type, if it's possible to create one. A member setter takes an instance of an object and writes the data
 		/// for the fields and properties to the writer. It does not write the ObjectStart and ObjectEnd data since the caller takes responsibility for those because reference
 		/// tracking is handled by the caller and it may need to inject a ReferenceID after the ObjectStart data. When reference tracking is enabled, only limited types may have
@@ -386,11 +432,13 @@ namespace DanSerialiser
 		private void WriteByte(byte value)
 		{
 			_stream.WriteByte(value);
+			_haveStartedSerialising = true;
 		}
 
 		private void WriteBytes(byte[] value)
 		{
 			_stream.Write(value, 0, value.Length);
+			_haveStartedSerialising = true;
 		}
 
 		// These WriteBytes overloads that take multiple individual bytes are to make it easier to compare calling WriteByte multiple times and wrapping into an array to pass to WriteBytes once

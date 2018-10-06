@@ -49,8 +49,19 @@ namespace DanSerialiser
 				objectHistoryIfReferenceReuseAllowed = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
 				deferredInitialisationObjectReferenceIDsIfSupported = new HashSet<int>();
 			}
+			else if (writer.ReferenceReuseStrategy == ReferenceReuseOptions.SpeedyButLimited)
+			{
+				parentsIfReferenceReuseDisallowed = null;
+				objectHistoryIfReferenceReuseAllowed = null;
+				deferredInitialisationObjectReferenceIDsIfSupported = null;
+			}
 			else
 				throw new NotSupportedException($"{nameof(writer)} has unsupported {nameof(writer.ReferenceReuseStrategy)}: {writer.ReferenceReuseStrategy}");
+
+			// Let the writer to any upfront analysis that it wants to - this will return a "generatedMemberSetters" dictionary and so we may not have to
+			// start from an empty member setter dictionary every time
+			var type = value?.GetType() ?? typeof(T);
+			var generatedMemberSetters = writer.PrepareForSerialisation(type, typeConverters);
 
 			// We need to know the type that we're serialising and that's why there is a generic type param, so that the caller HAS to specify one even if
 			// they're passing null. If we don't have null then take the type from the value argument, otherwise use the type param (we should prefer the
@@ -58,12 +69,12 @@ namespace DanSerialiser
 			// to process it as a string and not an object).
 			Serialise(
 				value,
-				value?.GetType() ?? typeof(T),
+				type,
 				false, // populatingDeferredObject is always false at the top level, it may become true in some nested calls, depending upon configuration
 				parentsIfReferenceReuseDisallowed,
 				objectHistoryIfReferenceReuseAllowed,
 				deferredInitialisationObjectReferenceIDsIfSupported,
-				generatedMemberSetters: new Dictionary<Type, Action<object>>(),
+				generatedMemberSetters,
 				typeConverters: typeConverters,
 				writer: writer
 			);
@@ -95,10 +106,10 @@ namespace DanSerialiser
 				}
 			}
 
-			// If the we've got a Nullable<> then unpack the internal value/type - if it's null then we'll get a null ObjectStart/ObjectEnd value which the BinarySerialisationReader
-			// will happily interpret (reading it as a null and setting the Nullable<> field) and if it's non-null then we'll serialise just the value itself (again, the reader will
-			// take that value and happily set a Nullable<> field - so if we write an int then the reader will read the int and set the int? field just fine). Doing this means that
-			// we have less work to do (otherwise we'd record the Nullable<> as an object and write the type name and so it's just more work to write, more work to read and takes
+			// If we've got a Nullable<> then unpack the internal value/type - if it's null then we'll get a null ObjectStart/ObjectEnd value which the BinarySerialisationReader will
+			// happily interpret (reading it as a null and setting the Nullable<> field) and if it's non-null then we'll serialise just the value itself (again, the reader will take
+			// that value and happily set a Nullable<> field - so if we write an int then the reader will read the int and set the int? field just fine). Doing this means that we
+			// have less work to do (otherwise we'd record the Nullable<> as an object and write the type name and so it's just more work to write, more work to read and takes
 			// up more data in the serialisation output).
 			if ((value != null) && type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(Nullable<>)))
 				type = type.GetGenericArguments()[0];

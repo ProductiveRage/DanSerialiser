@@ -20,6 +20,13 @@
 		/// exception due to the way in which the structure is investigated. This configuration will take a breadth-wise approach to identifying object references in arrays and so may avoid the
 		/// stack overflows but there are optimisations which may not be applied in this case and so this should probably not be the default approach.
 		/// </summary>
-		OptimiseForWideCircularReferences
+		OptimiseForWideCircularReferences,
+
+		/// <summary>
+		/// This option may be used where raw performance is more important than other factors, such as detecting circular references (meaning circular references in an object graph to be serialised
+		/// will result in a stack overflow exception) and supporting custom type converters. The backwards and forwards compatibility support for different versions of serialisation entities will
+		/// still be fully supported since that will always be a primary goal of this library, more important than performance.
+		/// </summary>
+		SpeedyButLimited
 	}
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace DanSerialiser
@@ -67,6 +68,18 @@ namespace DanSerialiser
 		/// This will return false if the property should be skipped
 		/// </summary>
 		bool PropertyName(PropertyInfo property, Type serialisationTargetType);
+
+		/// <summary>
+		/// Some writer configurations may perform some upfront analysis based upon the type being serialised. This method should be called by the Serialiser before it starts any
+		/// other serialisation process. This will return a dictionary of optimised 'member setters' that the Serialiser may use (a member setter is a delegate that will write the
+		/// field and property content for an instance - writing the ObjectStart and ObjectEnd content is the Serialiser's responsibility because that is related to reference-tracking,
+		/// which is also the Serialiser's responsibility). Note that this dictionary may include entries that have a null value to indicate that it was not possible generate a member
+		/// setter for that type (this may save the Serialiser from calling TryToGenerateMemberSetter for that type later on because it knows that null will be returned). When this
+		/// method is called, it will always return a new Dictionary reference and so the caller is free to take ownership of it and mutate it if it wants to. It is not mandatory for
+		/// the Serialiser to call this method (and it's not mandatory for it to use the returned dictionary) but it is highly recommended. This should always be called before any
+		/// other serialisation methods, calling it after starting serialisation of data will result in an exception being thrown.
+		/// </summary>
+		Dictionary<Type, Action<object>> PrepareForSerialisation(Type serialisationTargetType, ISerialisationTypeConverter[] typeConverters);
 
 		/// <summary>
 		/// This will return a compiled 'member setter' for the specified type, if it's possible to create one. A member setter takes an instance of an object and writes the data
