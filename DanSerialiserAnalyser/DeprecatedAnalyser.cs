@@ -79,7 +79,7 @@ namespace DanSerialiserAnalyser
 					namespaceSegments.Insert(0, containingNamespace.Name);
 					containingNamespace = containingNamespace.ContainingNamespace;
 				}
-				if (string.Join(".", namespaceSegments) != "DanSerialiser.Attributes")
+				if (string.Join(".", namespaceSegments) != "DanSerialiser")
 					continue;
 
 				// The "replacedBy" value must indicate a Field or Property. Technically, it would be ok to specify the name with a string literal or with a string
