@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using DanSerialiser.BinaryTypeStructures;
@@ -242,29 +241,6 @@ namespace DanSerialiser
 				throw new ArgumentNullException(nameof(serialisationTargetType));
 
 			return WritePropertyNameBytesIfWantoSerialiseField(property);
-		}
-
-		public Dictionary<Type, Action<object>> PrepareForSerialisation(Type serialisationTargetType, ISerialisationTypeConverter[] typeConverters)
-		{
-			if (serialisationTargetType == null)
-				throw new ArgumentNullException(nameof(serialisationTargetType));
-			if (typeConverters == null)
-				throw new ArgumentNullException(nameof(typeConverters));
-
-			// TODO: Explain
-			if ((ReferenceReuseStrategy != ReferenceReuseOptions.SpeedyButLimited) || (typeConverters.Length > 0))
-				return new Dictionary<Type, Action<object>>();
-
-			var memberSetterData = SpeedyBinarySerialisationWriterMemberSetters.GetAvailableMemberSettersFor(serialisationTargetType);
-			foreach (var field in memberSetterData.Item2)
-			{
-				_stream.WriteByte((byte)BinarySerialisationDataType.FieldNamePreLoad);
-				WriteBytes(field.AsStringAndReferenceID);
-			}
-			return memberSetterData.Item1.ToDictionary(
-				entry => entry.Key,
-				entry => (entry.Value == null) ? null : (Action<object>)(source => entry.Value(source, this))
-			);
 		}
 
 		/// <summary>
