@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Reflection;
 using DanSerialiser.Reflection;
 using static DanSerialiser.CachedLookups.BinarySerialisationCompiledMemberSetters;
 using static DanSerialiser.CachedLookups.BinarySerialisationWriterCachedNames;
@@ -58,7 +59,7 @@ namespace DanSerialiser.CachedLookups
 
 			var memberSetters = new Dictionary<Type, MemberSetterDetails>();
 			var fieldNamesToDeclare = new HashSet<CachedNameData>(CachedNameDataEqualityComparer.Instance);
-			GenerateMemberSettersForTypeIfPossible(serialisationTargetType, new HashSet<Type>(), memberSetters, fieldNamesToDeclare);
+			GenerateMemberSettersForTypeIfPossible(serialisationTargetType, new HashSet<Type>(), memberSetters, fieldNamesToDeclare, fieldIsHappyToIgnoreSpecialisations: false);
 			var compiledMemberSetters = new ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>(
 				memberSetters.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.GetCompiledMemberSetter())
 			);
@@ -67,20 +68,35 @@ namespace DanSerialiser.CachedLookups
 			return memberSetterData;
 		}
 
-		private static void GenerateMemberSettersForTypeIfPossible(Type type, HashSet<Type> typesEncountered, Dictionary<Type, MemberSetterDetails> memberSetters, HashSet<CachedNameData> fieldNamesToDeclare)
+		private static void GenerateMemberSettersForTypeIfPossible(
+			Type type,
+			HashSet<Type> typesEncountered,
+			Dictionary<Type, MemberSetterDetails> memberSetters,
+			HashSet<CachedNameData> fieldNamesToDeclare,
+			bool fieldIsHappyToIgnoreSpecialisations)
 		{
 			// Leave primitive-like values to the BinarySerialisationWriter's specialised methods (Boolean, String, DateTime, etc..)
 			if (Serialiser.IsTreatedAsPrimitive(type))
 				return;
 
-			// Only consider consistent concrete types - sealed classes and structs, essentially. If a field has type MyClass and MyClass is a non-sealed class then
-			// we might generate a member setter for MyClass but then encounter a MyDerivedClass at runtime that inherits from MyClass but has three extra fields;
-			// those extra fields would not be serialised, then. If the field has a type that is a class that is sealed then we know that this can't happen and so
-			// we're safe (and structs don't support inheritance, so we're safe with those as well).
+			// Ordinarily, we want to only consider consistent concrete types (sealed classes and structs, essentially) - if a field has type MyClass and MyClass is a
+			// non -sealed class then we might generate a member setter for MyClass but then encounter a MyDerivedClass at runtime that inherits from MyClass but has
+			// three extra fields; those extra fields would not be serialised, then. If the field has a type that is a class that is sealed then we know that this
+			// can't happen and so we're safe (and structs don't support inheritance, so we're safe with those as well). 
+			//
+			// However, if we're looking at generating a member setter for a type specified on a field or property that has the [SpecialisationsMayBeIgnoredWhenSerialising]
+			// attribute then we're willing to ignore the fact that there may be derived classes to consider. This means that if fieldIsHappyToIgnoreSpecialisations is true
+			// then we'll try to create a member setter for the current type, even if it's a class that isn't sealed. There are still limits, though - we still can't generate
+			// member setters for abstract classes or for interfaces because the deserialisation process needs to be given a type name that it can instantiate on the other
+			// side and things will be bad if it is tries to do that for a type name relating to an abstract class or interface. For more information about why someone
+			// might not care about losing information in the serialisation process that may only appear on specialised / derived types, see the comments on the
+			// SpecialisationsMayBeIgnoredWhenSerialisingAttribute class.
 			var isPredictableType = (type.IsClass && type.IsSealed) || type.IsValueType;
 			if (!isPredictableType)
-				return;
-
+			{
+				if (!fieldIsHappyToIgnoreSpecialisations || (type.IsClass && type.IsAbstract) || type.IsInterface)
+					return;
+			}
 			if (typesEncountered.Contains(type))
 				return;
 
@@ -89,7 +105,7 @@ namespace DanSerialiser.CachedLookups
 			// in the future)
 			if (type.IsArray)
 			{
-				GenerateMemberSettersForTypeIfPossible(type.GetElementType(), typesEncountered, memberSetters, fieldNamesToDeclare);
+				GenerateMemberSettersForTypeIfPossible(type.GetElementType(), typesEncountered, memberSetters, fieldNamesToDeclare, fieldIsHappyToIgnoreSpecialisations);
 				return;
 			}
 
@@ -98,9 +114,32 @@ namespace DanSerialiser.CachedLookups
 			typesEncountered.Add(type);
 			var (fields, properties) = DefaultTypeAnalyser.Instance.GetFieldsAndProperties(type);
 			foreach (var field in fields.Where(f => GetFieldNameBytesIfWantoSerialiseField(f.Member, type) != null))
-				GenerateMemberSettersForTypeIfPossible(field.Member.FieldType, typesEncountered, memberSetters, fieldNamesToDeclare);
+			{
+				// The [SpecialisationsMayBeIgnoredWhenSerialising] attribute "latches" when it's set on a field or property - if a field has this attribute then we'll
+				// proceed as is every field or property of that field's type had the attribute and do the same for every field or property that THOSE types have (this
+				// is so that we can, for example, put it on a Dictionary<,> field and ignore the fact that there might be instances where the field's value is of a
+				// type DERIVED from Dictionary<,> AND we can write null values for the IEqualityComparer field of the dictionary)
+				GenerateMemberSettersForTypeIfPossible(
+					field.Member.FieldType,
+					typesEncountered,
+					memberSetters,
+					fieldNamesToDeclare,
+					fieldIsHappyToIgnoreSpecialisations ||
+						(field.Member.GetCustomAttribute<SpecialisationsMayBeIgnoredWhenSerialisingAttribute>() != null) ||
+						(BackingFieldHelpers.TryToGetPropertyRelatingToBackingField(field.Member)?.GetCustomAttribute<SpecialisationsMayBeIgnoredWhenSerialisingAttribute>() != null)
+				);
+			}
 			foreach (var property in properties.Where(p => GetFieldNameBytesIfWantoSerialiseProperty(p.Member) != null))
-				GenerateMemberSettersForTypeIfPossible(property.Member.PropertyType, typesEncountered, memberSetters, fieldNamesToDeclare);
+			{
+				// See notes in loop above about [SpecialisationsMayBeIgnoredWhenSerialising] behaviour
+				GenerateMemberSettersForTypeIfPossible(
+					property.Member.PropertyType,
+					typesEncountered,
+					memberSetters,
+					fieldNamesToDeclare,
+					fieldIsHappyToIgnoreSpecialisations || (property.Member.GetCustomAttribute<SpecialisationsMayBeIgnoredWhenSerialisingAttribute>() != null)
+				);
+			}
 
 			// Now that we've been all the way down the chain for the current type, see if we can generate a member setter for it
 			var memberSetterDetails = TryToGenerateMemberSetter(
@@ -109,7 +148,28 @@ namespace DanSerialiser.CachedLookups
 				t =>
 				{
 					if (memberSetters.TryGetValue(t, out var valueWriter) && (valueWriter != null))
+					{
+						// The TryToGenerateMemberSetter method has requested a member setter for one of the fields or properties and we have access to a member
+						// setter that matches that type precisely - this is the ideal case!
 						return ValueWriter.PopulateValue(valueWriter.MemberSetter);
+					}
+
+					if (fieldIsHappyToIgnoreSpecialisations && ((t.IsClass && t.IsAbstract) || t.IsInterface))
+					{
+						// The current type is from a field or property annotated with [SpecialisationsMayBeIgnoredWhenSerialising] (or the attribute appeared
+						// further up the chain) and that means that we're able to be more flexible with awkward types that require specialisation (types that
+						// can't be instantiated directly and that only make sense when inherited or implemented by another class) - by "more flexible", I mean
+						// that we can ignore them and write away a null value for it. An example use case for this would be a class that we want to serialise
+						// as efficiently as possible using the SpeedyButLimited option, where that class has a field that is of type Dictionary<int, string>
+						// and that field will ONLY EVER have a Dictionary<int, string> reference (and never be set to an instance of a type that is derived
+						// from Dictionary<int, string>) and it will never have an equality comparer specified; in that case, the attribute may be added to
+						// that field or property. In that example, if the attribute was't applied to the field / property then serialisation would still
+						// succeed but it would be a little bit slower. If there is a chance that the field / property MIGHT be set to an instance of a
+						// type that is derived from Dictionary<int, string> or if there is a chance that a different equality comparer might be needed
+						// then the [SpecialisationsMayBeIgnoredWhenSerialising] attribute should NOT be applied to the field / property (again, this
+						// will not stop the serialisation process from succeeding, it will just mean that it will be slower).
+						return ValueWriter.SetValueToDefault;
+					}
 
 					return null;
 				}
