@@ -277,13 +277,13 @@ namespace DanSerialiser
 			if ((ReferenceReuseStrategy != ReferenceReuseOptions.SpeedyButLimited) || (_typeAnalyser != DefaultTypeAnalyser.Instance) || (typeConverters.Length > 0))
 				return new Dictionary<Type, Action<object>>();
 
-			var memberSetterData = BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor(serialisationTargetType);
-			foreach (var field in memberSetterData.Item2)
+			var (memberSetters, fieldNamesToDeclare) = BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor(serialisationTargetType);
+			foreach (var field in fieldNamesToDeclare)
 			{
 				WriteByte((byte)BinarySerialisationDataType.FieldNamePreLoad);
 				WriteBytes(field.AsStringAndReferenceID);
 			}
-			return memberSetterData.Item1.ToDictionary(
+			return memberSetters.ToDictionary(
 				entry => entry.Key,
 				entry => (entry.Value == null) ? null : (Action<object>)(source => entry.Value(source, this))
 			);
