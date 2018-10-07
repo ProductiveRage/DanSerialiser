@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
+using DanSerialiser.CachedLookups;
 
 namespace DanSerialiser
 {
@@ -24,6 +26,24 @@ namespace DanSerialiser
 				if (field.FieldType.IsPointer || (field.FieldType == typeof(IntPtr)) || (field.FieldType == typeof(UIntPtr)))
 					return true;
 			}
+
+			// 2018-10-07: I had hoped to not have to include any type-specific exceptions or workarounds but it seems unavoidable with the BCL generic Dictionary - its Keys
+			// and Values properties back onto private "keys" and "values" fields that are null until they are requested and then then become instances of KeyCollection /
+			// ValueCollections classes that have a reference back to the Dictionary. This has repurcussions for serialiser configurations that don't support circular
+			// references because if the "keys" or "values" fields have been initialised then circular references will be present. On the plus side, the Dictionary
+			// is happy for them to be null (it will initialise them as required).
+			// - It may be necessary to add more workarounds for BCL types in the future but I'm hoping not!
+			// - If there are any internal details like this on custom types then it should be possible for any required workarounds to be specified via type converters
+			if (field.DeclaringType.IsGenericType && (field.DeclaringType.GetGenericTypeDefinition() == typeof(Dictionary<,>)))
+			{
+				if ((field.Name == "keys") || (field.Name == "values"))
+					return true;
+			}
+
+			// 2018-10-07 When I added the above, I thought I might as well sneak this in too - some BCL types have a "syncRoot" reference that is a field that it would
+			// not make any sense to persist across serialisation boundaries and so we can ignore it (one less field to check!)
+			if ((field.FieldType == CommonTypeOfs.Object) && (field.Name.Equals("syncRoot", StringComparison.OrdinalIgnoreCase) || field.Name.Equals("_syncRoot", StringComparison.OrdinalIgnoreCase)))
+				return true;
 
 			return false;
 		}

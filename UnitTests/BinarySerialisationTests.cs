@@ -333,6 +333,36 @@ namespace UnitTests
 			Assert.True(clone.ContainsKey("One"));
 		}
 
+		/// <summary>
+		/// This tests a fix that I made for serialisation with ReferenceReuseOptions.NoReferenceReuse configuration - the BCL generic Dictionary has internals 'keys' and 'values' fields
+		/// that are instances of classes that have a reference back to the dictionary and so there will be a circular reference. However, those fields are null until the public 'Keys' or
+		/// 'Values' properties are accessed and so the serialisation behaviour varied depending upon whether or not they had been accessed before attempting serialisation. For configurations
+		/// that supported reference reuse, there would be no exception but a little extra serialisation and deserialisation work was required before the change (to skip the 'keys' and 'values'
+		/// fields when serialising).
+		/// </summary>
+		[Fact]
+		public void DictionaryOfInt32ToStringWhereKeysPropertyAccessedBeforeClone()
+		{
+			var source = new Dictionary<string, int>() { { "One", 1 } };
+			Console.WriteLine(source.Keys);
+			var clone = AssertCloneMatchesOriginalAndReturnClone(source);
+			Assert.Single(clone);
+			Assert.True(clone.ContainsKey("One"));
+		}
+
+		/// <summary>
+		/// Variation on DictionaryOfInt32ToStringWhereKeysPropertyAccessedBeforeClone
+		/// </summary>
+		[Fact]
+		public void DictionaryOfInt32ToStringWhereValuesPropertyAccessedBeforeClone()
+		{
+			var source = new Dictionary<string, int>() { { "One", 1 } };
+			Console.WriteLine(source.Values);
+			var clone = AssertCloneMatchesOriginalAndReturnClone(source);
+			Assert.Single(clone);
+			Assert.True(clone.ContainsKey("One"));
+		}
+
 		[Fact]
 		public void DictionaryOfInt32ToStringWithSpecificComparer()
 		{
