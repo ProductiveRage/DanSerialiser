@@ -17,14 +17,24 @@ namespace DanSerialiser.CachedLookups
 	internal static class BinarySerialisationWriterCachedNames
 	{
 		private static readonly ConcurrentDictionary<Type, CachedNameData> _typeNameCache;
-		private static readonly ConcurrentDictionary<Tuple<FieldInfo, Type>, CachedNameData> _fieldNameCache;
-		private static readonly ConcurrentDictionary<PropertyInfo, CachedNameData> _propertyNameCache;
+		private static readonly ConcurrentDictionary<(FieldInfo, Type), CachedNameData> _fieldInfoNameCache;
+		private static readonly ConcurrentDictionary<string, CachedNameData> _sharedFieldNameCache;
+		private static readonly ConcurrentDictionary<PropertyInfo, CachedNameData> _propertyInfoNameCache;
 		private static int _nextNameReferenceID;
 		static BinarySerialisationWriterCachedNames()
 		{
+			// 2018-10-07: The type name cache will always take a type name string and map it to a CachedNameData entry - very straight forward. The property name cache does the
+			// same thing because the property name strings are a combination of the property name and the declaring type (note that data relating to properties is only required
+			// when dealing with [Deprecated] attributes because we can skip the property in all other cases and rely upon the serialisation of whatever field(s) contain the data
+			// that the property would return / update). When recording field names, unless there is any ambiguity about what type the field is declared on (which is possible as
+			// a field may be declared on a type AND declared on its base type, both times with the same name), only the name of the field is stored (not the name of the declaring
+			// type). There is no need to use separate Name Reference IDs for the field "id" on Type A and for the field "id" on Type B, the same Name Reference ID may be used for
+			// both - to achieve this, there are two dictionaries; one that maps a particular type-and-field to a CachedNameData instance and another that maps strings to a Cached-
+			// NameData instance, to enable this sharing.
 			_typeNameCache = new ConcurrentDictionary<Type, CachedNameData>();
-			_fieldNameCache = new ConcurrentDictionary<Tuple<FieldInfo, Type>, CachedNameData>();
-			_propertyNameCache = new ConcurrentDictionary<PropertyInfo, CachedNameData>();
+			_fieldInfoNameCache = new ConcurrentDictionary<(FieldInfo, Type), CachedNameData>();
+			_sharedFieldNameCache = new ConcurrentDictionary<string, CachedNameData>();
+			_propertyInfoNameCache = new ConcurrentDictionary<PropertyInfo, CachedNameData>();
 			_nextNameReferenceID = 0;
 		}
 
@@ -43,6 +53,7 @@ namespace DanSerialiser.CachedLookups
 			}
 			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
 			var cacheEntry = new CachedNameData(
+				id: referenceID,
 				asStringAndReferenceID: bytesForStringAndReferenceID.ToArray(),
 				onlyAsReferenceID: bytesForReferenceID.ToArray()
 			);
@@ -57,13 +68,13 @@ namespace DanSerialiser.CachedLookups
 			if (serialisationTargetType == null)
 				throw new ArgumentNullException(nameof(serialisationTargetType));
 
-			var cacheKey = Tuple.Create(field, serialisationTargetType);
-			if (_fieldNameCache.TryGetValue(cacheKey, out var cachedResult))
+			var cacheKey = (field, serialisationTargetType);
+			if (_fieldInfoNameCache.TryGetValue(cacheKey, out var cachedResult))
 				return cachedResult;
 
 			if (BinaryReaderWriterShared.IgnoreField(field))
 			{
-				_fieldNameCache.TryAdd(cacheKey, null);
+				_fieldInfoNameCache.TryAdd(cacheKey, null);
 				return null;
 			}
 
@@ -91,20 +102,32 @@ namespace DanSerialiser.CachedLookups
 
 			// When recording a field name, either write a string and then the Name Reference ID that that string should be stored as OR write just the Name Reference ID
 			// (if the field name has already been recorded once and may be reused)
-			var referenceID = Interlocked.Increment(ref _nextNameReferenceID);
-			var bytesForReferenceID = GetBytesForNameReferenceID(referenceID);
-			var bytesForStringAndReferenceID = new List<byte>();
-			using (var stream = new StreamThatAppendsBytesToList(bytesForStringAndReferenceID))
-			{
-				var writer = new BinarySerialisationWriter(stream);
-				writer.String(BinaryReaderWriterShared.CombineTypeAndFieldName(fieldNameExistsMultipleTimesInHierarchy ? field.DeclaringType : null, field.Name));
-			}
-			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
-			var cacheEntry = new CachedNameData(
-				asStringAndReferenceID: bytesForStringAndReferenceID.ToArray(),
-				onlyAsReferenceID: bytesForReferenceID.ToArray()
+			var cacheEntry = _sharedFieldNameCache.GetOrAdd(
+				BinaryReaderWriterShared.CombineTypeAndFieldName(fieldNameExistsMultipleTimesInHierarchy ? field.DeclaringType : null, field.Name),
+				valueFactory: stringToRecord =>
+				{
+					// Note: Unlike most other interactions with a ConcurrentDictionary, thread safety is not assured when GetOrAdd is called using the signature that takes a
+					// "valueFactory" delegate (the reason for this is that the internal ConcurrentDictionary lock will be released while the delegate is being called because
+					// there are no guarantees that whatever user code exists in that delegate won't cause a deadlock somehow). The work that we're doing inside this delegate
+					// is not expensive, though, and so it wouldn't be the end of the world if we hit the worst case scenario that meant that this valueFactory delegete would
+					// be called twice for the same field name string.
+					var referenceID = Interlocked.Increment(ref _nextNameReferenceID);
+					var bytesForReferenceID = GetBytesForNameReferenceID(referenceID);
+					var bytesForStringAndReferenceID = new List<byte>();
+					using (var stream = new StreamThatAppendsBytesToList(bytesForStringAndReferenceID))
+					{
+						var writer = new BinarySerialisationWriter(stream);
+						writer.String(stringToRecord);
+					}
+					bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
+					return new CachedNameData(
+						id: referenceID,
+						asStringAndReferenceID: bytesForStringAndReferenceID.ToArray(),
+						onlyAsReferenceID: bytesForReferenceID.ToArray()
+					);
+				}
 			);
-			_fieldNameCache.TryAdd(cacheKey, cacheEntry);
+			_fieldInfoNameCache.TryAdd(cacheKey, cacheEntry);
 			return cacheEntry;
 		}
 
@@ -117,13 +140,13 @@ namespace DanSerialiser.CachedLookups
 			if (property == null)
 				throw new ArgumentNullException(nameof(property));
 
-			if (_propertyNameCache.TryGetValue(property, out var cachedResult))
+			if (_propertyInfoNameCache.TryGetValue(property, out var cachedResult))
 				return cachedResult;
 
 			// Most of the time, we'll just serialise the backing fields because that should capture all of the data..
 			if (property.GetCustomAttribute<DeprecatedAttribute>() == null)
 			{
-				_propertyNameCache[property] = null;
+				_propertyInfoNameCache[property] = null;
 				return null;
 			}
 
@@ -150,10 +173,11 @@ namespace DanSerialiser.CachedLookups
 			}
 			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
 			var cacheEntry = new CachedNameData(
+				id: referenceID,
 				asStringAndReferenceID: bytesForStringAndReferenceID.ToArray(),
 				onlyAsReferenceID: bytesForReferenceID.ToArray()
 			);
-			_propertyNameCache.TryAdd(property, cacheEntry);
+			_propertyInfoNameCache.TryAdd(property, cacheEntry);
 			return cacheEntry;
 		}
 
@@ -176,11 +200,13 @@ namespace DanSerialiser.CachedLookups
 
 		public sealed class CachedNameData
 		{
-			public CachedNameData(byte[] asStringAndReferenceID, byte[] onlyAsReferenceID)
+			public CachedNameData(int id, byte[] asStringAndReferenceID, byte[] onlyAsReferenceID)
 			{
+				ID = id;
 				AsStringAndReferenceID = asStringAndReferenceID ?? throw new ArgumentNullException(nameof(asStringAndReferenceID));
 				OnlyAsReferenceID = onlyAsReferenceID ?? throw new ArgumentNullException(nameof(onlyAsReferenceID));
 			}
+			public int ID { get; }
 			public byte[] AsStringAndReferenceID { get; }
 			public byte[] OnlyAsReferenceID { get; }
 		}
