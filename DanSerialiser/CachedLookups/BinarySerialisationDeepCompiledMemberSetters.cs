@@ -106,7 +106,13 @@ namespace DanSerialiser.CachedLookups
 			var memberSetterDetails = TryToGenerateMemberSetter(
 				type,
 				DefaultTypeAnalyser.Instance,
-				t => memberSetters.TryGetValue(t, out var valueWriter) ? valueWriter?.MemberSetter : null
+				t =>
+				{
+					if (memberSetters.TryGetValue(t, out var valueWriter) && (valueWriter != null))
+						return ValueWriter.PopulateValue(valueWriter.MemberSetter);
+
+					return null;
+				}
 			);
 			if (memberSetterDetails != null)
 			{

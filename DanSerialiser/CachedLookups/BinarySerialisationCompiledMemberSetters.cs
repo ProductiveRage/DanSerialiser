@@ -20,7 +20,8 @@ namespace DanSerialiser.CachedLookups
 			_writeCharValueMethod, _writeStringValueMethod,
 			_writeGuidValueMethod,
 			_writeArrayStartMethod, _writeArrayEndMethod,
-			_writeObjectStartMethod, _writeObjectEndMethod;
+			_writeObjectStartMethod, _writeObjectEndMethod,
+			_writeNullMethod;
 		static BinarySerialisationCompiledMemberSetters()
 		{
 			_writerType = typeof(BinarySerialisationWriter);
@@ -51,12 +52,13 @@ namespace DanSerialiser.CachedLookups
 			_writeArrayEndMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ArrayEnd), Type.EmptyTypes) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ArrayEnd));
 			_writeObjectStartMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ObjectStart), new[] { typeof(Type) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ObjectStart));
 			_writeObjectEndMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ObjectEnd), Type.EmptyTypes) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ObjectEnd));
+			_writeNullMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Null), Type.EmptyTypes) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Null));
 		}
 
 		/// <summary>
 		/// This may return null if no ValueWriter is available
 		/// </summary>
-		public delegate LambdaExpression ValueWriterRetriever(Type type);
+		public delegate ValueWriter ValueWriterRetriever(Type type);
 
 		/// <summary>
 		/// A member setter is a delegate that takes an instance and writes the data for fields and properties to a BinarySerialisationWriter. Note that it will not write the
@@ -110,10 +112,17 @@ namespace DanSerialiser.CachedLookups
 			}
 
 			// Group all of the field setters together into one call
+			Expression body;
+			if (statements.Count == 0)
+				body = Expression.Empty();
+			else if (statements.Count == 1)
+				body = statements[0];
+			else
+				body = Expression.Block(statements);
 			return new MemberSetterDetails(
 				type,
 				Expression.Lambda(
-					Expression.Block(statements),
+					body,
 					sourceParameter,
 					writerParameter
 				),
@@ -213,15 +222,35 @@ namespace DanSerialiser.CachedLookups
 				if (preBuiltMemberSetter == null)
 					return null;
 
-				individualMemberSetterForNonNullValue = Expression.Block(
-					Expression.Call(writerParameter, _writeObjectStartMethod, Expression.Constant(type)),
-					Expression.Invoke(
-						preBuiltMemberSetter,
-						(nullableTypeInner == null) ? value : Expression.Convert(value, nullableTypeInner),
-						writerParameter
-					),
-					Expression.Call(writerParameter, _writeObjectEndMethod)
-				);
+				if (preBuiltMemberSetter.SetToDefault)
+				{
+					// This means that we want to record serialisation data that will set this value to default(T)
+					//  - If we're looking at a reference type then that means that we will want to call "writer.Null()" when it comes to writing this value (in this case,
+					//    we can return the expression to do that immediately; if we don't return now then this method will wrap this expression so that it becomes a block
+					//    that says "when serialising, if the source value is null then calling writer.Null() but if the source value is non-null then also call write.Null()"
+					//    and that is a waste of time!)
+					//  - If we're looking at a value type then we need to call "writer.ObjectStart(type)" and "writer.ObjectEnd()" so that it writes the data for a struct
+					//    in its default state
+					if (!type.IsValueType)
+						return Expression.Call(writerParameter, _writeNullMethod);
+
+					individualMemberSetterForNonNullValue = Expression.Block(
+						Expression.Call(writerParameter, _writeObjectStartMethod, Expression.Constant(type)),
+						Expression.Call(writerParameter, _writeObjectEndMethod)
+					);
+				}
+				else
+				{
+					individualMemberSetterForNonNullValue = Expression.Block(
+						Expression.Call(writerParameter, _writeObjectStartMethod, Expression.Constant(type)),
+						Expression.Invoke(
+							preBuiltMemberSetter.MemberSetterIfNotSettingToDefault,
+							(nullableTypeInner == null) ? value : Expression.Convert(value, nullableTypeInner),
+							writerParameter
+						),
+						Expression.Call(writerParameter, _writeObjectEndMethod)
+					);
+				}
 			}
 
 			// If we're not dealing with a type that may be null then there is nothing more to do!
@@ -285,6 +314,33 @@ namespace DanSerialiser.CachedLookups
 				return _writeGuidValueMethod;
 			else
 				return null;
+		}
+
+		/// <summary>
+		/// This is used in scenarios where existing member setters for types are used to construct member setters for more complex types, whose fields or properties include types that
+		/// we have already generated member setters for. When the TryToGenerateMemberSetter methods requests an instance of this class for a particular type, a null reference indicates
+		/// that we have no idea what to do and it will not be possible to create a member setter for the type that had a field or property of the type that was just requested (in other
+		/// words, we don't know what to do and so we can't do anything). An instance of this that has a SetToDefault value of true indicates that the field or property of the requested
+		/// type should be set to the default value for that type (meaning that we DO know what to do with the field or property and that is to set it to null / struct default-value).
+		/// An instance of this that has a SetToDefault value of false will always have a non-null MemberSetterIfNotSettingToDefault reference and this will be a member setter Lamda-
+		/// Expression (an expression that emits the serialisation data for the properties of an instance of the requested type).
+		/// </summary>
+		public sealed class ValueWriter
+		{
+			public static ValueWriter PopulateValue(LambdaExpression memberSetter) => new ValueWriter(false, memberSetter ?? throw new ArgumentNullException(nameof(memberSetter)));
+			public static ValueWriter SetValueToDefault { get; } = new ValueWriter(true, null);
+			private ValueWriter(bool setToDefault, LambdaExpression memberSetterIfNotSettingToDefault)
+			{
+				SetToDefault = setToDefault;
+				MemberSetterIfNotSettingToDefault = memberSetterIfNotSettingToDefault;
+			}
+
+			public bool SetToDefault { get; }
+
+			/// <summary>
+			/// This will be null if SetToDefault is true and non-null if SetToDefault is false
+			/// </summary>
+			public LambdaExpression MemberSetterIfNotSettingToDefault { get; }
 		}
 
 		public sealed class MemberSetterDetails
