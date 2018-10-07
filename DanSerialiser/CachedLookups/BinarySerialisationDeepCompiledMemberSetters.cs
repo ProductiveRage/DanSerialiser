@@ -57,7 +57,7 @@ namespace DanSerialiser.CachedLookups
 				return memberSetterData;
 
 			var memberSetters = new Dictionary<Type, MemberSetterDetails>();
-			var fieldNamesToDeclare = new List<CachedNameData>();
+			var fieldNamesToDeclare = new HashSet<CachedNameData>(CachedNameDataEqualityComparer.Instance);
 			GenerateMemberSettersForTypeIfPossible(serialisationTargetType, new HashSet<Type>(), memberSetters, fieldNamesToDeclare);
 			var compiledMemberSetters = new ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>(
 				memberSetters.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.GetCompiledMemberSetter())
@@ -67,7 +67,7 @@ namespace DanSerialiser.CachedLookups
 			return memberSetterData;
 		}
 
-		private static void GenerateMemberSettersForTypeIfPossible(Type type, HashSet<Type> typesEncountered, Dictionary<Type, MemberSetterDetails> memberSetters, List<CachedNameData> fieldNamesToDeclare)
+		private static void GenerateMemberSettersForTypeIfPossible(Type type, HashSet<Type> typesEncountered, Dictionary<Type, MemberSetterDetails> memberSetters, HashSet<CachedNameData> fieldNamesToDeclare)
 		{
 			// Leave primitive-like values to the BinarySerialisationWriter's specialised methods (Boolean, String, DateTime, etc..)
 			if (Serialiser.IsTreatedAsPrimitive(type))
@@ -116,7 +116,8 @@ namespace DanSerialiser.CachedLookups
 			);
 			if (memberSetterDetails != null)
 			{
-				fieldNamesToDeclare.AddRange(memberSetterDetails.FieldsSet);
+				foreach (var fieldName in memberSetterDetails.FieldsSet)
+					fieldNamesToDeclare.Add(fieldName);
 				memberSetters.Add(type, memberSetterDetails);
 			}
 			else
@@ -126,6 +127,15 @@ namespace DanSerialiser.CachedLookups
 				// to generate them for because it can save the caller some work (they won't waste time trying to generate a member setter themselves)
 				memberSetters.Add(type, null);
 			}
+		}
+
+		private sealed class CachedNameDataEqualityComparer : IEqualityComparer<CachedNameData>
+		{
+			public static CachedNameDataEqualityComparer Instance { get; } = new CachedNameDataEqualityComparer();
+			private CachedNameDataEqualityComparer() { }
+
+			public bool Equals(CachedNameData x, CachedNameData y) => x?.ID == y?.ID;
+			public int GetHashCode(CachedNameData obj) => (obj == null) ? -1 : obj.ID;
 		}
 	}
 }
