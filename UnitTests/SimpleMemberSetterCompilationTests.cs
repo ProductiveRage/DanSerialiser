@@ -39,6 +39,12 @@ namespace UnitTests
 		[Fact]
 		public static void ClassWithOnlyDateTimePropertyIsEasy() => Assert.NotNull(TryToGenerateMemberSetter(typeof(SomethingWithModifiedDate)));
 
+		/// <summary>
+		/// This is a bit of a fat test! It is more of a final sanity test, rather than a small focussed unit test..
+		/// </summary>
+		[Fact]
+		public static void ClassWithPropertiesCoveringEverySimpleTypeAndAsOneDimensionArraysShouldWork() => Assert.NotNull(TryToGenerateMemberSetter(typeof(SomethingWithAllSimpleTypes)));
+
 		[Fact]
 		public static void PropertyOfClassWithoutFirstClassSupportInIWriteWillNotWork() => Assert.Null(TryToGenerateMemberSetter(typeof(WrapperForSomethingEmpty)));
 
@@ -112,6 +118,45 @@ namespace UnitTests
 		private class WrapperForSomethingEmpty
 		{
 			public SomethingEmpty Value { get; set; }
+		}
+
+		private class SomethingWithAllSimpleTypes
+		{
+			bool Value1 { get; set; }
+			byte Value2 { get; set; }
+			sbyte Value3 { get; set; }
+			short Value4 { get; set; }
+			int Value5 { get; set; }
+			long Value6 { get; set; }
+			ushort Value7 { get; set; }
+			uint Value8 { get; set; }
+			ulong Value9 { get; set; }
+			float Value10 { get; set; }
+			double Value11 { get; set; }
+			decimal Value12 { get; set; }
+			char Value13 { get; set; }
+			string Value14 { get; set; }
+			DateTime Value15 { get; set; }
+			TimeSpan Value16 { get; set; }
+			Guid Value17 { get; set; }
+
+			bool[] Values1 { get; set; }
+			byte[] Values2 { get; set; }
+			sbyte[] Values3 { get; set; }
+			short[] Values4 { get; set; }
+			int[] Values5 { get; set; }
+			long[] Values6 { get; set; }
+			ushort[] Values7 { get; set; }
+			uint[] Values8 { get; set; }
+			ulong[] Values9 { get; set; }
+			float[] Values10 { get; set; }
+			double[] Values11 { get; set; }
+			decimal[] Values12 { get; set; }
+			char[] Values13 { get; set; }
+			string[] Values14 { get; set; }
+			DateTime[] Values15 { get; set; }
+			TimeSpan[] Values16 { get; set; }
+			Guid[] Values17 { get; set; }
 		}
 	}
 }
