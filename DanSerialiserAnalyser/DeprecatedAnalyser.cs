@@ -32,10 +32,10 @@ namespace DanSerialiserAnalyser
 
 		public override void Initialize(AnalysisContext context)
 		{
-			context.RegisterSyntaxNodeAction(LookForFieldWithMultipleDeprecatedAttributes, SyntaxKind.Attribute);
+			context.RegisterSyntaxNodeAction(LookForInvalidDeprecatedAttributes, SyntaxKind.Attribute);
 		}
 
-		private void LookForFieldWithMultipleDeprecatedAttributes(SyntaxNodeAnalysisContext context)
+		private void LookForInvalidDeprecatedAttributes(SyntaxNodeAnalysisContext context)
 		{
 			if (!(context.Node is AttributeSyntax attribute))
 				return;
@@ -72,14 +72,7 @@ namespace DanSerialiserAnalyser
 				// Ensure that this is the [Deprecated] attribute from DanSerialiser and not one from somewhere else (if can't resolve it then presume that there is
 				// a problem with the code and wait until it all compiles properly)
 				// Note: Don't need to check that argument name since [Deprecated] only has one ctor signature that takes a single argument (which is "replacedBy")
-				var namespaceSegments = new List<string>();
-				var containingNamespace = (context.SemanticModel.GetSymbolInfo(deprecatedAttribute).Symbol as IMethodSymbol)?.ContainingNamespace;
-				while (!string.IsNullOrEmpty(containingNamespace?.Name))
-				{
-					namespaceSegments.Insert(0, containingNamespace.Name);
-					containingNamespace = containingNamespace.ContainingNamespace;
-				}
-				if (string.Join(".", namespaceSegments) != "DanSerialiser")
+				if ((!(context.SemanticModel.GetSymbolInfo(deprecatedAttribute).Symbol is IMethodSymbol method)) || !NamespaceConfirming.IsIn(method, "DanSerialiser"))
 					continue;
 
 				// The "replacedBy" value must indicate a Field or Property. Technically, it would be ok to specify the name with a string literal or with a string
