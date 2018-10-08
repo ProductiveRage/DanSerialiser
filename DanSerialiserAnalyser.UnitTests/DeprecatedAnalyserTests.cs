@@ -110,7 +110,7 @@ namespace DanSerialiserAnalyser.UnitTests
 			var expected = new DiagnosticResult
 			{
 				Id = DeprecatedAnalyser.DiagnosticId,
-				Message = string.Format(DeprecatedAnalyser.ReplacedByMustBeNameofPropertyRule.MessageFormat.ToString()),
+				Message = DeprecatedAnalyser.ReplacedByMustBeNameofPropertyRule.MessageFormat.ToString(),
 				Severity = DiagnosticSeverity.Error,
 				Locations = new[]
 				{
@@ -141,7 +141,7 @@ namespace DanSerialiserAnalyser.UnitTests
 			var expected = new DiagnosticResult
 			{
 				Id = DeprecatedAnalyser.DiagnosticId,
-				Message = string.Format(DeprecatedAnalyser.ReplacedByMustBeNameofPropertyRule.MessageFormat.ToString()),
+				Message = DeprecatedAnalyser.ReplacedByMustBeNameofPropertyRule.MessageFormat.ToString(),
 				Severity = DiagnosticSeverity.Error,
 				Locations = new[]
 				{
@@ -179,7 +179,7 @@ namespace DanSerialiserAnalyser.UnitTests
 			var expected = new DiagnosticResult
 			{
 				Id = DeprecatedAnalyser.DiagnosticId,
-				Message = string.Format(DeprecatedAnalyser.ReplacedByMustBeNameofPropertyRule.MessageFormat.ToString()),
+				Message = DeprecatedAnalyser.ReplacedByMustBeNameofPropertyRule.MessageFormat.ToString(),
 				Severity = DiagnosticSeverity.Error,
 				Locations = new[]
 				{
