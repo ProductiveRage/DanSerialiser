@@ -20,7 +20,6 @@ namespace DanSerialiser.CachedLookups
 			_writeCharValueMethod, _writeStringValueMethod,
 			_writeGuidValueMethod,
 			_writeArrayStartMethod, _writeArrayEndMethod,
-			_writeObjectStartMethod, _writeObjectEndMethod,
 			_writeNullMethod;
 		static BinarySerialisationCompiledMemberSetters()
 		{
@@ -50,8 +49,6 @@ namespace DanSerialiser.CachedLookups
 			_writeGuidValueMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Guid), new[] { typeof(Guid) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Guid));
 			_writeArrayStartMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ArrayStart), new[] { typeof(object), typeof(Type) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ArrayStart));
 			_writeArrayEndMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ArrayEnd), Type.EmptyTypes) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ArrayEnd));
-			_writeObjectStartMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ObjectStart), new[] { typeof(Type) }) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ObjectStart));
-			_writeObjectEndMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.ObjectEnd), Type.EmptyTypes) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.ObjectEnd));
 			_writeNullMethod = _writerType.GetMethod(nameof(BinarySerialisationWriter.Null), Type.EmptyTypes) ?? throw new Exception("Could not find " + nameof(BinarySerialisationWriter.Null));
 		}
 
@@ -86,10 +83,10 @@ namespace DanSerialiser.CachedLookups
 			var sourceParameter = Expression.Parameter(type, "source");
 			var writerParameter = Expression.Parameter(_writerType, "writer");
 			var statements = new List<Expression>();
-			var fieldsSet = new List<BinarySerialisationWriterCachedNames.CachedNameData>();
+			var fieldsSet = new List<CachedNameData>();
 			foreach (var field in fields)
 			{
-				var fieldNameBytes = BinarySerialisationWriterCachedNames.GetFieldNameBytesIfWantoSerialiseField(field, type);
+				var fieldNameBytes = GetFieldNameBytesIfWantoSerialiseField(field, type);
 				if (fieldNameBytes == null)
 					return null;
 
@@ -126,6 +123,7 @@ namespace DanSerialiser.CachedLookups
 					sourceParameter,
 					writerParameter
 				),
+				GetTypeNameBytes(type),
 				fieldsSet.ToArray()
 			);
 		}
@@ -222,6 +220,17 @@ namespace DanSerialiser.CachedLookups
 				if (preBuiltMemberSetter == null)
 					return null;
 
+				// Instead of calling writer.ObjectStart(type)/ObjectEnd() when writing out the data for complete objects, we'll write out the data in the correct format here
+				// because it will be cheaper as we the ObjectStart method has to determine whether the type has appeared already in the content and, if not, write out the full
+				// type name string and, if it HAS been encountered already, write out just the Name Reference ID - here, we can skip this check and always go straight for the
+				// Name Reference ID approach, which will save us many dictionary lookups if the object graph is large. The reason that we can skip the write-name-or-id check
+				// is that member setters created here will be used in one of two situations:
+				//  1. During a regular serialisation (ie. any ReferenceReuseOptions other than SpeedyButLimited) and only after an instance of the type has been serialised the
+				//     slower way (through the Serialiser class), meaning that the type name has definitely been encountered already
+				//  2. During a SpeedyButLimited serialisation, in which case TypeNamePreLoad data will be emitted at the start of the serialisation data and we can be sure,
+				//     then, that the type name will have been encountered by the reader before it tries to deserialise any instances of the type (because TypeNamePreLoad
+				//     and FieldNamePreLoad data must always be the first content in serialised data)
+				var typeNameBytes = GetTypeNameBytes(type);
 				if (preBuiltMemberSetter.SetToDefault)
 				{
 					// This means that we want to record serialisation data that will set this value to default(T)
@@ -229,26 +238,31 @@ namespace DanSerialiser.CachedLookups
 					//    we can return the expression to do that immediately; if we don't return now then this method will wrap this expression so that it becomes a block
 					//    that says "when serialising, if the source value is null then calling writer.Null() but if the source value is non-null then also call write.Null()"
 					//    and that is a waste of time!)
-					//  - If we're looking at a value type then we need to call "writer.ObjectStart(type)" and "writer.ObjectEnd()" so that it writes the data for a struct
-					//    in its default state
+					//  - If we're looking at a value type then we need to write the ObjectStart ObjectEnd data so that it writes content for a struct in its default state
 					if (!type.IsValueType)
 						return Expression.Call(writerParameter, _writeNullMethod);
 
-					individualMemberSetterForNonNullValue = Expression.Block(
-						Expression.Call(writerParameter, _writeObjectStartMethod, Expression.Constant(type)),
-						Expression.Call(writerParameter, _writeObjectEndMethod)
+					var bytesForEmptyObjectInitialisation = new List<byte> { (byte)BinarySerialisationDataType.ObjectStart };
+					bytesForEmptyObjectInitialisation.AddRange(typeNameBytes.OnlyAsReferenceID);
+					bytesForEmptyObjectInitialisation.Add((byte)BinarySerialisationDataType.ObjectEnd);
+					individualMemberSetterForNonNullValue = Expression.Call(
+						writerParameter,
+						_writeBytesMethod,
+						Expression.Constant(bytesForEmptyObjectInitialisation.ToArray())
 					);
 				}
 				else
 				{
+					var bytesForObjectStart = new List<byte> { (byte)BinarySerialisationDataType.ObjectStart };
+					bytesForObjectStart.AddRange(typeNameBytes.OnlyAsReferenceID);
 					individualMemberSetterForNonNullValue = Expression.Block(
-						Expression.Call(writerParameter, _writeObjectStartMethod, Expression.Constant(type)),
+						Expression.Call(writerParameter, _writeBytesMethod, Expression.Constant(bytesForObjectStart.ToArray())),
 						Expression.Invoke(
 							preBuiltMemberSetter.MemberSetterIfNotSettingToDefault,
 							(nullableTypeInner == null) ? value : Expression.Convert(value, nullableTypeInner),
 							writerParameter
 						),
-						Expression.Call(writerParameter, _writeObjectEndMethod)
+						Expression.Call(writerParameter, _writeByteMethod, Expression.Constant((byte)BinarySerialisationDataType.ObjectEnd))
 					);
 				}
 			}
@@ -346,19 +360,23 @@ namespace DanSerialiser.CachedLookups
 		public sealed class MemberSetterDetails
 		{
 			private readonly Type _type;
-			public MemberSetterDetails(Type type, LambdaExpression memberSetter, BinarySerialisationWriterCachedNames.CachedNameData[] fieldsSet)
+			public MemberSetterDetails(Type type, LambdaExpression memberSetter, CachedNameData typeName, CachedNameData[] fieldsSet)
 			{
 				if (memberSetter == null)
 					throw new ArgumentNullException(nameof(memberSetter));
-				if ((memberSetter.Parameters.Count != 2)|| (memberSetter.Parameters[0].Type != type) || (memberSetter.Parameters[1].Type != typeof(BinarySerialisationWriter)))
+				if ((memberSetter.Parameters.Count != 2) || (memberSetter.Parameters[0].Type != type) || (memberSetter.Parameters[1].Type != typeof(BinarySerialisationWriter)))
 					throw new ArgumentException($"The {nameof(memberSetter)} lambda expression must have two parameters - {type} and {nameof(BinarySerialisationWriter)}");
 
 				_type = type ?? throw new ArgumentNullException(nameof(type));
 				MemberSetter = memberSetter;
+				TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
 				FieldsSet = fieldsSet ?? throw new ArgumentNullException(nameof(fieldsSet));
 			}
 
 			public LambdaExpression MemberSetter { get; }
+			public CachedNameData TypeName { get; }
+			public CachedNameData[] FieldsSet { get; }
+
 			public Action<object, BinarySerialisationWriter> GetCompiledMemberSetter()
 			{
 				var sourceParameter = Expression.Parameter(typeof(object), "source");
@@ -375,7 +393,6 @@ namespace DanSerialiser.CachedLookups
 					)
 					.Compile();
 			}
-			public BinarySerialisationWriterCachedNames.CachedNameData[] FieldsSet { get; }
 		}
 	}
 }

@@ -62,7 +62,7 @@ namespace DanSerialiser
 
 		internal object Read(bool ignoreAnyInvalidTypes, Type targetTypeIfAvailable)
 		{
-			var dataType = ProcessAnyFieldNamePreLoadAndReturnNextDataType();
+			var dataType = ProcessAnyTypeAndFieldNamePreLoadsAndReturnNextDataType();
 			var value = ReadBeforeApplyingAnyTransforms(dataType, ignoreAnyInvalidTypes);
 
 			// Give the type converters a crack at the current value - if any of them change the value then take that as the new value and don't consider any other converters
@@ -511,19 +511,21 @@ namespace DanSerialiser
 			}
 		}
 
-		private BinarySerialisationDataType ProcessAnyFieldNamePreLoadAndReturnNextDataType()
+		private BinarySerialisationDataType ProcessAnyTypeAndFieldNamePreLoadsAndReturnNextDataType()
 		{
 			while (true)
 			{
 				var dataType = ReadNextDataType();
-				if (dataType != BinarySerialisationDataType.FieldNamePreLoad)
+				if ((dataType == BinarySerialisationDataType.TypeNamePreLoad) || (dataType == BinarySerialisationDataType.FieldNamePreLoad))
+				{
+					if (ReadNextDataType() != BinarySerialisationDataType.String)
+						throw new InvalidSerialisationDataFormatException("Expected String value after " + dataType);
+					var typeOrFieldName = ReadNextString();
+					var nameReferenceID = ReadNextNameReferenceID(ReadNextDataType());
+					_nameReferences[nameReferenceID] = typeOrFieldName;
+				}
+				else
 					return dataType;
-
-				if (ReadNextDataType() != BinarySerialisationDataType.String)
-					throw new InvalidSerialisationDataFormatException("Expected String value after FieldNamePreLoad");
-				var rawFieldNameInformation = ReadNextString();
-				var fieldNameReferenceID = ReadNextNameReferenceID(ReadNextDataType());
-				_nameReferences[fieldNameReferenceID] = rawFieldNameInformation;
 			}
 		}
 

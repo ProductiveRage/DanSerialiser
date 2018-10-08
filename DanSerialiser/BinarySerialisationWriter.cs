@@ -277,13 +277,18 @@ namespace DanSerialiser
 			if ((ReferenceReuseStrategy != ReferenceReuseOptions.SpeedyButLimited) || (_typeAnalyser != DefaultTypeAnalyser.Instance) || (typeConverters.Length > 0))
 				return new Dictionary<Type, Action<object>>();
 
-			var (memberSetters, fieldNamesToDeclare) = BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor(serialisationTargetType);
-			foreach (var field in fieldNamesToDeclare)
+			var generatedMemberSetterResult = BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor(serialisationTargetType);
+			foreach (var typeName in generatedMemberSetterResult.TypeNamesToDeclare)
+			{
+				WriteByte((byte)BinarySerialisationDataType.TypeNamePreLoad);
+				WriteBytes(typeName.AsStringAndReferenceID);
+			}
+			foreach (var fieldName in generatedMemberSetterResult.FieldNamesToDeclare)
 			{
 				WriteByte((byte)BinarySerialisationDataType.FieldNamePreLoad);
-				WriteBytes(field.AsStringAndReferenceID);
+				WriteBytes(fieldName.AsStringAndReferenceID);
 			}
-			return memberSetters.ToDictionary(
+			return generatedMemberSetterResult.MemberSetters.ToDictionary(
 				entry => entry.Key,
 				entry => (entry.Value == null) ? null : (Action<object>)(source => entry.Value(source, this))
 			);

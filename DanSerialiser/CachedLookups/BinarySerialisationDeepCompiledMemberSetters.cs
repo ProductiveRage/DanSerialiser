@@ -36,10 +36,10 @@ namespace DanSerialiser.CachedLookups
 	/// </summary>
 	internal static class BinarySerialisationDeepCompiledMemberSetters
 	{
-		private static ConcurrentDictionary<Type, (ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>, IEnumerable<CachedNameData>)> _cache;
+		private static ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults> _cache;
 		static BinarySerialisationDeepCompiledMemberSetters()
 		{
-			_cache = new ConcurrentDictionary<Type, (ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>, IEnumerable<CachedNameData>)>();
+			_cache = new ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults>();
 		}
 
 		/// <summary>
@@ -49,7 +49,7 @@ namespace DanSerialiser.CachedLookups
 		/// for that type (this can also save the Serialiser some work because it will know not to bother trying). The member setters will write data that uses Field Name
 		/// Reference IDs, so the Serialiser will have to use the return CachedNameData list to write FieldNamePreLoad content ahead of the serialised object data.
 		/// </summary>
-		public static (ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>, IEnumerable<CachedNameData>) GetMemberSettersFor(Type serialisationTargetType)
+		public static DeepCompiledMemberSettersGenerationResults GetMemberSettersFor(Type serialisationTargetType)
 		{
 			if (serialisationTargetType == null)
 				throw new ArgumentNullException(nameof(serialisationTargetType));
@@ -58,12 +58,13 @@ namespace DanSerialiser.CachedLookups
 				return memberSetterData;
 
 			var memberSetters = new Dictionary<Type, MemberSetterDetails>();
+			var typeNamesToDeclare = new HashSet<CachedNameData>(CachedNameDataEqualityComparer.Instance);
 			var fieldNamesToDeclare = new HashSet<CachedNameData>(CachedNameDataEqualityComparer.Instance);
-			GenerateMemberSettersForTypeIfPossible(serialisationTargetType, new HashSet<Type>(), memberSetters, fieldNamesToDeclare, fieldIsHappyToIgnoreSpecialisations: false);
+			GenerateMemberSettersForTypeIfPossible(serialisationTargetType, new HashSet<Type>(), typeNamesToDeclare, fieldNamesToDeclare, memberSetters, fieldIsHappyToIgnoreSpecialisations: false);
 			var compiledMemberSetters = new ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>(
 				memberSetters.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.GetCompiledMemberSetter())
 			);
-			memberSetterData = (compiledMemberSetters, fieldNamesToDeclare);
+			memberSetterData = new DeepCompiledMemberSettersGenerationResults(typeNamesToDeclare, fieldNamesToDeclare, compiledMemberSetters);
 			_cache.TryAdd(serialisationTargetType, memberSetterData);
 			return memberSetterData;
 		}
@@ -71,8 +72,9 @@ namespace DanSerialiser.CachedLookups
 		private static void GenerateMemberSettersForTypeIfPossible(
 			Type type,
 			HashSet<Type> typesEncountered,
-			Dictionary<Type, MemberSetterDetails> memberSetters,
+			HashSet<CachedNameData> typeNamesToDeclare,
 			HashSet<CachedNameData> fieldNamesToDeclare,
+			Dictionary<Type, MemberSetterDetails> memberSetters,
 			bool fieldIsHappyToIgnoreSpecialisations)
 		{
 			// Leave primitive-like values to the BinarySerialisationWriter's specialised methods (Boolean, String, DateTime, etc..)
@@ -105,7 +107,7 @@ namespace DanSerialiser.CachedLookups
 			// in the future)
 			if (type.IsArray)
 			{
-				GenerateMemberSettersForTypeIfPossible(type.GetElementType(), typesEncountered, memberSetters, fieldNamesToDeclare, fieldIsHappyToIgnoreSpecialisations);
+				GenerateMemberSettersForTypeIfPossible(type.GetElementType(), typesEncountered, typeNamesToDeclare, fieldNamesToDeclare, memberSetters, fieldIsHappyToIgnoreSpecialisations);
 				return;
 			}
 
@@ -122,8 +124,9 @@ namespace DanSerialiser.CachedLookups
 				GenerateMemberSettersForTypeIfPossible(
 					field.Member.FieldType,
 					typesEncountered,
-					memberSetters,
+					typeNamesToDeclare,
 					fieldNamesToDeclare,
+					memberSetters,
 					fieldIsHappyToIgnoreSpecialisations ||
 						(field.Member.GetCustomAttribute<SpecialisationsMayBeIgnoredWhenSerialisingAttribute>() != null) ||
 						(BackingFieldHelpers.TryToGetPropertyRelatingToBackingField(field.Member)?.GetCustomAttribute<SpecialisationsMayBeIgnoredWhenSerialisingAttribute>() != null)
@@ -135,8 +138,9 @@ namespace DanSerialiser.CachedLookups
 				GenerateMemberSettersForTypeIfPossible(
 					property.Member.PropertyType,
 					typesEncountered,
-					memberSetters,
+					typeNamesToDeclare,
 					fieldNamesToDeclare,
+					memberSetters,
 					fieldIsHappyToIgnoreSpecialisations || (property.Member.GetCustomAttribute<SpecialisationsMayBeIgnoredWhenSerialisingAttribute>() != null)
 				);
 			}
@@ -176,6 +180,7 @@ namespace DanSerialiser.CachedLookups
 			);
 			if (memberSetterDetails != null)
 			{
+				typeNamesToDeclare.Add(memberSetterDetails.TypeName);
 				foreach (var fieldName in memberSetterDetails.FieldsSet)
 					fieldNamesToDeclare.Add(fieldName);
 				memberSetters.Add(type, memberSetterDetails);
@@ -196,6 +201,23 @@ namespace DanSerialiser.CachedLookups
 
 			public bool Equals(CachedNameData x, CachedNameData y) => x?.ID == y?.ID;
 			public int GetHashCode(CachedNameData obj) => (obj == null) ? -1 : obj.ID;
+		}
+
+		public sealed class DeepCompiledMemberSettersGenerationResults
+		{
+			public DeepCompiledMemberSettersGenerationResults(
+				IEnumerable<CachedNameData> typeNamesToDeclare,
+				IEnumerable<CachedNameData> fieldNamesToDeclare,
+				ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>> memberSetters)
+			{
+				TypeNamesToDeclare = typeNamesToDeclare;
+				FieldNamesToDeclare = fieldNamesToDeclare;
+				MemberSetters = memberSetters;
+			}
+
+			public IEnumerable<CachedNameData> TypeNamesToDeclare { get; }
+			public IEnumerable<CachedNameData> FieldNamesToDeclare { get; }
+			public ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>> MemberSetters { get; }
 		}
 	}
 }

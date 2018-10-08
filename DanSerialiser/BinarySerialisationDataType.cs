@@ -49,6 +49,11 @@
 		/// </summary>
 		FieldNamePreLoad = 33,
 		/// <summary>
+		/// Same principle as FieldNamePreLoad - declare type names upfront and then always includes the Name Reference IDs in the content, rather than having to check a has-type-name-
+		/// been-included-in-serialised-data yet each time (as with FieldNamePreLoad, whether or not TypeNamePreLoad data appears will vary depending by writer configuration)
+		/// </summary>
+		TypeNamePreLoad = 34,
+		/// <summary>
 		/// This indicates that the reference should be instantiated but left unitialised for now and that the member data will appear later (against the same Reference ID)
 		/// </summary>
 		ObjectContentPostponed = 29,
