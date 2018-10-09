@@ -135,6 +135,11 @@ namespace UnitTests
 				// immediately think of a way to fully test this otherwise - one option would be to skip the writing of the FieldNamePreLoad data and to skip
 				// the ObjectStart and ObjectEnd calls and to then read the data back out via a BinarySerialisationReader and manually compare the field and
 				// property names to expected values but I wanted to offload that sort of comparison work to a library like CompareNetObjects!
+				// - "Optimisied member setters" are not usually generated until after an instance of a type has been serialised without, in which case all
+				//   field names will have appeared in the serialised data at least once, which is important because the member setters will write out Name
+				//   Reference IDs for fields and the reader needs to know what strings those IDs map on to. Since this code won't be serialising an instance
+				//   of each type before using the member setter, FieldNamePreLoad data can be injected into the start of the serialised data and then the
+				//   reader will be able to refer to use that to map IDs to strings.
 				foreach (var fieldName in memberSetterDetails.FieldsSet)
 				{
 					var fieldNameBytes = new[] { (byte)BinarySerialisationDataType.FieldNamePreLoad }.Concat(fieldName.AsStringAndReferenceID).ToArray();
