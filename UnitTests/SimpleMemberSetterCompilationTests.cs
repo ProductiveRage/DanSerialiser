@@ -12,98 +12,104 @@ namespace UnitTests
 {
 	public static class SimpleMemberSetterCompilationTests
 	{
-		[Fact]
-		public static void ClassWithNoFieldsOrPropertiesIsEasy() => AssertCanGenerateCorrectMemberSetter(new SomethingEmpty());
-
-		/// <summary>
-		/// Test a property that is a primitive type
-		/// </summary>
-		[Fact]
-		public static void ClassWithOnlyKeyPropertyIsEasy() => AssertCanGenerateCorrectMemberSetter(new SomethingWithKey { Key = 123 });
-
-		[Fact]
-		public static void ClassWithOnlyKeyFieldIsEasy() => AssertCanGenerateCorrectMemberSetter(new SomethingWithKeyField { Key = 123 });
-
-		/// <summary>
-		/// Test a property that is a string (not a primitive but treated like one in that it was an IWrite method and references of the class are never reused)
-		/// </summary>
-		[Fact]
-		public static void ClassWithOnlyStringPropertyIsEasy() => AssertCanGenerateCorrectMemberSetter(new SomethingWithID { ID = "abc" });
-
-		/// <summary>
-		/// Test a property that is a string array - if a type has an IWrite method for it then a 1D array of that type is also supported (multi-dimensional arrays
-		/// are not supported at the moment, see ClassWithOnlyStringArrayPropertyIsEasy)
-		/// </summary>
-		[Fact]
-		public static void ClassWithOnlyStringArrayPropertyIsEasy() => AssertCanGenerateCorrectMemberSetter(new SomethingWithIDs { IDs = new[] { "abc", "def" } });
-
-		/// <summary>
-		/// Test a property that is a DateTime (also not a primitive but also given first class treatment by IWrite)
-		/// </summary>
-		[Fact]
-		public static void ClassWithOnlyDateTimePropertyIsEasy() => AssertCanGenerateCorrectMemberSetter(new SomethingWithModifiedDate { ModifiedAt = new DateTime(2018, 10, 9, 12, 10, 1) });
-
-		/// <summary>
-		/// This is a bit of a fat test! It is more of a final sanity test, rather than a small focussed unit test..
-		/// </summary>
-		[Fact]
-		public static void ClassWithPropertiesCoveringEverySimpleTypeAndAsOneDimensionArraysShouldWork()
+		public static class CanGenerate
 		{
-			AssertCanGenerateCorrectMemberSetter(new SomethingWithAllSimpleTypesFields
-			{
-				Value1 = true,
-				Value2 = 1,
-				Value3 = 12,
-				Value4 = 123,
-				Value5 = 1234,
-				Value6 = 12345,
-				Value7 = 123,
-				Value8 = 1234,
-				Value9 = 12345,
-				Value10 = 1.23f,
-				Value11 = 12.34,
-				Value12 = 123.45m,
-				Value13 = 'a',
-				Value14 = "abc",
-				Value15 = new DateTime(2018, 10, 9, 12, 28, 53),
-				Value16 = new TimeSpan(0, 12, 29, 1, 123),
-				Value17 = new Guid("E1E06164-0477-4FF7-AD79-86772AE5EF7A"),
+			[Fact]
+			public static void ClassWithNoFieldsOrProperties() => AssertCanGenerateCorrectMemberSetter(new SomethingEmpty());
 
-				Values1 = new[] { true },
-				Values2 = new[] { (byte)1 },
-				Values3 = new[] { (sbyte)12 },
-				Values4 = new[] { (short)123 },
-				Values5 = new[] { 1234 },
-				Values6 = new[] { (long)12345 },
-				Values7 = new[] { (ushort)123 },
-				Values8 = new[] { (uint)1234 },
-				Values9 = new[] { (ulong)12345 },
-				Values10 = new[] { 1.23f },
-				Values11 = new[] { 12.34 },
-				Values12 = new[] { 123.45m },
-				Values13 = new[] { 'a' },
-				Values14 = new[] { "abc" },
-				Values15 = new[] { new DateTime(2018, 10, 9, 12, 28, 53) },
-				Values16 = new[] { new TimeSpan(0, 12, 29, 1, 123) },
-				Values17 = new[] { new Guid("E1E06164-0477-4FF7-AD79-86772AE5EF7A") }
-			});
+			/// <summary>
+			/// Test a property that is a primitive type
+			/// </summary>
+			[Fact]
+			public static void ClassWithOnlyKeyProperty() => AssertCanGenerateCorrectMemberSetter(new SomethingWithKey { Key = 123 });
+
+			[Fact]
+			public static void ClassWithOnlyKeyField() => AssertCanGenerateCorrectMemberSetter(new SomethingWithKeyField { Key = 123 });
+
+			/// <summary>
+			/// Test a property that is a string (not a primitive but treated like one in that it was an IWrite method and references of the class are never reused)
+			/// </summary>
+			[Fact]
+			public static void ClassWithOnlyStringProperty() => AssertCanGenerateCorrectMemberSetter(new SomethingWithID { ID = "abc" });
+
+			/// <summary>
+			/// Test a property that is a string array - if a type has an IWrite method for it then a 1D array of that type is also supported (multi-dimensional arrays
+			/// are not supported at the moment, see ClassWithOnlyStringArrayProperty)
+			/// </summary>
+			[Fact]
+			public static void ClassWithOnlyStringArrayProperty() => AssertCanGenerateCorrectMemberSetter(new SomethingWithIDs { IDs = new[] { "abc", "def" } });
+
+			/// <summary>
+			/// Test a property that is a DateTime (also not a primitive but also given first class treatment by IWrite)
+			/// </summary>
+			[Fact]
+			public static void ClassWithOnlyDateTimeProperty() => AssertCanGenerateCorrectMemberSetter(new SomethingWithModifiedDate { ModifiedAt = new DateTime(2018, 10, 9, 12, 10, 1) });
+
+			/// <summary>
+			/// This is a bit of a fat test! It is more of a final sanity test, rather than a small focussed unit test..
+			/// </summary>
+			[Fact]
+			public static void ClassWithPropertiesCoveringEverySimpleTypeAndAsOneDimensionArraysShouldWork()
+			{
+				AssertCanGenerateCorrectMemberSetter(new SomethingWithAllSimpleTypesFields
+				{
+					Value1 = true,
+					Value2 = 1,
+					Value3 = 12,
+					Value4 = 123,
+					Value5 = 1234,
+					Value6 = 12345,
+					Value7 = 123,
+					Value8 = 1234,
+					Value9 = 12345,
+					Value10 = 1.23f,
+					Value11 = 12.34,
+					Value12 = 123.45m,
+					Value13 = 'a',
+					Value14 = "abc",
+					Value15 = new DateTime(2018, 10, 9, 12, 28, 53),
+					Value16 = new TimeSpan(0, 12, 29, 1, 123),
+					Value17 = new Guid("E1E06164-0477-4FF7-AD79-86772AE5EF7A"),
+
+					Values1 = new[] { true },
+					Values2 = new[] { (byte)1 },
+					Values3 = new[] { (sbyte)12 },
+					Values4 = new[] { (short)123 },
+					Values5 = new[] { 1234 },
+					Values6 = new[] { (long)12345 },
+					Values7 = new[] { (ushort)123 },
+					Values8 = new[] { (uint)1234 },
+					Values9 = new[] { (ulong)12345 },
+					Values10 = new[] { 1.23f },
+					Values11 = new[] { 12.34 },
+					Values12 = new[] { 123.45m },
+					Values13 = new[] { 'a' },
+					Values14 = new[] { "abc" },
+					Values15 = new[] { new DateTime(2018, 10, 9, 12, 28, 53) },
+					Values16 = new[] { new TimeSpan(0, 12, 29, 1, 123) },
+					Values17 = new[] { new Guid("E1E06164-0477-4FF7-AD79-86772AE5EF7A") }
+				});
+			}
 		}
 
-		[Fact]
-		public static void PropertyOfClassWithoutFirstClassSupportInIWriteWillNotWork() => Assert.Null(TryToGenerateMemberSetter(typeof(WrapperForSomethingEmpty)));
+		public static class CanNotGenerate
+		{
+			[Fact]
+			public static void PropertyOfClassWithoutFirstClassSupportInIWrite() => Assert.Null(TryToGenerateMemberSetter(typeof(WrapperForSomethingEmpty)));
 
-		/// <summary>
-		/// Maybe support for multi-dimensional arrays will be added in the future but it is not supported currently (the test ClassWithOnlyStringArrayPropertyIsEasy
-		/// illustrates that 1D arrays of simple types are supported)
-		/// </summary>
-		[Fact]
-		public static void PropertiesThatAreMultiDimensionalArraysWillNotWork() => Assert.Null(TryToGenerateMemberSetter(typeof(SomethingWithMap)));
+			/// <summary>
+			/// Maybe support for multi-dimensional arrays will be added in the future but it is not supported currently (the test ClassWithOnlyStringArrayProperty
+			/// illustrates that 1D arrays of simple types are supported)
+			/// </summary>
+			[Fact]
+			public static void PropertiesThatAreMultiDimensionalArrays() => Assert.Null(TryToGenerateMemberSetter(typeof(SomethingWithMap)));
 
-		/// <summary>
-		/// Similar to PropertiesThatAreMultiDimensionalArraysWillNotWork - currently jagged arrays of basic types are not supported
-		/// </summary>
-		[Fact]
-		public static void PropertiesThatAreJaggedArraysWillNotWork() => Assert.Null(TryToGenerateMemberSetter(typeof(SomethingWithJaggedMap)));
+			/// <summary>
+			/// Similar to PropertiesThatAreMultiDimensionalArraysWillNotWork - currently jagged arrays of basic types are not supported
+			/// </summary>
+			[Fact]
+			public static void PropertiesThatAreJaggedArrays() => Assert.Null(TryToGenerateMemberSetter(typeof(SomethingWithJaggedMap)));
+		}
 
 		private static MemberSetterDetails TryToGenerateMemberSetter(Type type)
 		{
