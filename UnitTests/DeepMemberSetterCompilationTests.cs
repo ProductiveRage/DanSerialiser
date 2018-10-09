@@ -20,7 +20,8 @@ namespace UnitTests
 			/// </summary>
 			[Fact]
 			public static void ClassWithSinglePropertyThatIsSealedClassWithSinglePrimitiveProperty() => AssertCanGenerateCorrectMemberSetter(
-				new SealedPersonDetailsWithSealedNameDetails { Name = new SealedNameDetails { Name = "Test" } }
+				new SealedPersonDetailsWithSealedNameDetails { Name = new SealedNameDetails { Name = "Test" } },
+				expectedNumberOfMemberSettersGenerated: 2
 			);
 
 			/// <summary>
@@ -29,7 +30,8 @@ namespace UnitTests
 			/// </summary>
 			[Fact]
 			public static void ClassWithSinglePropertyThatIsStructWithSinglePrimitiveProperty() => AssertCanGenerateCorrectMemberSetter(
-				new SealedPersonDetailsWithStructNameDetails { Name = new StructNameDetails { Name = "Test" } }
+				new SealedPersonDetailsWithStructNameDetails { Name = new StructNameDetails { Name = "Test" } },
+				expectedNumberOfMemberSettersGenerated: 2
 			);
 
 			/// <summary>
@@ -39,12 +41,33 @@ namespace UnitTests
 			/// </summary>
 			[Fact]
 			public static void ClassWithSinglePropertyThatIsNonSealedTypeWhereSpecialisationsMayBeIgnored() => AssertCanGenerateCorrectMemberSetter(
-				new SealedPersonDetailsWithUnsealedButSpecialisationIgnoredNameDetails { Name = new UnsealedNameDetails { Name = "Test" } }
+				new SealedPersonDetailsWithUnsealedButSpecialisationIgnoredNameDetails { Name = new UnsealedNameDetails { Name = "Test" } },
+				expectedNumberOfMemberSettersGenerated: 2
 			);
 
 			[Fact]
 			public static void NestedTypesWillWorkInOneDimensionalArrayTypes() => AssertCanGenerateCorrectMemberSetter(
-				new ContactListDetails { Names = new[] { new SealedNameDetails { Name = "Test" }, new SealedNameDetails { Name = "Test" } } }
+				new ContactListDetails { Names = new[] { new SealedNameDetails { Name = "Test" }, new SealedNameDetails { Name = "Test" } } },
+				expectedNumberOfMemberSettersGenerated: 2
+			);
+
+			[Fact]
+			public static void ClassWithSimplePropertyThatIsSealedTypeThatUsesAllPrimitiveLikeTypes() => AssertCanGenerateCorrectMemberSetter(
+				new SomethingWithPropertyOfTypeWithEveryPrimitiveEsqueType {
+					Value = new SomethingWithAllSimpleTypesFields
+					{
+						Value1 = true, Value2 = 1, Value3 = 12, Value4 = 123, Value5 = 1234, Value6 = 12345, Value7 = 123, Value8 = 1234, Value9 = 12345, Value10 = 1.23f,
+						Value11 = 12.34, Value12 = 123.45m, Value13 = 'a', Value14 = "abc", Value15 = new DateTime(2018, 10, 9, 12, 28, 53),
+						Value16 = new TimeSpan(0, 12, 29, 1, 123), Value17 = new Guid("E1E06164-0477-4FF7-AD79-86772AE5EF7A"),
+
+						Values1 = new[] { true }, Values2 = new[] { (byte)1 }, Values3 = new[] { (sbyte)12 }, Values4 = new[] { (short)123 }, Values5 = new[] { 1234 },
+						Values6 = new[] { (long)12345 }, Values7 = new[] { (ushort)123 }, Values8 = new[] { (uint)1234 }, Values9 = new[] { (ulong)12345 },
+						Values10 = new[] { 1.23f }, Values11 = new[] { 12.34 }, Values12 = new[] { 123.45m }, Values13 = new[] { 'a' }, Values14 = new[] { "abc" },
+						Values15 = new[] { new DateTime(2018, 10, 9, 12, 28, 53) }, Values16 = new[] { new TimeSpan(0, 12, 29, 1, 123) },
+						Values17 = new[] { new Guid("E1E06164-0477-4FF7-AD79-86772AE5EF7A") }
+					}
+				},
+				expectedNumberOfMemberSettersGenerated: 2
 			);
 		}
 
@@ -61,7 +84,7 @@ namespace UnitTests
 			public static void ClassWithSinglePropertyThatIsAbstractClassWithSinglePrimitiveProperty() => AssertCanGenerateNotCorrectMemberSetter(typeof(SealedPersonDetailsWithAbstractNameDetails));
 		}
 
-		private static void AssertCanGenerateCorrectMemberSetter(object source)
+		private static void AssertCanGenerateCorrectMemberSetter(object source, int expectedNumberOfMemberSettersGenerated)
 		{
 			// TryToGenerateMemberSetters will try to return member setters for each type that it encountered while analysing the source type - for example, if
 			// source is an instance of "PersonDetails" and if "PersonDetails" has an int Key property and a "NameDetails" Name property where "NameDetails" is
@@ -76,6 +99,9 @@ namespace UnitTests
 			if (!memberSetterDetailsForAllTypesInvolved.MemberSetters.TryGetValue(sourceType, out var memberSetterDetailsForType))
 				memberSetterDetailsForType = null;
 			Assert.NotNull(memberSetterDetailsForType);
+
+			// We should know how many member setters we expected to be generated, so let's confirm that
+			Assert.Equal(expectedNumberOfMemberSettersGenerated, memberSetterDetailsForAllTypesInvolved.MemberSetters.Count(kvp => kvp.Value != null));
 
 			byte[] serialised;
 			using (var stream = new MemoryStream())
@@ -177,6 +203,50 @@ namespace UnitTests
 		public struct StructNameDetails
 		{
 			public string Name { get; set; }
+		}
+
+		private sealed class SomethingWithPropertyOfTypeWithEveryPrimitiveEsqueType
+		{
+			public SomethingWithAllSimpleTypesFields Value { get; set; }
+		}
+
+		private sealed class SomethingWithAllSimpleTypesFields
+		{
+			public bool Value1 { get; set; }
+			public byte Value2 { get; set; }
+			public sbyte Value3 { get; set; }
+			public short Value4 { get; set; }
+			public int Value5 { get; set; }
+			public long Value6 { get; set; }
+			public ushort Value7 { get; set; }
+			public uint Value8 { get; set; }
+			public ulong Value9 { get; set; }
+			public float Value10 { get; set; }
+			public double Value11 { get; set; }
+			public decimal Value12 { get; set; }
+			public char Value13 { get; set; }
+			public string Value14 { get; set; }
+			public DateTime Value15 { get; set; }
+			public TimeSpan Value16 { get; set; }
+			public Guid Value17 { get; set; }
+
+			public bool[] Values1 { get; set; }
+			public byte[] Values2 { get; set; }
+			public sbyte[] Values3 { get; set; }
+			public short[] Values4 { get; set; }
+			public int[] Values5 { get; set; }
+			public long[] Values6 { get; set; }
+			public ushort[] Values7 { get; set; }
+			public uint[] Values8 { get; set; }
+			public ulong[] Values9 { get; set; }
+			public float[] Values10 { get; set; }
+			public double[] Values11 { get; set; }
+			public decimal[] Values12 { get; set; }
+			public char[] Values13 { get; set; }
+			public string[] Values14 { get; set; }
+			public DateTime[] Values15 { get; set; }
+			public TimeSpan[] Values16 { get; set; }
+			public Guid[] Values17 { get; set; }
 		}
 	}
 }

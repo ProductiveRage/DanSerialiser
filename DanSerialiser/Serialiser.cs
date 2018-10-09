@@ -508,7 +508,9 @@ namespace DanSerialiser
 		}
 
 		internal static bool IsTreatedAsPrimitive(Type type) =>
-			type.IsPrimitive || type.IsEnum || (type == CommonTypeOfs.DateTime) || (type == CommonTypeOfs.TimeSpan) || (type == CommonTypeOfs.String) || (type == CommonTypeOfs.Guid);
+			type.IsPrimitive ||
+			type.IsEnum ||
+			(type == CommonTypeOfs.Decimal) || (type == CommonTypeOfs.DateTime) || (type == CommonTypeOfs.TimeSpan) || (type == CommonTypeOfs.String) || (type == CommonTypeOfs.Guid);
 
 		// Courtesy of https://stackoverflow.com/a/41169463/3813189
 		private sealed class ReferenceEqualityComparer : IEqualityComparer<object>
