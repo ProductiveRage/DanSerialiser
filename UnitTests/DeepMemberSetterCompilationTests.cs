@@ -23,12 +23,29 @@ namespace UnitTests
 				new SealedPersonDetailsWithSealedNameDetails { Name = new SealedNameDetails { Name = "Test" } }
 			);
 
+			/// <summary>
+			/// There is no ambiguity about types when a property type is a struct (can't derive from a struct so a property that is a struct type will always have
+			/// a value that is precisely that type)
+			/// </summary>
 			[Fact]
 			public static void ClassWithSinglePropertyThatIsStructWithSinglePrimitiveProperty() => AssertCanGenerateCorrectMemberSetter(
 				new SealedPersonDetailsWithStructNameDetails { Name = new StructNameDetails { Name = "Test" } }
 			);
 
-			// TODO: property is non-sealed but has [SpecialisationsMayBeIgnoredWhenSerialising] attribute
+			/// <summary>
+			/// If a class has a property that is an unsealed class but that property is has a SpecialisationsMayBeIgnoredWhenSerialising attribute on it then
+			/// it means that the potential for specialisations of that class may be ignored (it may be treated as if that property class was sealed, there will
+			/// be no ambiguity at analysis time about what type it should be serialised as)
+			/// </summary>
+			[Fact]
+			public static void ClassWithSinglePropertyThatIsNonSealedTypeWhereSpecialisationsMayBeIgnored() => AssertCanGenerateCorrectMemberSetter(
+				new SealedPersonDetailsWithUnsealedButSpecialisationIgnoredNameDetails { Name = new UnsealedNameDetails { Name = "Test" } }
+			);
+
+			[Fact]
+			public static void NestedTypesWillWorkInOneDimensionalArrayTypes() => AssertCanGenerateCorrectMemberSetter(
+				new ContactListDetails { Names = new[] { new SealedNameDetails { Name = "Test" }, new SealedNameDetails { Name = "Test" } } }
+			);
 		}
 
 		public static class CanNotGenerate
@@ -129,6 +146,17 @@ namespace UnitTests
 		private sealed class SealedPersonDetailsWithStructNameDetails
 		{
 			public StructNameDetails Name { get; set; }
+		}
+
+		private sealed class SealedPersonDetailsWithUnsealedButSpecialisationIgnoredNameDetails
+		{
+			[SpecialisationsMayBeIgnoredWhenSerialising]
+			public UnsealedNameDetails Name { get; set; }
+		}
+
+		private sealed class ContactListDetails
+		{
+			public SealedNameDetails[] Names { get; set; }
 		}
 
 		private sealed class SealedNameDetails
