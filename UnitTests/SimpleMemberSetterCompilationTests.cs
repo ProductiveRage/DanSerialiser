@@ -4,7 +4,6 @@ using System.Linq;
 using DanSerialiser;
 using DanSerialiser.CachedLookups;
 using DanSerialiser.Reflection;
-using KellermanSoftware.CompareNetObjects;
 using Xunit;
 using static DanSerialiser.CachedLookups.BinarySerialisationCompiledMemberSetters;
 
@@ -25,6 +24,15 @@ namespace UnitTests
 
 			[Fact]
 			public static void ClassWithOnlyKeyField() => AssertCanGenerateCorrectMemberSetter(new SomethingWithKeyField { Key = 123 });
+
+			[Fact]
+			public static void ClassWithOnlyReadOnlyKeyProperty() => AssertCanGenerateCorrectMemberSetter(new SomethingWithReadOnlyKey(key: 123));
+
+			[Fact]
+			public static void ClassWithOnlyPrivateKeyProperty() => AssertCanGenerateCorrectMemberSetter(new SomethingWithPrivateKeyField(key: 123));
+
+			[Fact]
+			public static void ClassWithOnlyPrivateKeyReadOnlyProperty() => AssertCanGenerateCorrectMemberSetter(new SomethingWithPrivateReadOnlyKeyField(key: 123));
 
 			/// <summary>
 			/// Test a property that is a string (not a primitive but treated like one in that it was an IWrite method and references of the class are never reused)
@@ -128,9 +136,6 @@ namespace UnitTests
 
 		private static void AssertCanGenerateCorrectMemberSetter(object source)
 		{
-			if (source == null)
-				throw new ArgumentNullException(nameof(source));
-
 			var memberSetterDetails = TryToGenerateMemberSetter(source.GetType());
 			Assert.NotNull(memberSetterDetails);
 
@@ -158,10 +163,8 @@ namespace UnitTests
 				serialised = stream.ToArray();
 			}
 			var clone = BinarySerialisation.Deserialise<object>(serialised);
-			var comparer = new CompareLogic(); // Unfortunately, can not compare private fields (https://github.com/GregFinzer/Compare-Net-Objects/issues/77)
-			var comparisonResult = comparer.Compare(source, clone);
-			if (!comparisonResult.AreEqual)
-				throw new Exception("Clone failed: " + comparisonResult.DifferencesString);
+			if (!ObjectComparer.AreEqual(source, clone, out var differenceSummaryIfNotEqual))
+				throw new Exception("Clone failed: " + differenceSummaryIfNotEqual);
 		}
 
 		private class SomethingEmpty { }
@@ -169,6 +172,35 @@ namespace UnitTests
 		private class SomethingWithKey
 		{
 			public int Key { get; set; }
+		}
+
+		private class SomethingWithReadOnlyKey
+		{
+			public SomethingWithReadOnlyKey(int key)
+			{
+				Key = key;
+			}
+			public int Key { get; }
+		}
+
+		private class SomethingWithPrivateKeyField
+		{
+#pragma warning disable IDE0044 // Don't suggest changing this field, I want it how it is
+			private int _key;
+#pragma warning restore IDE0044
+			public SomethingWithPrivateKeyField(int key)
+			{
+				_key = key;
+			}
+		}
+
+		private class SomethingWithPrivateReadOnlyKeyField
+		{
+			private readonly int _key;
+			public SomethingWithPrivateReadOnlyKeyField(int key)
+			{
+				_key = key;
+			}
 		}
 
 		private class SomethingWithKeyField

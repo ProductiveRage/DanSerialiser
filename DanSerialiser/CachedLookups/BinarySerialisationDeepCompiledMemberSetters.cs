@@ -43,6 +43,13 @@ namespace DanSerialiser.CachedLookups
 		}
 
 		/// <summary>
+		/// This should only be called by unit tests when tests that exercise this class want to start from a clean slate (as they all should!) - this class is internal and
+		/// so this method is not exposed through the public API and so this comment will not be read by consumers of the library but I wanted to make it clear what its use
+		/// case was (and that it isn't expected to be used in normal operations)
+		/// </summary>
+		public static void ClearCache() => _cache.Clear();
+
+		/// <summary>
 		/// This will explore the shape of the data that starts at the specified type - looking at its fields and properties and then looking at the fields and properties
 		/// on those types, etc.. to try to produce as many member setters for those types as possible (the more member setters that it can produce, the less analysis work
 		/// that the Serialiser should need to do). The dictionary that it returns may include null values that indicate that it is not possible to generate a member setter
