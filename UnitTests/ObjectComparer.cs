@@ -2,7 +2,7 @@
 
 namespace UnitTests
 {
-	public static class ObjectComparer
+	internal static class ObjectComparer
 	{
 		public static bool AreEqual(object x, object y, out string differenceSummaryIfNotEqual)
 		{

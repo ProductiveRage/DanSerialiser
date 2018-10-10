@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace UnitTests
 {
-	public static class PersistentList
+	internal static class PersistentList
 	{
 		public static PersistentList<T> Of<T>(IEnumerable<T> items)
 		{
@@ -18,7 +18,7 @@ namespace UnitTests
 		}
 	}
 
-	public sealed class PersistentList<T>
+	internal sealed class PersistentList<T>
 	{
 		public static PersistentList<T> Empty { get; } = new PersistentList<T>(null);
 

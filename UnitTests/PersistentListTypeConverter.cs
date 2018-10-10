@@ -5,7 +5,7 @@ using DanSerialiser;
 
 namespace UnitTests
 {
-	public class PersistentListTypeConverter : ISerialisationTypeConverter, IDeserialisationTypeConverter
+	internal class PersistentListTypeConverter : ISerialisationTypeConverter, IDeserialisationTypeConverter
 	{
 		/// <summary>
 		/// When considering type converters for serialisation, there is only one factor to consider - what the current type of the value being considered is; if it's a PersistentList
