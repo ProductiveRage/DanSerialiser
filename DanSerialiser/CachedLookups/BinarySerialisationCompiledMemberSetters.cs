@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using DanSerialiser.Reflection;
+using static DanSerialiser.CachedLookups.BinarySerialisationWriterCachedNames;
 
 namespace DanSerialiser.CachedLookups
 {
@@ -76,22 +77,41 @@ namespace DanSerialiser.CachedLookups
 			if (valueWriterRetriever == null)
 				throw new ArgumentNullException(nameof(valueWriterRetriever));
 
-			// If there are any fields or properties whose types don't match the TypeWillWorkWithTypeGenerator conditions then don't try to make a type generator (there will be
-			// potential complications such as checking for circular / reused references that can't be handled by a simple type generator)
-			var fields = typeAnalyser.GetAllFieldsThatShouldBeSet(type);
-
 			var sourceParameter = Expression.Parameter(type, "source");
 			var writerParameter = Expression.Parameter(_writerType, "writer");
 			var statements = new List<Expression>();
 			var fieldsSet = new List<CachedNameData>();
-			foreach (var field in fields)
+			var (fields, properties) = typeAnalyser.GetFieldsAndProperties(type);
+			var membersToConsiderSerialising = 
+				fields.Select(f =>
+				{
+					var fieldNameBytes = GetFieldNameBytesIfWantoSerialiseField(f.Member, type);
+					if (fieldNameBytes == null)
+						return null;
+					return new
+					{
+						FieldNameBytes = fieldNameBytes,
+						ValueWriterIfPossibleToGenerate = TryToGetValueWriterForMember(f.Member, f.Member.FieldType, sourceParameter, writerParameter, valueWriterRetriever)
+					};
+				})
+				.Concat(
+					properties.Select(p =>
+					{
+						var fieldNameBytes = GetFieldNameBytesIfWantoSerialiseProperty(p.Member);
+						if (fieldNameBytes == null)
+							return null;
+						return new
+						{
+							FieldNameBytes = fieldNameBytes,
+							ValueWriterIfPossibleToGenerate = TryToGetValueWriterForMember(p.Member, p.Member.PropertyType, sourceParameter, writerParameter, valueWriterRetriever)
+						};
+					})
+				)
+				.Where(member => member != null); // Ignore any fields or properties that we didn't want to serialise
+			foreach (var member in membersToConsiderSerialising)
 			{
-				var fieldNameBytes = GetFieldNameBytesIfWantoSerialiseField(field, type);
-				if (fieldNameBytes == null)
-					return null;
-
-				var valueWriterIfPossibleToGenerate = TryToGetValueWriterForField(field, sourceParameter, writerParameter, valueWriterRetriever);
-				if (valueWriterIfPossibleToGenerate == null)
+				// If it wasn't possible to get a member setter for this field/property type then it's not possible to generate a member setter for the type that it's on
+				if (member.ValueWriterIfPossibleToGenerate == null)
 					return null;
 
 				// Generate the write-FieldName-to-stream method call
@@ -99,13 +119,13 @@ namespace DanSerialiser.CachedLookups
 					Expression.Call(
 						writerParameter,
 						_writeBytesMethod,
-						Expression.Constant(new[] { (byte)BinarySerialisationDataType.FieldName }.Concat(fieldNameBytes.OnlyAsReferenceID).ToArray())
+						Expression.Constant(new[] { (byte)BinarySerialisationDataType.FieldName }.Concat(member.FieldNameBytes.OnlyAsReferenceID).ToArray())
 					)
 				);
 
 				// Write out the value-serialising expression
-				statements.Add(valueWriterIfPossibleToGenerate);
-				fieldsSet.Add(fieldNameBytes);
+				statements.Add(member.ValueWriterIfPossibleToGenerate);
+				fieldsSet.Add(member.FieldNameBytes);
 			}
 
 			// Group all of the field setters together into one call
@@ -128,18 +148,18 @@ namespace DanSerialiser.CachedLookups
 			);
 		}
 
-		private static Expression TryToGetValueWriterForField(FieldInfo field, ParameterExpression typedSource, ParameterExpression writerParameter, ValueWriterRetriever valueWriterRetriever)
+		private static Expression TryToGetValueWriterForMember(MemberInfo member, Type memberType, ParameterExpression typedSource, ParameterExpression writerParameter, ValueWriterRetriever valueWriterRetriever)
 		{
-			if (field.FieldType.IsArray && (field.FieldType.GetArrayRank() == 1))
+			if (memberType.IsArray && (memberType.GetArrayRank() == 1))
 			{
 				// Note: There is some duplication of logic between here and the Serialiser class - namely that we call ArrayStart, then write the elements, then call ArrayEnd
-				var elementType = field.FieldType.GetElementType();
+				var elementType = memberType.GetElementType();
 				var current = Expression.Parameter(elementType, "current");
 				var valueWriterForFieldElementType = TryToGetValueWriterForType(elementType, current, writerParameter, valueWriterRetriever);
 				if (valueWriterForFieldElementType == null)
 					return null;
 
-				var arrayValue = Expression.MakeMemberAccess(typedSource, field);
+				var arrayValue = Expression.MakeMemberAccess(typedSource, member);
 				var ifNull = Expression.Call(
 					writerParameter,
 					nameof(BinarySerialisationWriter.Null),
@@ -169,17 +189,17 @@ namespace DanSerialiser.CachedLookups
 					Expression.Call(writerParameter, _writeArrayEndMethod)
 				);
 				return Expression.IfThenElse(
-					Expression.Equal(arrayValue, Expression.Constant(null, field.FieldType)),
+					Expression.Equal(arrayValue, Expression.Constant(null, memberType)),
 					ifNull,
 					ifNotNull
 				);
 			}
 
-			if (field.FieldType.IsEnum)
+			if (memberType.IsEnum)
 			{
 				// Note: There is some duplication of logic between here and the Serialiser class (that we write the underlying value)
-				var underlyingType = field.FieldType.GetEnumUnderlyingType();
-				var enumValue = Expression.MakeMemberAccess(typedSource, field);
+				var underlyingType = memberType.GetEnumUnderlyingType();
+				var enumValue = Expression.MakeMemberAccess(typedSource, member);
 				return TryToGetValueWriterForType(
 					underlyingType,
 					Expression.Convert(enumValue, underlyingType),
@@ -188,7 +208,7 @@ namespace DanSerialiser.CachedLookups
 				);
 			}
 
-			return TryToGetValueWriterForType(field.FieldType, Expression.MakeMemberAccess(typedSource, field), writerParameter, valueWriterRetriever);
+			return TryToGetValueWriterForType(memberType, Expression.MakeMemberAccess(typedSource, member), writerParameter, valueWriterRetriever);
 		}
 
 		private static Expression TryToGetValueWriterForType(Type type, Expression value, ParameterExpression writerParameter, ValueWriterRetriever valueWriterRetriever)
