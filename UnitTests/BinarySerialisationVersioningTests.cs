@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using static UnitTests.DynamicTypeConstructor;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
@@ -375,24 +375,6 @@ namespace UnitTests
 			return callerName;
 		}
 
-		private static ModuleBuilder GetModuleBuilder(string assemblyName, Version assemblyVersion)
-		{
-			var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(
-				new AssemblyName { Name = assemblyName, Version = assemblyVersion },
-				AssemblyBuilderAccess.Run
-			);
-			return assemblyBuilder.DefineDynamicModule(assemblyBuilder.GetName().Name);
-		}
-
-		private static Type ConstructType(ModuleBuilder module, string typeNameWithNamespace, IEnumerable<Tuple<string, Type>> fields, Action<TypeBuilder> optionalFinisher = null)
-		{
-			var typeBuilder = module.DefineType(typeNameWithNamespace);
-			foreach (var field in fields)
-				typeBuilder.DefineField(field.Item1, field.Item2, FieldAttributes.Public);
-			optionalFinisher?.Invoke(typeBuilder);
-			return typeBuilder.CreateType();
-		}
-
 		/// <summary>
 		/// This calls the BinarySerialisationCloner Deserialise method but populates the generic type parameter with a runtime type value
 		/// </summary>
@@ -421,32 +403,6 @@ namespace UnitTests
 				() => BinarySerialisationCloner.Clone(value, ReferenceReuseOptions.SupportReferenceReUseInMostlyTreeLikeStructure),
 				dynamicTypes
 			);
-		}
-
-		private static T ResolveDynamicAssembliesWhilePerformingAction<T>(Func<T> work, params Type[] dynamicTypes)
-		{
-			AppDomain.CurrentDomain.AssemblyResolve += AssemblyResolve;
-			try
-			{
-				return work();
-			}
-			finally
-			{
-				AppDomain.CurrentDomain.AssemblyResolve -= AssemblyResolve;
-			}
-
-			Assembly AssemblyResolve(object sender, ResolveEventArgs args)
-			{
-				if (dynamicTypes != null)
-				{
-					foreach (var type in dynamicTypes)
-					{
-						if (args.Name == type.Assembly.FullName)
-							return type.Assembly;
-					}
-				}
-				return null;
-			}
 		}
 	}
 }
