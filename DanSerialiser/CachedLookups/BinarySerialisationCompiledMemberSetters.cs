@@ -189,7 +189,7 @@ namespace DanSerialiser.CachedLookups
 					Expression.Call(writerParameter, _writeArrayEndMethod)
 				);
 				return Expression.IfThenElse(
-					Expression.Equal(arrayValue, Expression.Constant(null, memberType)),
+					Expression.ReferenceEqual(arrayValue, Expression.Constant(null, memberType)),
 					ifNull,
 					ifNotNull
 				);
@@ -296,8 +296,11 @@ namespace DanSerialiser.CachedLookups
 			// 2018-07-01: The "Null" method on IWrite was added because it's cheaper to write a single Null byte. Otherwise, a null Object would have been written as
 			// two for ObjectStart, ObjectEnd; a null Array would have been written as be an ArrayStart byte, the bytes for a null String (for the element type) and
 			// an ArrayEnd; a null String would have required three bytes to specify the String data type and then a length of minus one encoded as an Int32_16.
+			var ifNullCheck = type.IsValueType
+				? Expression.Equal(value, Expression.Constant(null, type)) // Null check for structs such as Nullable<T> (this will have the op_Equality or Equals implementations)
+				: Expression.ReferenceEqual(value, Expression.Constant(null, type)); // Null check for reference types, should be quicker to compare it to a null reference than let it implement custom equality logic
 			return Expression.IfThenElse(
-				Expression.Equal(value, Expression.Constant(null, type)),
+				ifNullCheck,
 				Expression.Call(writerParameter, nameof(BinarySerialisationWriter.Null), typeArguments: Type.EmptyTypes),
 				individualMemberSetterForNonNullValue
 			);
