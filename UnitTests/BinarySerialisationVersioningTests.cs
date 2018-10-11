@@ -1,10 +1,10 @@
 ﻿using System;
-using static UnitTests.DynamicTypeConstructor;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using DanSerialiser;
 using Xunit;
+using static UnitTests.DynamicTypeConstructor;
 
 namespace UnitTests
 {
