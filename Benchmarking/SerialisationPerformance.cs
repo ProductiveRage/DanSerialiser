@@ -28,9 +28,23 @@ namespace Benchmarking
 	public class SerialisationPerformance
 	{
 		private Product[] _products;
+		private EntitiesForFastestTreeBinarySerialisation.Product[] _productsWithHintsForSpeedyButLimited;
 		private string _jsonNetSerialisedData;
-		private byte[] _binaryFormatterSerialisedData, _protoBufSerialisedData, _danSerialiserSerialisedData, _danSerialiserSerialisedDataOptimisedForWideCircularReferences;
-		private Product[] _warmUpDeserialisedProductsFromBinaryFormatter, _warmUpDeserialisedProductsFromProtoBuf, _warmUpDeserialisedProductsFromDanSerialiser;
+		private byte[]
+			_binaryFormatterSerialisedData,
+			_protoBufSerialisedData,
+			_danSerialiserSerialisedData,
+			_danSerialiserSerialisedDataOptimisedForWideCircularReferences,
+			_danSerialiserSerialisedDataFastButSpeedy,
+			_danSerialiserSerialisedDataFastButSpeedyWithHints;
+		private Product[]
+			_warmUpDeserialisedProductsFromBinaryFormatter,
+			_warmUpDeserialisedProductsFromProtoBuf,
+			_warmUpDeserialisedProductsFromDanSerialiser,
+			_warmUpDeserialisedProductsFromDanSerialiserOptimisedForWideCircularReferences,
+			_warmUpDeserialisedProductsFromDanSerialiserFastButSpeedy;
+		private EntitiesForFastestTreeBinarySerialisation.Product[]
+			_warmUpDeserialisedProductsFromDanSerialiserFastButSpeedyWithHints;
 
 		[GlobalSetup]
 		public void Setup()
@@ -42,28 +56,39 @@ namespace Benchmarking
 				.EnumerateFiles("*.json")
 				.Select(file => JsonConvert.DeserializeObject<Product>(File.ReadAllText(file.FullName)))
 				.ToArray();
+			
+			// The EntitiesForFastestTreeBinarySerialisation classes are very similar to the regular entity classes but they have a few hints added that allow the SpeedyButLimited serialisation process to
+			// apply more optimisations (see the ReadMe.txt file in the EntitiesForFastestTreeBinarySerialisation folder)
+			_productsWithHintsForSpeedyButLimited = new DirectoryInfo("SampleData")
+				.EnumerateFiles("*.json")
+				.Select(file => JsonConvert.DeserializeObject<EntitiesForFastestTreeBinarySerialisation.Product>(File.ReadAllText(file.FullName)))
+				.ToArray();
+
+			// Allow each library to "warm up" before any timings are taken - it could be argued that this work should be part of the benchmarks but I'm interested in how the serialisers compare in
+			// performance when they're in use in a long-lived service and so I don't care about any warm up times
+			// - Allow each library to serialise the data once
 			_jsonNetSerialisedData = JsonNetSerialise();
-			RegisterTypesWithProtoBufThatShareAssemblyAndNamespaceWith(typeof(Product));
 			_binaryFormatterSerialisedData = BinaryFormatterSerialise();
-			_warmUpDeserialisedProductsFromBinaryFormatter = BinaryFormatterDeserialise();
+			RegisterTypesWithProtoBufThatShareAssemblyAndNamespaceWith(typeof(Product)); // Not putting protobuf-net attributes on the entities so let it do its reflection work as part of the warm up
 			_protoBufSerialisedData = ProtoBufSerialise();
-			_warmUpDeserialisedProductsFromProtoBuf = ProtoBufDeserialise();
 			_danSerialiserSerialisedData = DanSerialiserSerialise();
 			_danSerialiserSerialisedDataOptimisedForWideCircularReferences = DanSerialiserSerialise_OptimisedForWideCircularReferences();
+			_danSerialiserSerialisedDataFastButSpeedy = DanSerialiserSerialise_FastestTreeBinarySerialisation();
+			_danSerialiserSerialisedDataFastButSpeedyWithHints = DanSerialiserSerialise_FastestTreeBinarySerialisationWithHints();
+			// - Allow each library to deserialise the data once (apart from Json.NET, which has already deserialised the data to produce the _products and _productsOptimisedForSpeedyButLimited arrays)
+			_warmUpDeserialisedProductsFromBinaryFormatter = BinaryFormatterDeserialise();
+			_warmUpDeserialisedProductsFromProtoBuf = ProtoBufDeserialise();
 			_warmUpDeserialisedProductsFromDanSerialiser = DanSerialiserDeserialise();
+			_warmUpDeserialisedProductsFromDanSerialiserOptimisedForWideCircularReferences = DanSerialiserDeserialise_OptimisedForWideCircularReferences();
+			_warmUpDeserialisedProductsFromDanSerialiserFastButSpeedy = DanSerialiserDeserialise_FastestTreeBinarySerialisation();
+			_warmUpDeserialisedProductsFromDanSerialiserFastButSpeedyWithHints = DanSerialiserDeserialise_FastestTreeBinarySerialisationWithHints();
 		}
 
 		[Benchmark]
-		public string JsonNetSerialise()
-		{
-			return JsonConvert.SerializeObject(_products);
-		}
+		public string JsonNetSerialise() => JsonConvert.SerializeObject(_products);
 
 		[Benchmark]
-		public Product[] JsonNetDeserialise()
-		{
-			return JsonConvert.DeserializeObject<Product[]>(_jsonNetSerialisedData);
-		}
+		public Product[] JsonNetDeserialise() => JsonConvert.DeserializeObject<Product[]>(_jsonNetSerialisedData);
 
 		[Benchmark]
 		public byte[] BinaryFormatterSerialise()
@@ -104,28 +129,34 @@ namespace Benchmarking
 		}
 
 		[Benchmark]
-		public byte[] DanSerialiserSerialise()
-		{
-			return BinarySerialisation.Serialise(_products, optimiseForWideCircularReference: false);
-		}
-
+		public byte[] DanSerialiserSerialise() => BinarySerialisation.Serialise(_products, optimiseForWideCircularReference: false);
 
 		[Benchmark]
-		public byte[] DanSerialiserSerialise_OptimisedForWideCircularReferences()
-		{
-			return BinarySerialisation.Serialise(_products, optimiseForWideCircularReference: true);
-		}
+		public byte[] DanSerialiserSerialise_OptimisedForWideCircularReferences() => BinarySerialisation.Serialise(_products, optimiseForWideCircularReference: true);
 
 		[Benchmark]
-		public Product[] DanSerialiserDeserialise()
-		{
-			return BinarySerialisation.Deserialise<Product[]>(_danSerialiserSerialisedData);
-		}
+		public byte[] DanSerialiserSerialise_FastestTreeBinarySerialisation() => FastestTreeBinarySerialisation.Serialise(_products);
 
 		[Benchmark]
-		public Product[] DanSerialiserDeserialise_OptimisedForWideCircularReferences()
+		public byte[] DanSerialiserSerialise_FastestTreeBinarySerialisationWithHints() => FastestTreeBinarySerialisation.Serialise(_productsWithHintsForSpeedyButLimited);
+
+		// Note: The BinarySerialisation.Deserialise can handle data whether the writer that created the serialised content was optimised for wide circular references or was SpeedyButLimited and
+		// the performance should be the same between standard and optimised-for-wide-circular-references but it will be quicker for SpeedyButLimited because there will be no Object Reference IDs
+		// in the content. Even though deserialising standard and optimised-for-wide-circular-references data is expected to take the same time, it makes sense to have seperate benchmarks for them
+		// in case this changes in the future.
+		[Benchmark]
+		public Product[] DanSerialiserDeserialise() => BinarySerialisation.Deserialise<Product[]>(_danSerialiserSerialisedData);
+
+		[Benchmark]
+		public Product[] DanSerialiserDeserialise_OptimisedForWideCircularReferences() => BinarySerialisation.Deserialise<Product[]>(_danSerialiserSerialisedDataOptimisedForWideCircularReferences);
+
+		[Benchmark]
+		public Product[] DanSerialiserDeserialise_FastestTreeBinarySerialisation() => BinarySerialisation.Deserialise<Product[]>(_danSerialiserSerialisedDataFastButSpeedy);
+
+		[Benchmark]
+		public EntitiesForFastestTreeBinarySerialisation.Product[] DanSerialiserDeserialise_FastestTreeBinarySerialisationWithHints()
 		{
-			return BinarySerialisation.Deserialise<Product[]>(_danSerialiserSerialisedDataOptimisedForWideCircularReferences);
+			return BinarySerialisation.Deserialise<EntitiesForFastestTreeBinarySerialisation.Product[]>(_danSerialiserSerialisedDataFastButSpeedyWithHints);
 		}
 
 		private static void RegisterTypesWithProtoBufThatShareAssemblyAndNamespaceWith(Type sourceType)
