@@ -17,10 +17,7 @@ namespace UnitTests
 				return false;
 			}
 
-			var comparer = new CompareLogic(
-				// Can't enable private field/property analysis until https://github.com/GregFinzer/Compare-Net-Objects/issues/77 is addressed
-				//new ComparisonConfig { ComparePrivateFields = true, ComparePrivateProperties = true }
-			);
+			var comparer = new CompareLogic(new ComparisonConfig { ComparePrivateFields = true, ComparePrivateProperties = true });
 			var comparisonResult = comparer.Compare(x, y);
 			if (comparisonResult.AreEqual)
 			{
