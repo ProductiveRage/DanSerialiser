@@ -1,4 +1,7 @@
-﻿using System.Collections.Immutable;
+﻿using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 using DanSerialiser;
 using Xunit;
 
@@ -6,35 +9,50 @@ namespace UnitTests
 {
 	public static class ImmutableListTypeConverterTests
 	{
-		public static class MicrosoftImmutableList
+		public sealed class MicrosoftImmutableList : SharedTests
+		{
+			protected override Type GetListType<T>() => typeof(ImmutableList<T>);
+			protected override IEnumerable<T> GetList<T>(T[] valuesIfAny) => (valuesIfAny == null) ? null : ImmutableList.Create(valuesIfAny);
+		}
+
+		public sealed class CustomPersistentList : SharedTests
+		{
+			protected override Type GetListType<T>() => typeof(PersistentList<T>);
+			protected override IEnumerable<T> GetList<T>(T[] valuesIfAny) => (valuesIfAny == null) ? null : PersistentList.Of(valuesIfAny);
+		}
+
+		public abstract class SharedTests
 		{
 			[Fact]
-			public static void NullImmutableListOfStringSerialisedAsNull()
+			public void NullImmutableListOfStringSerialisedAsNull()
 			{
-				ImmutableList<string> value = null;
+				var value = Convert.ChangeType(null, GetListType<string>());
 				var serialised = ((ISerialisationTypeConverter)ImmutableListTypeConverter.Instance).ConvertIfRequired(value);
 				AssertEqualContentsAndThatTypesMatch(null, serialised);
 
 				var deserialised = ((IDeserialisationTypeConverter)ImmutableListTypeConverter.Instance).ConvertIfRequired(
-					typeof(ImmutableList<string>),
+					GetListType<string>(),
 					serialised
 				);
 				AssertEqualContentsAndThatTypesMatch(value, deserialised);
 			}
 
 			[Fact]
-			public static void ImmutableListOfStringSerialisedViaStringArray()
+			public void ImmutableListOfStringSerialisedViaStringArray()
 			{
-				var value = ImmutableList.Create("One", "Two");
+				var value = GetList("One", "Two");
 				var serialised = ((ISerialisationTypeConverter)ImmutableListTypeConverter.Instance).ConvertIfRequired(value);
-				AssertEqualContentsAndThatTypesMatch(new[] { "One", "Two" }, serialised);
+				AssertEqualContentsAndThatTypesMatch(value.ToArray(), serialised);
 
 				var deserialised = ((IDeserialisationTypeConverter)ImmutableListTypeConverter.Instance).ConvertIfRequired(
-					typeof(ImmutableList<string>),
+					GetListType<string>(),
 					serialised
 				);
 				AssertEqualContentsAndThatTypesMatch(value, deserialised);
 			}
+
+			protected abstract Type GetListType<T>();
+			protected abstract IEnumerable<T> GetList<T>(params T[] valuesIfAny);
 		}
 
 		private static void AssertEqualContentsAndThatTypesMatch(object expected, object actual)
