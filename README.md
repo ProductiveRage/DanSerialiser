@@ -255,6 +255,65 @@ There is a way to tackle this kind of data; the "optimiseForWideCircularReferenc
 
 I would recommend *not* enabling this option unless you come to find that you have to.
 
+## Is instantiate-via-constructor used for immutable types?
+
+I've mentioned immutable types multiple times so far. They're certainly not a requirement if you want to use this library (it's perfectly happy with POCOs, too!) but they're how I prefer to model entities in my own code and I wanted this library to be able to handle them without requiring any intermediary types (aka "serialisation DTOs").
+
+Other libraries (such as Json.NET and protobuf-net\*) will deserialise immutable types by trying to find a constructor to call whose arguments may all be provided by field or property values present in the serialised data. This library takes a similar approach to the BinaryFormatter, which is to try to record the values of all fields (regardless of accessibility; whether they are private or not) when serialising and to try to set all of these fields when *de*serialising - no constructor is called. This side steps any potential complications with naming conventions between property names and constructor arguments.
+
+\* *(By default - which can be overriden using setting the flag "SkipConstructor" to false in the [ProtoContract] attribute on the type)*
+
+To illustate:
+
+	// This may be serialised/deserialised by this library as-is
+	public sealed class Something
+	{
+		public Something(string name) : this(name, null) { }
+		private Something(string name, string notes)
+		{
+			Name = name;
+			Notes = notes;
+		}
+		public string Name { get; }
+		public string Notes { get; }
+		public Something WithNotes(string notes) => new Something(Name, notes);
+	}
+	
+	// To use protobuf-net, these attributes will be needed (it may be possible to configure
+	// without attributes but I've been unable to find out how). Without SkipConstructor
+	// being set to true, the "Deserialize" call will throw a ProtoException.
+	[ProtoContract(SkipConstructor = true)]
+	public sealed class Something
+	{
+		public Something(string name) : this(name, null) { }
+		private Something(string name, string notes)
+		{
+			Name = name;
+			Notes = notes;
+		}
+		[ProtoMember(1)]
+		public string Name { get; }
+		[ProtoMember(2)]
+		public string Notes { get; }
+		public Something WithNotes(string notes) => new Something(Name, notes);
+	}
+
+	// To use Json.NET, the private constructor will need the [JsonConstructor] - without this,
+	// the Notes property will be null (the data will be silently lost)
+	public sealed class Something
+	{
+		public Something(string name) : this(name, null) { }
+		[JsonConstructor]
+		private Something(string name, string notes)
+		{
+			Name = name;
+			Notes = notes;
+		}
+		public string Name { get; }
+		public string Notes { get; }
+		public Something WithNotes(string notes) => new Something(Name, notes);
+	}	
+
 ## Performance
 
 My primary goal with this library was to see if I could create something that fit the versioning plan that I had in mind. Performance is not the number one goal - but it also shouldn't be forgotten. It won't be as fast as [protobuf](https://github.com/google/protobuf/tree/master/csharp) / [protobuf-net](https://github.com/mgravell/protobuf-net) but it also shouldn't require their compromises\*. It should be at least comparable to obvious alternatives, such as the BinaryFormatter.
@@ -367,11 +426,10 @@ The deserialisation methods have overloads that allow any type converters to be 
 	
 and
     
-    var result =
-		(new BinarySerialisationReader(
-			stream,
-			new[] { new InvalidEnumToDefaultValueTypeConverter() }
-		)).Read<PersonDetails>();
+    var result = (new BinarySerialisationReader(
+                    stream,
+                    new[] { new InvalidEnumToDefaultValueTypeConverter() }
+                 )).Read<PersonDetails>();
 
 One of the downsides to serialising the underlying value for enums is that reordering the enum names will change the values (unless each name is explicitly given a value). In this scenario:
 
