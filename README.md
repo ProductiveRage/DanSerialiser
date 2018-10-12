@@ -426,7 +426,7 @@ Just as the deserialisation methods have overloads to specify type converters, s
 
     var serialisedData = BinarySerialisation.Serialise(
 		value,
-		new[] { new EnumAsStringTypeConverter }
+		new[] { new EnumAsStringTypeConverter() }
 	);
 
 and
@@ -434,6 +434,8 @@ and
     var writer = new BinarySerialisationWriter(stream);
     Serialiser.Instance.Serialise(
 		value,
-		new[] { new EnumAsStringTypeConverter },
+		new[] { new EnumAsStringTypeConverter() },
 		writer
 	);
+	
+It is possible to specify as few or as many type converters as you required for serialisation and/or deserialisation. However, once one type converter has changed the value then no other type converters will be considered. This means that it is possible to provide multiple type converters that target decreasingly specific types and that only the first one that does work will apply and the others will be ignored.
