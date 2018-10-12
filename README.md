@@ -438,4 +438,6 @@ and
 		writer
 	);
 	
+*(The **EnumAsStringTypeConverter** class is included in the library if you want to use this functionality - it caches values and names so that lookups can be quick as enum inspection has been slow on some .NET frameworks and it has a static "Instance" property to avoid needlessly creating instances of the class, see [EnumAsStringTypeConverter.cs](https://github.com/ProductiveRage/DanSerialiser/blob/master/DanSerialiser/TypeConverters/EnumAsStringTypeConverter.cs))*
+
 It is possible to specify as few or as many type converters as you required for serialisation and/or deserialisation. However, once one type converter has changed the value then no other type converters will be considered. This means that it is possible to provide multiple type converters that target decreasingly specific types and that only the first one that does work will apply and the others will be ignored.
