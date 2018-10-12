@@ -21,11 +21,11 @@ Using it is as simple as this:
 The above are static convenience methods that serialise to and from a byte array via a MemoryStream using code like the following:
 
     // Serialise to a strem
-    var writer = new BinarySerialisationWriter(stream);
+    var writer = new DanSerialiser.BinarySerialisationWriter(stream);
     Serialiser.Instance.Serialise(value, writer);
 
     // Deserialise data from the stream back into an object
-    var result = (new BinarySerialisationReader(stream)).Read<PersonDetails>();
+    var result = (new DanSerialiser.BinarySerialisationReader(stream)).Read<PersonDetails>();
     
 .. and so, if you want to use a different stream (to read/write straight from/to disk, for example) then you can do so easily.
     
@@ -298,3 +298,142 @@ There is a project in the repository that uses [BenchmarkDotNet](https://github.
 Initially, I imagined that getting with one order of magnitude of protobuf would be acceptable but I hadn't realised how close Json.NET would be in performance - approx. 13.6x / 9.3x times slower than protobuf to serialise the data on .NET 4.6.1 / .NET Core 2.1 and only 6.0x / 6.4x slower to deserialise it. Considering that Json.NET is so general purpose, I thought that that was impressive!
 
 I'm happy that *this* library is less than 5x as slow as protobuf in serialising the sample data and less than 2x as slow at deserialising.
+
+## A words about enums and entity versioning
+
+Enums in C# are a bit of a wobbly concept, they look like they might bring strong-typing to the game than they really do. For example, if we take this enum:
+
+	// https://thedailywtf.com/articles/What_Is_Truth_0x3f_
+	enum Bool { True, False, FileNotFound }
+
+.. then we can set values like this:
+
+	var isTrue = Bool.True;
+	var isFalse = Bool.False;
+
+.. but we can also do this:
+
+	var problem99 = (Bool)99;
+
+.. and so there is no guarantee that a **Bool** variable will have a value that is one of the enum's named options.
+
+The default behaviour of this serialiser is to write the underlying numeric value for enums. This means that it is possible to get enum values in deserialised content that are not valid. For example, if the enum above was from v1 of an assembly but it was extended in v2 to this:
+
+	enum Bool { True, False, FileNotFound, SurpriseMe }
+
+.. and an entity from the v2 assembly was serialised that contained the value **Bool**.SurpriseMe and then *deserialised* in a process where the v1 assembly was loaded then the value would be (**Bool**)3, which would not be named.
+
+Serialising the underlying values for enums is expected to result in the least surprising behaviour in cases where enums vary across assembly versions (particularly since enums in C# are not limited to the declared named values in normal operation).
+
+If you would prefer to change this behaviour for your use case then you may do so using Type Converters.
+
+## "Type Converters" for changing the shape of data while in transit
+
+There may be occasions where you wish to change how data is represented in its serialised state - not changes to the entity types being serialised but a way to control how they are transmitted. One example would be if you wanted to change how versioning of enum values is handled. For example, if you had the following enum in v1 of an assembly:
+
+	enum FailureReason { Unknown, FileNotFound, AccessDenied, TimeOut }
+	
+.. and then expanded it in v2 of that assembly to this:
+
+	enum FailureReason { Unknown, FileNotFound, AccessDenied, TimeOut, ChaosMonkey }
+
+.. then it's possible that an entity serialised by a process that has the v2 assembly loaded will include a **FailureReason** value that could not be deserialised into one of the named enum values where the v1 assembly is loaded. This would not result in an error, in the same way that this would not result in an error:
+
+	var cause = (FailureReason)101;
+
+However, you may find this behaviour undesirable and would prefer to map any unknown enum values onto the default value for that enum. That could be achieved by using a Deserialisation Type Converter, such as this:
+
+	public class InvalidEnumToDefaultValueTypeConverter : IDeserialisationTypeConverter
+	{
+		public object ConvertIfRequired(Type targetType, object value)
+		{
+			if ((value == null) || !targetType.IsEnum)
+				return value;
+
+			if (Enum.IsDefined(targetType, value))
+				return value;
+
+			// Get default enum value
+			return Activator.CreateInstance(targetType);
+		}
+	}
+
+The deserialisation methods have overloads that allow any type converters to be specified - eg.
+
+    var result = BinarySerialisation.Deserialise<PersonDetails>(
+		serialisedData,
+		new[] { new InvalidEnumToDefaultValueTypeConverter() }
+	);
+	
+and
+    
+    var result =
+		(new BinarySerialisationReader(
+			stream,
+			new[] { new InvalidEnumToDefaultValueTypeConverter() }
+		)).Read<PersonDetails>();
+
+One of the downsides to serialising the underlying value for enums is that reordering the enum names will change the values (unless each name is explicitly given a value). In this scenario:
+
+	// v1 assembly has this enum
+	enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun }
+	
+	// v2 assembly has this enum (someone loves alphabetical ordering)
+	enum Days { Fri, Mon, Sat, Sun, Tue, Thu, Wed }
+
+.. if "Fri" is serialised by a process that has v2 assembly loaded and then deserialised as the v1 entity then it be interpeted as "Mon" and confusion could ensue.
+
+One way to avoid this problem is to never reorder enum values (if new values are required then they would always be added to the end). Another way is to explicitly set the underlying values - eg.
+
+	// v1 assembly has this enum
+	enum Days { Mon = 0, Tue = 1, Wed = 2, Thu = 3, Fri = 4, Sat = 5, Sun = 6 }
+	
+	// v2 assembly has this enum (someone loves alphabetical ordering)
+	enum Days { Fri = 4, Mon = 0, Sat = 5, Sun = 6, Tue = 1, Thu = 3, Wed = 2 }
+
+A third way is to use serialisation and deserialisation type converters to serialise enums as their names, instead of they underlying values. Something like this:
+
+	public class EnumAsStringTypeConverter
+		: ISerialisationTypeConverter, IDeserialisationTypeConverter
+	{
+		object ISerialisationTypeConverter.ConvertIfRequired(object value)
+		{
+			if (value == null)
+				return value;
+
+			var valueType = value.GetType();
+			if (!valueType.IsEnum)
+				return value;
+
+			return Enum.GetName(valueType, value);
+		}
+
+		object IDeserialisationTypeConverter.ConvertIfRequired(Type targetType, object value)
+		{
+			if (targetType == null)
+				throw new ArgumentNullException(nameof(targetType));
+
+			if (!targetType.IsEnum || !(value is string valueString))
+				return value;
+
+			return Enum.TryParse(targetType, valueString, out var enumValue)
+				? enumValue
+				: Activator.CreateInstance(targetType);
+		}
+	}
+
+Just as the deserialisation methods have overloads to specify type converters, so do the serialisation methods:
+
+    var serialisedData = BinarySerialisation.Serialise(
+		value,
+		new[] { new EnumAsStringTypeConverter }
+	);
+
+and
+
+    var writer = new BinarySerialisationWriter(stream);
+    Serialiser.Instance.Serialise(
+		value,
+		new[] { new EnumAsStringTypeConverter },
+		writer
+	);
