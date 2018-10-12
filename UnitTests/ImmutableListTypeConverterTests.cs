@@ -15,6 +15,10 @@ namespace UnitTests
 			protected override IEnumerable<T> GetList<T>(T[] valuesIfAny) => (valuesIfAny == null) ? null : ImmutableList.Create(valuesIfAny);
 		}
 
+		/// <summary>
+		/// The PersistentList class has its own ToArray instance method, which makes it slightly different to the ImmutableList (the type converter will use an instance method
+		/// if there is one) and it has an Empty property (whereas ImmutableList has a field) and an InsertRange method (where ImmutableList has an AddRange method)
+		/// </summary>
 		public sealed class CustomPersistentList : SharedTests
 		{
 			protected override Type GetListType<T>() => typeof(PersistentList<T>);
@@ -29,6 +33,20 @@ namespace UnitTests
 				var value = Convert.ChangeType(null, GetListType<string>());
 				var serialised = ((ISerialisationTypeConverter)ImmutableListTypeConverter.Instance).ConvertIfRequired(value);
 				AssertEqualContentsAndThatTypesMatch(null, serialised);
+
+				var deserialised = ((IDeserialisationTypeConverter)ImmutableListTypeConverter.Instance).ConvertIfRequired(
+					GetListType<string>(),
+					serialised
+				);
+				AssertEqualContentsAndThatTypesMatch(value, deserialised);
+			}
+
+			[Fact]
+			public void EmptyImmutableListOfStringSerialisedViaStringArray()
+			{
+				var value = GetList<string>();
+				var serialised = ((ISerialisationTypeConverter)ImmutableListTypeConverter.Instance).ConvertIfRequired(value);
+				AssertEqualContentsAndThatTypesMatch(value.ToArray(), serialised);
 
 				var deserialised = ((IDeserialisationTypeConverter)ImmutableListTypeConverter.Instance).ConvertIfRequired(
 					GetListType<string>(),
