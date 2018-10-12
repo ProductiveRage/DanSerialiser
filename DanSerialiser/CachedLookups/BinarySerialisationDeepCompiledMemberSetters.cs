@@ -36,7 +36,7 @@ namespace DanSerialiser.CachedLookups
 	/// </summary>
 	internal static class BinarySerialisationDeepCompiledMemberSetters
 	{
-		private static ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults> _cache;
+		private static readonly ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults> _cache;
 		static BinarySerialisationDeepCompiledMemberSetters()
 		{
 			_cache = new ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults>();
