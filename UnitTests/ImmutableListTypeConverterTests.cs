@@ -9,7 +9,20 @@ namespace UnitTests
 {
 	public static class ImmutableListTypeConverterTests
 	{
-		public sealed class MicrosoftImmutableList : SharedTests
+		public static class SystemCollectionsGenericListTests
+		{
+			[Fact]
+			public static void DoNotTryToChange()
+			{
+				var value = new List<string> { "One", "Two" };
+				Assert.Same(
+					value,
+					((ISerialisationTypeConverter)ImmutableListTypeConverter.Instance).ConvertIfRequired(value)
+				);
+			}
+		}
+
+		public sealed class MicrosoftImmutableList : SharedTestsForApplicableListTypes
 		{
 			protected override Type GetListType<T>() => typeof(ImmutableList<T>);
 			protected override IEnumerable<T> GetList<T>(T[] valuesIfAny) => (valuesIfAny == null) ? null : ImmutableList.Create(valuesIfAny);
@@ -19,13 +32,13 @@ namespace UnitTests
 		/// The PersistentList class has its own ToArray instance method, which makes it slightly different to the ImmutableList (the type converter will use an instance method
 		/// if there is one) and it has an Empty property (whereas ImmutableList has a field) and an InsertRange method (where ImmutableList has an AddRange method)
 		/// </summary>
-		public sealed class CustomPersistentList : SharedTests
+		public sealed class CustomPersistentList : SharedTestsForApplicableListTypes
 		{
 			protected override Type GetListType<T>() => typeof(PersistentList<T>);
 			protected override IEnumerable<T> GetList<T>(T[] valuesIfAny) => (valuesIfAny == null) ? null : PersistentList.Of(valuesIfAny);
 		}
 
-		public abstract class SharedTests
+		public abstract class SharedTestsForApplicableListTypes
 		{
 			[Fact]
 			public void NullImmutableListOfStringSerialisedAsNull()

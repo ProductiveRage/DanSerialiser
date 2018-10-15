@@ -99,7 +99,7 @@ namespace DanSerialiser
 			else
 			{
 				var emptyInstanceField = type.GetField("Empty", BindingFlags.Public | BindingFlags.Static);
-				if (emptyInstanceField.FieldType != type)
+				if (emptyInstanceField?.FieldType != type)
 					return null;
 				emptyInstanceMember = emptyInstanceField;
 			}
