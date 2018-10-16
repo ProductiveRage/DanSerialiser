@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 15.0.27428.2043
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DanSerialiser", "DanSerialiser\DanSerialiser.csproj", "{3696FA7B-8F36-4BC5-AD9B-8D82798F6F08}"
+	ProjectSection(ProjectDependencies) = postProject
+		{B77CDC9F-B6A0-4EEB-B8A8-0A27026A35B7} = {B77CDC9F-B6A0-4EEB-B8A8-0A27026A35B7}
+	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester", "Tester\Tester.csproj", "{307D1879-965C-4C39-939F-C19D65981A22}"
 EndProject
