@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using DanSerialiser.Reflection;
 using static DanSerialiser.CachedLookups.BinarySerialisationCompiledMemberSetters;
@@ -56,10 +57,12 @@ namespace DanSerialiser.CachedLookups
 		/// for that type (this can also save the Serialiser some work because it will know not to bother trying). The member setters will write data that uses Field Name
 		/// Reference IDs, so the Serialiser will have to use the return CachedNameData list to write FieldNamePreLoad content ahead of the serialised object data.
 		/// </summary>
-		public static DeepCompiledMemberSettersGenerationResults GetMemberSettersFor(Type serialisationTargetType)
+		public static DeepCompiledMemberSettersGenerationResults GetMemberSettersFor(Type serialisationTargetType, IFastSerialisationTypeConverter[] typeConverters)
 		{
 			if (serialisationTargetType == null)
 				throw new ArgumentNullException(nameof(serialisationTargetType));
+			if (typeConverters == null)
+				throw new ArgumentNullException(nameof(typeConverters));
 
 			if (_cache.TryGetValue(serialisationTargetType, out var memberSetterData))
 				return memberSetterData;
@@ -67,7 +70,7 @@ namespace DanSerialiser.CachedLookups
 			var memberSetters = new Dictionary<Type, MemberSetterDetails>();
 			var typeNamesToDeclare = new HashSet<CachedNameData>(CachedNameDataEqualityComparer.Instance);
 			var fieldNamesToDeclare = new HashSet<CachedNameData>(CachedNameDataEqualityComparer.Instance);
-			GenerateMemberSettersForTypeIfPossible(serialisationTargetType, new HashSet<Type>(), typeNamesToDeclare, fieldNamesToDeclare, memberSetters, fieldIsHappyToIgnoreSpecialisations: false);
+			GenerateMemberSettersForTypeIfPossible(serialisationTargetType, new HashSet<Type>(), typeNamesToDeclare, fieldNamesToDeclare, memberSetters, typeConverters, fieldIsHappyToIgnoreSpecialisations: false);
 			var compiledMemberSetters = new ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>(
 				memberSetters.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.GetCompiledMemberSetter())
 			);
@@ -82,6 +85,7 @@ namespace DanSerialiser.CachedLookups
 			HashSet<CachedNameData> typeNamesToDeclare,
 			HashSet<CachedNameData> fieldNamesToDeclare,
 			Dictionary<Type, MemberSetterDetails> memberSetters,
+			IFastSerialisationTypeConverter[] typeConverters,
 			bool fieldIsHappyToIgnoreSpecialisations)
 		{
 			// Leave primitive-like values to the BinarySerialisationWriter's specialised methods (Boolean, String, DateTime, etc..)
@@ -114,7 +118,7 @@ namespace DanSerialiser.CachedLookups
 			// in the future)
 			if (type.IsArray)
 			{
-				GenerateMemberSettersForTypeIfPossible(type.GetElementType(), typesEncountered, typeNamesToDeclare, fieldNamesToDeclare, memberSetters, fieldIsHappyToIgnoreSpecialisations);
+				GenerateMemberSettersForTypeIfPossible(type.GetElementType(), typesEncountered, typeNamesToDeclare, fieldNamesToDeclare, memberSetters, typeConverters, fieldIsHappyToIgnoreSpecialisations);
 				return;
 			}
 
@@ -134,6 +138,7 @@ namespace DanSerialiser.CachedLookups
 					typeNamesToDeclare,
 					fieldNamesToDeclare,
 					memberSetters,
+					typeConverters,
 					fieldIsHappyToIgnoreSpecialisations ||
 						(field.Member.GetCustomAttribute<SpecialisationsMayBeIgnoredWhenSerialisingAttribute>() != null) ||
 						(BackingFieldHelpers.TryToGetPropertyRelatingToBackingField(field.Member)?.GetCustomAttribute<SpecialisationsMayBeIgnoredWhenSerialisingAttribute>() != null)
@@ -148,16 +153,28 @@ namespace DanSerialiser.CachedLookups
 					typeNamesToDeclare,
 					fieldNamesToDeclare,
 					memberSetters,
+					typeConverters,
 					fieldIsHappyToIgnoreSpecialisations || (property.Member.GetCustomAttribute<SpecialisationsMayBeIgnoredWhenSerialisingAttribute>() != null)
 				);
 			}
 
-			// Now that we've been all the way down the chain for the current type, see if we can generate a member setter for it
 			var memberSetterDetails = TryToGenerateMemberSetter(
 				type,
 				DefaultTypeAnalyser.Instance,
 				t =>
 				{
+					// Give the type converters a shot - if TryToGetMemberSetterDetailsViaTypeConverters returns a non-null reference then one of them wants to
+					// control the serialisation of this type (if null is returned then continue on to process as normal)
+					var memberSetterDetailsViaTypeConverter = TryToGetMemberSetterDetailsViaTypeConverters(t);
+					if (memberSetterDetailsViaTypeConverter != null)
+					{
+						foreach (var typeName in memberSetterDetailsViaTypeConverter.OtherTypeNames)
+							typeNamesToDeclare.Add(typeName);
+						foreach (var fieldName in memberSetterDetailsViaTypeConverter.FieldNames)
+							fieldNamesToDeclare.Add(fieldName);
+						return ValueWriter.OverrideValue(memberSetterDetailsViaTypeConverter.NewTypeName, memberSetterDetailsViaTypeConverter.MemberSetter);
+					}
+
 					if (memberSetters.TryGetValue(t, out var valueWriter) && (valueWriter != null))
 					{
 						// The TryToGenerateMemberSetter method has requested a member setter for one of the fields or properties and we have access to a member
@@ -199,6 +216,57 @@ namespace DanSerialiser.CachedLookups
 				// to generate them for because it can save the caller some work (they won't waste time trying to generate a member setter themselves)
 				memberSetters.Add(type, null);
 			}
+
+			FastTypeConverterSerialisationDependencies TryToGetMemberSetterDetailsViaTypeConverters(Type t)
+			{
+				foreach (var typeConverter in typeConverters)
+				{
+					var typeNames = new List<CachedNameData>();
+					var fieldNames = new List<CachedNameData>();
+					var typeConverterWriter = typeConverter.GetDirectWriterIfPossible(
+						t,
+						requestedMemberSetterType =>
+						{
+							var requestedMemberSetterTypeWriter = TryToGenerateMemberSetter(
+								requestedMemberSetterType,
+								DefaultTypeAnalyser.Instance,
+								nestedType => (memberSetters.TryGetValue(nestedType, out var valueWriter) && (valueWriter != null))
+									? ValueWriter.PopulateValue(valueWriter.MemberSetter)
+									: null
+							);
+							if (requestedMemberSetterTypeWriter != null)
+							{
+								typeNames.Add(requestedMemberSetterTypeWriter.TypeName);
+								fieldNames.AddRange(requestedMemberSetterTypeWriter.FieldsSet);
+							}
+							return requestedMemberSetterTypeWriter;
+						}
+					);
+					if (typeConverterWriter != null)
+						return new FastTypeConverterSerialisationDependencies(GetTypeNameBytes(typeConverterWriter.ConvertedToType), typeNames, fieldNames, typeConverterWriter.MemberSetter);
+				}
+				return null;
+			}
+		}
+
+		/// <summary>
+		/// A type converter may potentially request member setters for multiple types and so there may be type names and field names from multiple types that are required
+		/// in order to serialise the value (not just the type name and field names of the type that the converter changes the value into) - this class contains all of that
+		/// information.
+		/// </summary>
+		private sealed class FastTypeConverterSerialisationDependencies
+		{
+			public FastTypeConverterSerialisationDependencies(CachedNameData newTypeName, IEnumerable<CachedNameData> otherTypeNames, IEnumerable<CachedNameData> fieldNames, LambdaExpression memberSetter)
+			{
+				NewTypeName = newTypeName ?? throw new ArgumentNullException(nameof(newTypeName));
+				OtherTypeNames = otherTypeNames ?? throw new ArgumentNullException(nameof(otherTypeNames));
+				FieldNames = fieldNames ?? throw new ArgumentNullException(nameof(fieldNames));
+				MemberSetter = memberSetter ?? throw new ArgumentNullException(nameof(memberSetter));
+			}
+			public CachedNameData NewTypeName { get; }
+			public IEnumerable<CachedNameData> OtherTypeNames { get; }
+			public IEnumerable<CachedNameData> FieldNames { get; }
+			public LambdaExpression MemberSetter { get; }
 		}
 
 		private sealed class CachedNameDataEqualityComparer : IEqualityComparer<CachedNameData>

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,12 +25,48 @@ namespace DanSerialiser
 	/// type converter(s) would be required for other immutable types, such as the ImmutableHashSet or ImmutableDictionary, if they use linked list structures internally and
 	/// if instances of those types have large numbers of items (where 'large' is relative to how deep the call stack can be).
 	/// </summary>
-	public sealed class ImmutableListTypeConverter : ISerialisationTypeConverter, IDeserialisationTypeConverter
+	public sealed class ImmutableListTypeConverter : IFastSerialisationTypeConverter, ISerialisationTypeConverter, IDeserialisationTypeConverter
 	{
 		private static readonly ConcurrentDictionary<Type, ListSerialiser> _serialisationConverters = new ConcurrentDictionary<Type, ListSerialiser>();
 
 		public static ImmutableListTypeConverter Instance { get; } = new ImmutableListTypeConverter();
 		private ImmutableListTypeConverter() { }
+
+		FastSerialisationTypeConversionResult IFastSerialisationTypeConverter.GetDirectWriterIfPossible(Type sourceType, MemberSetterDetailsRetriever memberSetterDetailsRetriever)
+		{
+			if (sourceType == null)
+				throw new ArgumentNullException(nameof(sourceType));
+			if (memberSetterDetailsRetriever == null)
+				throw new ArgumentNullException(nameof(memberSetterDetailsRetriever));
+
+			var serialiser = TryToGetListSerialiserFromCache(sourceType);
+			if (serialiser == null)
+				return null;
+
+			var flattenedType = typeof(FlattenedImmutableList<>).MakeGenericType(serialiser.ElementType);
+			var flattenedTypeWriter = memberSetterDetailsRetriever(flattenedType);
+			if (flattenedTypeWriter == null)
+				return null;
+
+			var sourceParameter = Expression.Parameter(sourceType, "source");
+			var writerParameter = Expression.Parameter(typeof(BinarySerialisationWriter), "writer");
+			return new FastSerialisationTypeConversionResult(
+				sourceType,
+				flattenedType,
+				Expression.Lambda(
+					Expression.Invoke(
+						flattenedTypeWriter.MemberSetter,
+						Expression.New(
+							flattenedType.GetConstructor(new[] { serialiser.ElementType.MakeArrayType() }),
+							GetToArrayCall(sourceParameter, sourceType, serialiser.ElementType)
+						),
+						writerParameter
+					),
+					sourceParameter,
+					writerParameter
+				)
+			);
+		}
 
 		object ISerialisationTypeConverter.ConvertIfRequired(object value)
 		{
@@ -50,9 +87,15 @@ namespace DanSerialiser
 			if (targetType == null)
 				throw new ArgumentNullException(nameof(targetType));
 
-			// Avoid the dictionary lookup entirely if possible (if we don't have an array to convert back or the target type is definitely not the correct shape
-			// then none of this logic will apply)
-			if ((value == null) || !value.GetType().IsArray || !targetType.IsGenericType || (targetType.GetGenericArguments().Length != 1))
+			// Avoid the dictionary lookup entirely if possible - if we don't have a type that are could convert back OR if the target type is definitely not the
+			// correct shape then none of this logic will apply (the ISerialisationTypeConverter.ConvertIfRequired will change an immutable list into an array as
+			// that is the most logical arrangement for it but IFastSerialisationTypeConverter.GetDirectWriterIfPossible has to wrap it in a FlattenedImmutableList
+			// because IFastSerialisationTypeConverter.GetDirectWriterIfPossible can't convert to an array type - so if we check that the source type is an appropriate
+			// IEnumerable then that covers both cases; the array and the IFastSerialisationTypeConverter.FlattenedImmutableList)
+			if ((value == null) || !targetType.IsGenericType)
+				return value;
+			var targetTypeGenericArguments = targetType.GetGenericArguments();
+			if ((targetTypeGenericArguments.Length != 1) || !typeof(IEnumerable<>).MakeGenericType(targetTypeGenericArguments[0]).IsAssignableFrom(value.GetType()))
 				return value;
 
 			var serialiser = TryToGetListSerialiserFromCache(targetType);
@@ -119,23 +162,7 @@ namespace DanSerialiser
 			var serialise = new Lazy<Func<object, object>>(() =>
 			{
 				var sourceParameter = Expression.Parameter(typeof(object), "source");
-				Expression toArray;
-				var toArrayInstanceMethodIfAny = type.GetMethod("ToArray", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
-				if (toArrayInstanceMethodIfAny?.ReturnType == elementType.MakeArrayType())
-				{
-					// If the type has its own "ToArray" method then use that (it may know something that we don't and have some nice optimisations)
-					toArray = Expression.Call(Expression.Convert(sourceParameter, type), toArrayInstanceMethodIfAny);
-				}
-				else
-				{
-					// If the type DOESN'T have its own "ToArray" method then use the static one within this class (I considered using LINQ's "ToArray" method
-					// in the static System.Linq.Enumerable class but it seemed like something outside of my control that I'm going to access via reflection,
-					// which is an inherently risky behaviour - while it's very unlikle that anything will change with it in the future, I still feel better
-					// this way)
-					var staticToArrayMethod = typeof(ImmutableListTypeConverter).GetMethod(nameof(ToArray), BindingFlags.NonPublic | BindingFlags.Static).MakeGenericMethod(elementType);
-					toArray = Expression.Call(null, staticToArrayMethod, Expression.Convert(sourceParameter, enumerableType));
-				}
-				return Expression.Lambda<Func<object, object>>(toArray, sourceParameter).Compile();
+				return Expression.Lambda<Func<object, object>>(GetToArrayCall(sourceParameter, type, elementType), sourceParameter).Compile();
 			});
 			var deserialise = new Lazy<Func<object, object>>(() =>
 			{
@@ -154,20 +181,72 @@ namespace DanSerialiser
 				);
 				return Expression.Lambda<Func<object, object>>(rebuildList, sourceParameter).Compile();
 			});
-			return new ListSerialiser(serialise, deserialise);
+			return new ListSerialiser(elementType, serialise, deserialise);
+		}
+
+		private static MethodCallExpression GetToArrayCall(ParameterExpression sourceParameter, Type type, Type elementType)
+		{
+			// Note: sourceParameter MAY be a ParameterExpression whose type matches the type passed to this method or it might be an object, in which case
+			// the expressions below will need to use Expression.Convert (it depends whether this method is called as part of the ISerialisationTypeConverter's
+			// ConvertIfRequired method (in which case sourceParameter will be of type object) or from IFastSerialisationTypeConverter.GetDirectWriterIfPossible
+			// (in which case sourceParameter will be of type "type").
+			var toArrayInstanceMethodIfAny = type.GetMethod("ToArray", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+			if (toArrayInstanceMethodIfAny?.ReturnType == elementType.MakeArrayType())
+			{
+				// If the type has its own "ToArray" method then use that (it may know something that we don't and have some nice optimisations)
+				return Expression.Call(
+					type.IsAssignableFrom(sourceParameter.Type) ? (Expression)sourceParameter : Expression.Convert(sourceParameter, type),
+					toArrayInstanceMethodIfAny
+				);
+			}
+			else
+			{
+				// If the type DOESN'T have its own "ToArray" method then use the static one within this class (I considered using LINQ's "ToArray" method
+				// in the static System.Linq.Enumerable class but it seemed like something outside of my control that I'm going to access via reflection,
+				// which is an inherently risky behaviour - while it's very unlikely that anything will change with it in the future, I still feel better
+				// this way)
+				var enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
+				return Expression.Call(
+					instance: null,
+					method: typeof(ImmutableListTypeConverter).GetMethod(nameof(ToArray), BindingFlags.NonPublic | BindingFlags.Static).MakeGenericMethod(elementType),
+					arguments: enumerableType.IsAssignableFrom(sourceParameter.Type) ? (Expression)sourceParameter : Expression.Convert(sourceParameter, enumerableType)
+				);
+			}
 		}
 
 		private static T[] ToArray<T>(IEnumerable<T> value) => value?.ToArray();
 
 		private sealed class ListSerialiser
 		{
-			public ListSerialiser(Lazy<Func<object, object>> serialise, Lazy<Func<object, object>> deserialise)
+			public ListSerialiser(Type elementType, Lazy<Func<object, object>> serialise, Lazy<Func<object, object>> deserialise)
 			{
+				ElementType = elementType ?? throw new ArgumentNullException(nameof(elementType));
 				Serialise = serialise ?? throw new ArgumentNullException(nameof(serialise));
 				Deserialise = deserialise ?? throw new ArgumentNullException(nameof(deserialise));
 			}
+			public Type ElementType { get; }
 			public Lazy<Func<object, object>> Serialise { get; }
 			public Lazy<Func<object, object>> Deserialise { get; }
+		}
+
+		/// <summary>
+		/// This is used by the IFastSerialisationTypeConverter.GetDirectWriterIfPossible type conversion process because it's not possible to convert a value into an
+		/// array and so it needs to be a type that contains the listed items
+		/// </summary>
+		private sealed class FlattenedImmutableList<T> : IEnumerable<T>
+		{
+			public FlattenedImmutableList(T[] values)
+			{
+				Values = values ?? throw new ArgumentNullException(nameof(values));
+			}
+			public T[] Values { get; }
+
+			public IEnumerator<T> GetEnumerator()
+			{
+				foreach (var value in Values)
+					yield return value;
+			}
+			IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 		}
 	}
 }

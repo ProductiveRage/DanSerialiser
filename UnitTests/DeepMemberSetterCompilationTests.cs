@@ -150,7 +150,7 @@ namespace UnitTests
 			lock (_lock)
 			{
 				BinarySerialisationDeepCompiledMemberSetters.ClearCache();
-				return BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor(type);
+				return BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor(type, new IFastSerialisationTypeConverter[0]);
 			}
 		}
 

@@ -274,10 +274,16 @@ namespace DanSerialiser
 			//    be applicable to cases where a different type analyser is required)
 			//  - No type converters are used (because these may change the shape of the data during the serialisation process but GetMemberSettersFor needs the data to be remain
 			//    in its original form)
-			if ((ReferenceReuseStrategy != ReferenceReuseOptions.SpeedyButLimited) || (_typeAnalyser != DefaultTypeAnalyser.Instance) || (typeConverters.Length > 0))
+			var typeConvertersIsFastTypeConverterArray = (typeConverters is IFastSerialisationTypeConverter[]);
+			if ((ReferenceReuseStrategy != ReferenceReuseOptions.SpeedyButLimited)
+			|| (_typeAnalyser != DefaultTypeAnalyser.Instance)
+			|| (!typeConvertersIsFastTypeConverterArray && typeConverters.Any(t => !(t is IFastSerialisationTypeConverter))))
 				return new Dictionary<Type, Action<object>>();
 
-			var generatedMemberSetterResult = BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor(serialisationTargetType);
+			var fastTypeConverters = typeConvertersIsFastTypeConverterArray
+				? (IFastSerialisationTypeConverter[])typeConverters
+				: typeConverters.Cast<IFastSerialisationTypeConverter>().ToArray();
+			var generatedMemberSetterResult = BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor(serialisationTargetType, fastTypeConverters);
 			foreach (var typeName in generatedMemberSetterResult.TypeNamesToDeclare)
 			{
 				WriteByte((byte)BinarySerialisationDataType.TypeNamePreLoad);

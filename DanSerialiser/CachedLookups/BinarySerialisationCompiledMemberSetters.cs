@@ -250,7 +250,6 @@ namespace DanSerialiser.CachedLookups
 				//  2. During a SpeedyButLimited serialisation, in which case TypeNamePreLoad data will be emitted at the start of the serialisation data and we can be sure,
 				//     then, that the type name will have been encountered by the reader before it tries to deserialise any instances of the type (because TypeNamePreLoad
 				//     and FieldNamePreLoad data must always be the first content in serialised data)
-				var typeNameBytes = GetTypeNameBytes(type);
 				if (preBuiltMemberSetter.SetToDefault)
 				{
 					// This means that we want to record serialisation data that will set this value to default(T)
@@ -262,6 +261,7 @@ namespace DanSerialiser.CachedLookups
 					if (!type.IsValueType)
 						return Expression.Call(writerParameter, _writeNullMethod);
 
+					var typeNameBytes = GetTypeNameBytes(type);
 					var bytesForEmptyObjectInitialisation = new List<byte> { (byte)BinarySerialisationDataType.ObjectStart };
 					bytesForEmptyObjectInitialisation.AddRange(typeNameBytes.OnlyAsReferenceID);
 					bytesForEmptyObjectInitialisation.Add((byte)BinarySerialisationDataType.ObjectEnd);
@@ -273,6 +273,7 @@ namespace DanSerialiser.CachedLookups
 				}
 				else
 				{
+					var typeNameBytes = preBuiltMemberSetter.OptionalTypeNameOverideIfNotSettingToDefault ?? GetTypeNameBytes(type);
 					var bytesForObjectStart = new List<byte> { (byte)BinarySerialisationDataType.ObjectStart };
 					bytesForObjectStart.AddRange(typeNameBytes.OnlyAsReferenceID);
 					individualMemberSetterForNonNullValue = Expression.Block(
@@ -364,12 +365,21 @@ namespace DanSerialiser.CachedLookups
 		/// </summary>
 		public sealed class ValueWriter
 		{
-			public static ValueWriter PopulateValue(LambdaExpression memberSetter) => new ValueWriter(false, memberSetter ?? throw new ArgumentNullException(nameof(memberSetter)));
-			public static ValueWriter SetValueToDefault { get; } = new ValueWriter(true, null);
-			private ValueWriter(bool setToDefault, LambdaExpression memberSetterIfNotSettingToDefault)
+			public static ValueWriter OverrideValue(CachedNameData typeNameOveride, LambdaExpression memberSetter)
+			{
+				return new ValueWriter(
+					false,
+					memberSetter ?? throw new ArgumentNullException(nameof(memberSetter)),
+					typeNameOveride ?? throw new ArgumentNullException(nameof(typeNameOveride))
+				);
+			}
+			public static ValueWriter PopulateValue(LambdaExpression memberSetter) => new ValueWriter(false, memberSetter ?? throw new ArgumentNullException(nameof(memberSetter)), null);
+			public static ValueWriter SetValueToDefault { get; } = new ValueWriter(true, null, null);
+			private ValueWriter(bool setToDefault, LambdaExpression memberSetterIfNotSettingToDefault, CachedNameData optionalTypeNameOverideIfNotSettingToDefault)
 			{
 				SetToDefault = setToDefault;
 				MemberSetterIfNotSettingToDefault = memberSetterIfNotSettingToDefault;
+				OptionalTypeNameOverideIfNotSettingToDefault = optionalTypeNameOverideIfNotSettingToDefault;
 			}
 
 			public bool SetToDefault { get; }
@@ -378,44 +388,12 @@ namespace DanSerialiser.CachedLookups
 			/// This will be null if SetToDefault is true and non-null if SetToDefault is false
 			/// </summary>
 			public LambdaExpression MemberSetterIfNotSettingToDefault { get; }
-		}
 
-		public sealed class MemberSetterDetails
-		{
-			private readonly Type _type;
-			public MemberSetterDetails(Type type, LambdaExpression memberSetter, CachedNameData typeName, CachedNameData[] fieldsSet)
-			{
-				if (memberSetter == null)
-					throw new ArgumentNullException(nameof(memberSetter));
-				if ((memberSetter.Parameters.Count != 2) || (memberSetter.Parameters[0].Type != type) || (memberSetter.Parameters[1].Type != typeof(BinarySerialisationWriter)))
-					throw new ArgumentException($"The {nameof(memberSetter)} lambda expression must have two parameters - {type} and {nameof(BinarySerialisationWriter)}");
-
-				_type = type ?? throw new ArgumentNullException(nameof(type));
-				MemberSetter = memberSetter;
-				TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
-				FieldsSet = fieldsSet ?? throw new ArgumentNullException(nameof(fieldsSet));
-			}
-
-			public LambdaExpression MemberSetter { get; }
-			public CachedNameData TypeName { get; }
-			public CachedNameData[] FieldsSet { get; }
-
-			public Action<object, BinarySerialisationWriter> GetCompiledMemberSetter()
-			{
-				var sourceParameter = Expression.Parameter(typeof(object), "source");
-				var writerParameter = Expression.Parameter(typeof(BinarySerialisationWriter), "writer");
-				return
-					Expression.Lambda<Action<object, BinarySerialisationWriter>>(
-						Expression.Invoke(
-							MemberSetter,
-							Expression.Convert(sourceParameter, _type),
-							writerParameter
-						),
-						sourceParameter,
-						writerParameter
-					)
-					.Compile();
-			}
+			/// <summary>
+			/// This will always be null if SetToDefault is true and may be null or non-null if SetToDefault is false (if non-null then this data should be used to write the
+			/// ObjectStart header instead of writing type name data corresponding the source type - this will be used when using type converters to alter data in transit
+			/// </summary>
+			public CachedNameData OptionalTypeNameOverideIfNotSettingToDefault { get; }
 		}
 	}
 }
