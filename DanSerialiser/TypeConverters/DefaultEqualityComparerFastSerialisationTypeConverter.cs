@@ -77,6 +77,14 @@ namespace DanSerialiser
 			return conversionResult;
 		}
 
+		/// <summary>
+		/// This class has the 'Serializable' attribute on it just in case deserialised data that includes this class in it is to be serialised by another serialisation
+		/// library (this attibute is not required on the FlattenedImmutableList class in the DefaultEqualityComparerFastSerialisationTypeConverter because instances of
+		/// that class do not exist within the deserialised data, it used only during the serialisation and deserialisation processes and nothing of it remains once the
+		/// deserialisation process has completed - this type, however, continues to exist in the deserialisation content as the IEqualityComparer implementation, which
+		/// is necessary because we can't serialise EqualityComparer&lt;T&gt;Default as EqualityComparer&lt;T&gt; is an abstract class).
+		/// </summary>
+		[Serializable]
 		private sealed class DefaultEqualityComparer<T> : IEqualityComparer<T>
 		{
 			public static DefaultEqualityComparer<T> Instance { get; } = new DefaultEqualityComparer<T>();
