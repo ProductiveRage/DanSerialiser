@@ -11,7 +11,7 @@ namespace UnitTests
 		public BinarySerialisationTests_SpeedyButLimited() : base(ReferenceReuseOptions.SpeedyButLimited) { }
 
 		// The "SpeedyButLimited" option doesn't detect OR handle circular references - so there are no tests for them because the only test would be to see if we get a stack overflow
-		// and the xnit runner won't handle that (it will terminate the process when the stack overflow occurs and then the test will be marked neither as a pass or a fail)
+		// and the xunit runner won't handle that (it will terminate the process when the stack overflow occurs and then the test will be marked neither as a pass or a fail)
 	}
 
 	public sealed class BinarySerialisationTests_NoReferenceReuse : BinarySerialisationTests

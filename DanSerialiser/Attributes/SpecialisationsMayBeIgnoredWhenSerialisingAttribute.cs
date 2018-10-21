@@ -10,12 +10,15 @@ namespace DanSerialiser
 	/// write away null values for them. It should be noted, though, that this attribute is not guaranteed to affect serialisation behaviour but that it opens the door for serialisers
 	/// to perform more aggressive optimisations if the serialiser is configured to do so (currently, only the FastestTreeBinarySerialisation methods will take advantage of this attribute).
 	/// 
-	/// It might be applied, for example, to a property of type Dictionary&lt;int, string&gt; if it is known that the property will only ever be assigned a value of that type (and not a
-	/// more specialised type that is derived from it) AND if values will never have a custom equality comparer specified.
-	/// 
 	/// This attribute should only be applied to fields or properties whose types are non-sealed, non-abstract classes - it does not make sense for primitives or value types or sealed
 	/// classes (because they have no opportunity to be derived into specialised types) and it does not makes sense for abstract classes or interfaces (because they require derived
 	/// classes / implementations in order to have meaning).
+	/// 
+	/// You must be careful when considering using this attribute on a field or property because it applies to the type of that field or property AND to any nested type - this means that
+	/// it would apply to the key and value types of a Dictionary, for example, so you must be certain that that will not cause any problems. This is not intended for general purpose
+	/// serialisation, it should only be used when you are sure that you want to accept the compromises in exchange for a little more serialisation performance (and it will only help
+	/// that in cases where reference reuse tracking is enabled - which, again, is not recommended for general purpose serialisation since any circular references will result in a
+	/// stack overflow exception).
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
 	public sealed class SpecialisationsMayBeIgnoredWhenSerialisingAttribute : Attribute { }
