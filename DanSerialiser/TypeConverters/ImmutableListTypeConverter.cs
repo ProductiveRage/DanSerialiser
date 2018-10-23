@@ -50,7 +50,7 @@ namespace DanSerialiser
 
 			var sourceParameter = Expression.Parameter(sourceType, "source");
 			var writerParameter = Expression.Parameter(typeof(BinarySerialisationWriter), "writer");
-			return new FastSerialisationTypeConversionResult(
+			return FastSerialisationTypeConversionResult.ConvertTo(
 				sourceType,
 				flattenedType,
 				Expression.Lambda(

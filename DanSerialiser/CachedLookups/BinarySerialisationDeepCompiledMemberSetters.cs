@@ -163,17 +163,11 @@ namespace DanSerialiser.CachedLookups
 				DefaultTypeAnalyser.Instance,
 				t =>
 				{
-					// Give the type converters a shot - if TryToGetMemberSetterDetailsViaTypeConverters returns a non-null reference then one of them wants to
-					// control the serialisation of this type (if null is returned then continue on to process as normal)
-					var memberSetterDetailsViaTypeConverter = TryToGetMemberSetterDetailsViaTypeConverters(t);
-					if (memberSetterDetailsViaTypeConverter != null)
-					{
-						foreach (var typeName in memberSetterDetailsViaTypeConverter.OtherTypeNames)
-							typeNamesToDeclare.Add(typeName);
-						foreach (var fieldName in memberSetterDetailsViaTypeConverter.FieldNames)
-							fieldNamesToDeclare.Add(fieldName);
-						return ValueWriter.OverrideValue(memberSetterDetailsViaTypeConverter.NewTypeName, memberSetterDetailsViaTypeConverter.MemberSetter);
-					}
+					// Give the type converters a shot - if TryToGetValueWriterViaTypeConverters returns a non-null reference then one of them wants to control
+					// the serialisation of this type (if null is returned then continue on to process as normal)
+					var valueWriterViaTypeConverter = TryToGetValueWriterViaTypeConverters(t);
+					if (valueWriterViaTypeConverter != null)
+						return valueWriterViaTypeConverter;
 
 					if (memberSetters.TryGetValue(t, out var valueWriter) && (valueWriter != null))
 					{
@@ -217,7 +211,7 @@ namespace DanSerialiser.CachedLookups
 				memberSetters.Add(type, null);
 			}
 
-			FastTypeConverterSerialisationDependencies TryToGetMemberSetterDetailsViaTypeConverters(Type t)
+			ValueWriter TryToGetValueWriterViaTypeConverters(Type t)
 			{
 				foreach (var typeConverter in typeConverters)
 				{
@@ -243,7 +237,18 @@ namespace DanSerialiser.CachedLookups
 						}
 					);
 					if (typeConverterWriter != null)
-						return new FastTypeConverterSerialisationDependencies(GetTypeNameBytes(typeConverterWriter.ConvertedToType), typeNames, fieldNames, typeConverterWriter.MemberSetter);
+					{
+						if (typeConverterWriter.MemberSetterIfNotSettingToDefault == null)
+							return ValueWriter.SetValueToDefault;
+
+						var newTypeName = GetTypeNameBytes(typeConverterWriter.ConvertedToType);
+						typeNamesToDeclare.Add(newTypeName);
+						foreach (var typeName in typeNames)
+							typeNamesToDeclare.Add(typeName);
+						foreach (var fieldName in fieldNames)
+							fieldNamesToDeclare.Add(fieldName);
+						return ValueWriter.OverrideValue(newTypeName, typeConverterWriter.MemberSetterIfNotSettingToDefault);
+					}
 				}
 				return null;
 			}

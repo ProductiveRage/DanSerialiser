@@ -11,12 +11,14 @@ namespace DanSerialiser // Note that this is not in the TypeConverters namespace
 		/// way in which arrays are represented internally within the serialisation process) - if it would be desirable to convert a type into an array then it will be
 		/// necessary to wrap that array in a sealed class (and the deserialisation type converter would need to be aware of this).
 		/// </summary>
-		public FastSerialisationTypeConversionResult(Type type, Type convertedToType, LambdaExpression memberSetter)
+		public static FastSerialisationTypeConversionResult ConvertTo(Type type, Type convertedToType, LambdaExpression memberSetter)
 		{
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
 			if (convertedToType == null)
 				throw new ArgumentNullException(nameof(convertedToType));
+			if (convertedToType == typeof(void))
+				throw new ArgumentException($"may not be typeof(void) - a result's ConvertedToType should only be typeof(void) if the {nameof(SetToDefault)} factory method was used", nameof(convertedToType));
 			if (convertedToType.IsArray)
 				throw new ArgumentNullException("must be an array", nameof(convertedToType));
 			if (convertedToType.IsInterface)
@@ -31,8 +33,25 @@ namespace DanSerialiser // Note that this is not in the TypeConverters namespace
 			|| (memberSetter.ReturnType != typeof(void)))
 				throw new ArgumentException($"The {nameof(memberSetter)} lambda expression must have two parameters - {type} and {nameof(BinarySerialisationWriter)} - and void return type");
 
-			ConvertedToType = convertedToType;
-			MemberSetter = memberSetter ?? throw new ArgumentNullException(nameof(memberSetter));
+			return new FastSerialisationTypeConversionResult(type, convertedToType, memberSetter);
+		}
+
+		/// <summary>
+		/// Use this FastSerialisationTypeConversionResult factory method to indicate that the 
+		/// </summary>
+		public static FastSerialisationTypeConversionResult SetToDefault(Type type)
+		{
+			if (type == null)
+				throw new ArgumentNullException(nameof(type));
+
+			return new FastSerialisationTypeConversionResult(type, typeof(void), memberSetterIfNotSettingToDefault: null);
+		}
+
+		private FastSerialisationTypeConversionResult(Type type, Type convertedToType, LambdaExpression memberSetterIfNotSettingToDefault)
+		{
+			Type = type ?? throw new ArgumentNullException(nameof(type));
+			ConvertedToType = convertedToType ?? throw new ArgumentNullException(nameof(convertedToType));
+			MemberSetterIfNotSettingToDefault = memberSetterIfNotSettingToDefault;
 		}
 
 		public Type Type { get; }
@@ -46,8 +65,8 @@ namespace DanSerialiser // Note that this is not in the TypeConverters namespace
 		/// <summary>
 		/// This LambdaExpression will have two parameters, the first matching the Type property of the instance and the second being of type BinarySerialisationWriter.
 		/// It will have no return type. When the lambda is invoked, the field and property values for the instance of the Type will be serialised using the specified
-		/// BinarySerialisationWriter.
+		/// BinarySerialisationWriter. It will be null if this instance was created via the SetToDefault was used because no members will be set in that case.
 		/// </summary>
-		public LambdaExpression MemberSetter { get; }
+		public LambdaExpression MemberSetterIfNotSettingToDefault { get; }
 	}
 }
