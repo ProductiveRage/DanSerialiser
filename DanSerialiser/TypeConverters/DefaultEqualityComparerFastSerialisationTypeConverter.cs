@@ -7,6 +7,8 @@ using System.Reflection;
 namespace DanSerialiser
 {
 	/// <summary>
+	/// In order for the FastestTreeBinarySerialisation to apply as many optimisations as possible, there must not be any 'unknown' types present in the object model - an unknown type is
+	/// a non-sealed class or an interface because a property of type non-sealed MyClass MAY have an instance of MyClass when it comes to be serialised or it may have have an instance of
 	/// MyOtherClass, which is derived from MyClass. The same applies to interfaces because there is no way to know what type will used to implement that interface. Types that have an
 	/// optional IEqualityComparer are common, particularly in the base library - such as Dictionary and HashSet. For instances of those classes, it can not be known during the pre-
 	/// serialisation optimisation analysis stage what types may be used for those IEqualityComparer implementations and so some optimisations are not available. However, if the particular

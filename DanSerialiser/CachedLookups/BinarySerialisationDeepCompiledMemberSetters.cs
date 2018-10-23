@@ -31,9 +31,8 @@ namespace DanSerialiser.CachedLookups
 	/// serialising the same types throughout its life and reusing the optimised member setters seems optimal when performance is the primary concern (which it presumably is
 	/// if reference tracking is disabled).
 	/// 
-	/// Further restrictions to using this class are that no de/serialisation type converters may be used because they could change the shape of the data in ways that are not
-	/// knowable until they are called (and this analysis needs to happen before that) and that the DefaultTypeAnalyser must be used (no other IAnalyseTypesForSerialisation
-	/// implementation because other implementations may use different logic that means that the member setters here couldn't be shared between requests).
+	/// A further restrictions to using this class is that the DefaultTypeAnalyser must be used (no other IAnalyseTypesForSerialisation implementation because other implementations
+	/// may use different logic that means that the member setters here couldn't be shared between requests).
 	/// </summary>
 	internal static class BinarySerialisationDeepCompiledMemberSetters
 	{
