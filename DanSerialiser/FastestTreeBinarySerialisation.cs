@@ -34,7 +34,8 @@ namespace DanSerialiser
 		/// 
 		/// IMPORTANT: The serialiser that is returned from this method should be reused for repeated serialisations so that the work to identify optimisations available when serialisation a particular
 		/// type are shared between one serialisation and the next. This is not necessary for cases where zero type converters are specified because the library will track and automatically reuse the
-		/// zero-type-converter optimised serialiser but if any type converters are required then then the resulting serialiser must be reused by the application code.
+		/// zero-type-converter optimised serialiser but if any type converters are required then then the resulting serialiser must be reused by the application code. It is safe to share the serialiser
+		/// across multiple threads for concurrent use.
 		/// </summary>
 		public static IOptimisingSerialiser GetSerialiser(IFastSerialisationTypeConverter[] typeConverters)
 		{
