@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using DanSerialiser;
 using DanSerialiser.CachedLookups;
 using Xunit;
+using static DanSerialiser.CachedLookups.BinarySerialisationDeepCompiledMemberSetters;
 
 namespace UnitTests
 {
@@ -92,7 +94,12 @@ namespace UnitTests
 			// and "NameDetails" classes (it may not succeed, in which case it may return zero or one member setters, or it may succeed completely and return
 			// two member setters). It won't return member setters for values that have first class IWrite support (primitives, strings, DateTime, etc..)
 			var sourceType = source.GetType();
-			var memberSetterDetailsForAllTypesInvolved = TryToGenerateMemberSetters(sourceType);
+			var deepMemberSetterCache = new ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults>();
+			var memberSetterDetailsForAllTypesInvolved = GetMemberSettersFor(
+				sourceType,
+				new IFastSerialisationTypeConverter[0],
+				deepMemberSetterCache
+			);
 			Assert.NotNull(memberSetterDetailsForAllTypesInvolved); // We should always get a non-null reference for this (but doesn't hurt to confirm)
 
 			// Try to get member setter for the source type
@@ -131,7 +138,12 @@ namespace UnitTests
 
 		private static void AssertCanGenerateNotCorrectMemberSetter(Type sourceType)
 		{
-			var memberSetterDetailsForAllTypesInvolved = TryToGenerateMemberSetters(sourceType);
+			var deepMemberSetterCache = new ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults>();
+			var memberSetterDetailsForAllTypesInvolved = GetMemberSettersFor(
+				sourceType,
+				new IFastSerialisationTypeConverter[0],
+				deepMemberSetterCache
+			);
 			Assert.NotNull(memberSetterDetailsForAllTypesInvolved); // This should never be null, even if it doesn't contain a member setter for the target type
 
 			// If the BinarySerialisationDeepCompiledMemberSetters failed to produce a member setter then it will include a null value in the MemberSetters dictionary
@@ -140,18 +152,6 @@ namespace UnitTests
 			// generate missing member setters).
 			Assert.True(memberSetterDetailsForAllTypesInvolved.MemberSetters.TryGetValue(sourceType, out var memberSetterForType));
 			Assert.Null(memberSetterForType);
-		}
-
-		private static readonly object _lock = new object();
-		private static BinarySerialisationDeepCompiledMemberSetters.DeepCompiledMemberSettersGenerationResults TryToGenerateMemberSetters(Type type)
-		{
-			// Don't expect the tests to be run in parallel but things could go awry if they did (because BinarySerialisationDeepCompiledMemberSetters is a static
-			// class with a shared lookup of member setters that it builds, that we clear out before each run)
-			lock (_lock)
-			{
-				BinarySerialisationDeepCompiledMemberSetters.ClearCache();
-				return BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor(type, new IFastSerialisationTypeConverter[0]);
-			}
 		}
 
 		private sealed class SealedPersonDetailsWithSealedNameDetails

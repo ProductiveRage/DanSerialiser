@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,6 +8,7 @@ using System.Text;
 using DanSerialiser.BinaryTypeStructures;
 using DanSerialiser.CachedLookups;
 using DanSerialiser.Reflection;
+using static DanSerialiser.CachedLookups.BinarySerialisationDeepCompiledMemberSetters;
 
 namespace DanSerialiser
 {
@@ -14,6 +16,7 @@ namespace DanSerialiser
 	{
 		private readonly Stream _stream;
 		private readonly IAnalyseTypesForSerialisation _typeAnalyser;
+		private readonly ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults> _deepMemberSetterCacheIfEnabled;
 		private readonly Dictionary<Type, BinarySerialisationWriterCachedNames.CachedNameData> _recordedTypeNames;
 		private readonly Dictionary<Tuple<FieldInfo, Type>, BinarySerialisationWriterCachedNames.CachedNameData> _encounteredFields;
 		private readonly Dictionary<PropertyInfo, BinarySerialisationWriterCachedNames.CachedNameData> _encounteredProperties;
@@ -28,13 +31,18 @@ namespace DanSerialiser
 		/// optimiseForWideCircularReference enabled or not.
 		/// </summary>
 		public BinarySerialisationWriter(Stream stream, bool optimiseForWideCircularReference = false)
-			: this(stream, optimiseForWideCircularReference ? ReferenceReuseOptions.OptimiseForWideCircularReferences : ReferenceReuseOptions.SupportReferenceReUseInMostlyTreeLikeStructure, DefaultTypeAnalyser.Instance) { }
-		internal BinarySerialisationWriter(Stream stream, ReferenceReuseOptions referenceReuseStrategy) : this(stream, referenceReuseStrategy, DefaultTypeAnalyser.Instance) { } // internal constructor for unit testing
-		internal BinarySerialisationWriter(Stream stream, ReferenceReuseOptions referenceReuseStrategy, IAnalyseTypesForSerialisation typeAnalyser) // internal constructor for unit testing
+			: this(stream, optimiseForWideCircularReference ? ReferenceReuseOptions.OptimiseForWideCircularReferences : ReferenceReuseOptions.SupportReferenceReUseInMostlyTreeLikeStructure, DefaultTypeAnalyser.Instance, null) { }
+		internal BinarySerialisationWriter(Stream stream, ReferenceReuseOptions referenceReuseStrategy) : this(stream, referenceReuseStrategy, DefaultTypeAnalyser.Instance, null) { } // internal constructor for unit testing
+		internal BinarySerialisationWriter( // internal constructor for unit testing and for FastestTreeBinarySerialisation
+			Stream stream,
+			ReferenceReuseOptions referenceReuseStrategy,
+			IAnalyseTypesForSerialisation typeAnalyser,
+			ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults> deepMemberSetterCacheIfEnabled)
 		{
 			_stream = stream ?? throw new ArgumentNullException(nameof(stream));
 			ReferenceReuseStrategy = referenceReuseStrategy;
 			_typeAnalyser = typeAnalyser;
+			_deepMemberSetterCacheIfEnabled = deepMemberSetterCacheIfEnabled; // Only expect this to be non-null when called by FastestTreeBinarySerialisation
 
 			_recordedTypeNames = new Dictionary<Type, BinarySerialisationWriterCachedNames.CachedNameData>();
 			_encounteredFields = new Dictionary<Tuple<FieldInfo, Type>, BinarySerialisationWriterCachedNames.CachedNameData>();
@@ -276,6 +284,7 @@ namespace DanSerialiser
 			//    in its original form)
 			var typeConvertersIsFastTypeConverterArray = (typeConverters is IFastSerialisationTypeConverter[]);
 			if ((ReferenceReuseStrategy != ReferenceReuseOptions.SpeedyButLimited)
+			|| (_deepMemberSetterCacheIfEnabled == null)
 			|| (_typeAnalyser != DefaultTypeAnalyser.Instance)
 			|| (!typeConvertersIsFastTypeConverterArray && typeConverters.Any(t => !(t is IFastSerialisationTypeConverter))))
 				return new Dictionary<Type, Action<object>>();
@@ -283,7 +292,7 @@ namespace DanSerialiser
 			var fastTypeConverters = typeConvertersIsFastTypeConverterArray
 				? (IFastSerialisationTypeConverter[])typeConverters
 				: typeConverters.Cast<IFastSerialisationTypeConverter>().ToArray();
-			var generatedMemberSetterResult = BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor(serialisationTargetType, fastTypeConverters);
+			var generatedMemberSetterResult = BinarySerialisationDeepCompiledMemberSetters.GetMemberSettersFor(serialisationTargetType, fastTypeConverters, _deepMemberSetterCacheIfEnabled);
 			foreach (var typeName in generatedMemberSetterResult.TypeNamesToDeclare)
 			{
 				WriteByte((byte)BinarySerialisationDataType.TypeNamePreLoad);

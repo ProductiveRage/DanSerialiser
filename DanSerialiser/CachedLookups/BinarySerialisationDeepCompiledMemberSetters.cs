@@ -37,19 +37,6 @@ namespace DanSerialiser.CachedLookups
 	/// </summary>
 	internal static class BinarySerialisationDeepCompiledMemberSetters
 	{
-		private static readonly ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults> _cache;
-		static BinarySerialisationDeepCompiledMemberSetters()
-		{
-			_cache = new ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults>();
-		}
-
-		/// <summary>
-		/// This should only be called by unit tests when tests that exercise this class want to start from a clean slate (as they all should!) - this class is internal and
-		/// so this method is not exposed through the public API and so this comment will not be read by consumers of the library but I wanted to make it clear what its use
-		/// case was (and that it isn't expected to be used in normal operations)
-		/// </summary>
-		public static void ClearCache() => _cache.Clear();
-
 		/// <summary>
 		/// This will explore the shape of the data that starts at the specified type - looking at its fields and properties and then looking at the fields and properties
 		/// on those types, etc.. to try to produce as many member setters for those types as possible (the more member setters that it can produce, the less analysis work
@@ -57,14 +44,19 @@ namespace DanSerialiser.CachedLookups
 		/// for that type (this can also save the Serialiser some work because it will know not to bother trying). The member setters will write data that uses Field Name
 		/// Reference IDs, so the Serialiser will have to use the return CachedNameData list to write FieldNamePreLoad content ahead of the serialised object data.
 		/// </summary>
-		public static DeepCompiledMemberSettersGenerationResults GetMemberSettersFor(Type serialisationTargetType, IFastSerialisationTypeConverter[] typeConverters)
+		public static DeepCompiledMemberSettersGenerationResults GetMemberSettersFor(
+			Type serialisationTargetType,
+			IFastSerialisationTypeConverter[] typeConverters,
+			ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults> cache)
 		{
 			if (serialisationTargetType == null)
 				throw new ArgumentNullException(nameof(serialisationTargetType));
 			if (typeConverters == null)
 				throw new ArgumentNullException(nameof(typeConverters));
+			if (cache == null)
+				throw new ArgumentNullException(nameof(cache));
 
-			if (_cache.TryGetValue(serialisationTargetType, out var memberSetterData))
+			if (cache.TryGetValue(serialisationTargetType, out var memberSetterData))
 				return memberSetterData;
 
 			var memberSetters = new Dictionary<Type, MemberSetterDetails>();
@@ -75,7 +67,7 @@ namespace DanSerialiser.CachedLookups
 				memberSetters.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.GetCompiledMemberSetter())
 			);
 			memberSetterData = new DeepCompiledMemberSettersGenerationResults(typeNamesToDeclare, fieldNamesToDeclare, compiledMemberSetters);
-			_cache.TryAdd(serialisationTargetType, memberSetterData);
+			cache.TryAdd(serialisationTargetType, memberSetterData);
 			return memberSetterData;
 		}
 
