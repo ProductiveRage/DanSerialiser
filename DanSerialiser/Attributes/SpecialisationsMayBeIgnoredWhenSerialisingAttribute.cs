@@ -21,5 +21,6 @@ namespace DanSerialiser
 	/// stack overflow exception).
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
-	public sealed class SpecialisationsMayBeIgnoredWhenSerialisingAttribute : Attribute { }
+	internal // 2018-10-23: I've made this internal instead of public (and may delete it entirely in the future) as I'm not happy with how easy it is for edge cases to slip in when it's used
+		sealed class SpecialisationsMayBeIgnoredWhenSerialisingAttribute : Attribute { }
 }
