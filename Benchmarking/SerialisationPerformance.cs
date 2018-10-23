@@ -45,6 +45,7 @@ namespace Benchmarking
 			_warmUpDeserialisedProductsFromDanSerialiserFastButSpeedy;
 		private EntitiesForFastestTreeBinarySerialisation.Product[]
 			_warmUpDeserialisedProductsFromDanSerialiserFastButSpeedyWithHints;
+		private FastestTreeBinarySerialisation.IOptimisingSerialiser _fastestTreeBinarySerialisation;
 
 		[GlobalSetup]
 		public void Setup()
@@ -73,6 +74,7 @@ namespace Benchmarking
 			_protoBufSerialisedData = ProtoBufSerialise();
 			_danSerialiserSerialisedData = DanSerialiserSerialise();
 			_danSerialiserSerialisedDataOptimisedForWideCircularReferences = DanSerialiserSerialise_OptimisedForWideCircularReferences();
+			_fastestTreeBinarySerialisation = FastestTreeBinarySerialisation.GetSerialiser(new[] { DefaultEqualityComparerFastSerialisationTypeConverter.Instance });
 			_danSerialiserSerialisedDataFastButSpeedy = DanSerialiserSerialise_FastestTreeBinarySerialisation();
 			_danSerialiserSerialisedDataFastButSpeedyWithHints = DanSerialiserSerialise_FastestTreeBinarySerialisationWithHints();
 			// - Allow each library to deserialise the data once (apart from Json.NET, which has already deserialised the data to produce the _products and _productsOptimisedForSpeedyButLimited arrays)
@@ -135,10 +137,10 @@ namespace Benchmarking
 		public byte[] DanSerialiserSerialise_OptimisedForWideCircularReferences() => BinarySerialisation.Serialise(_products, optimiseForWideCircularReference: true);
 
 		[Benchmark]
-		public byte[] DanSerialiserSerialise_FastestTreeBinarySerialisation() => FastestTreeBinarySerialisation.Serialise(_products);
+		public byte[] DanSerialiserSerialise_FastestTreeBinarySerialisation() => _fastestTreeBinarySerialisation.Serialise(_products);
 
 		[Benchmark]
-		public byte[] DanSerialiserSerialise_FastestTreeBinarySerialisationWithHints() => FastestTreeBinarySerialisation.Serialise(_productsWithHintsForSpeedyButLimited);
+		public byte[] DanSerialiserSerialise_FastestTreeBinarySerialisationWithHints() => _fastestTreeBinarySerialisation.Serialise(_productsWithHintsForSpeedyButLimited);
 
 		// Note: The BinarySerialisation.Deserialise can handle data whether the writer that created the serialised content was optimised for wide circular references or was SpeedyButLimited and
 		// the performance should be the same between standard and optimised-for-wide-circular-references but it will be quicker for SpeedyButLimited because there will be no Object Reference IDs
