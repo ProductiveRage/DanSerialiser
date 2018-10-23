@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
+using DanSerialiser.Reflection;
 using static DanSerialiser.CachedLookups.BinarySerialisationDeepCompiledMemberSetters;
 
 namespace DanSerialiser
@@ -92,7 +93,7 @@ namespace DanSerialiser
 				Serialiser.Instance.Serialise(
 					value,
 					_typeConverters,
-					new BinarySerialisationWriter(stream, ReferenceReuseOptions.SpeedyButLimited)
+					new BinarySerialisationWriter(stream, ReferenceReuseOptions.SpeedyButLimited, DefaultTypeAnalyser.Instance, _deepMemberSetterCache)
 				);
 			}
 		}
