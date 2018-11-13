@@ -64,7 +64,7 @@ namespace UnitTests
 		/// the ConvertIfRequired states that it will not be called with a null 'targetType' reference)
 		/// </summary>
 		[Fact]
-		public static void IgnoreFieldsInDataNotPresentOnDeserialisationType_TODO_Rename()
+		public static void IgnoreFieldsInDataNotPresentOnDeserialisationTypeWhenDeserialisationTypeConvertersUsed()
 		{
 			const string idFieldName = "Id";
 			const string nameFieldName = "Name";
