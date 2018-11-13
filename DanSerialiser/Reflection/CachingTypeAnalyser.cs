@@ -35,9 +35,7 @@ namespace DanSerialiser.Reflection
 			if (_typeLookupCache.TryGetValue(typeName, out var cachedResult))
 				return cachedResult;
 
-			var result = _reader.GetType(typeName);
-			_typeLookupCache.TryAdd(typeName, result);
-			return result;
+			return _typeLookupCache.GetOrAdd(typeName, _reader.GetType(typeName));
 		}
 
 		public Func<object> TryToGetUninitialisedInstanceBuilder(string typeName)
@@ -48,9 +46,7 @@ namespace DanSerialiser.Reflection
 			if (_typeBuilderCache.TryGetValue(typeName, out var cachedResult))
 				return cachedResult;
 
-			var result = _reader.TryToGetUninitialisedInstanceBuilder(typeName);
-			_typeBuilderCache.TryAdd(typeName, result);
-			return result;
+			return _typeBuilderCache.GetOrAdd(typeName, _reader.TryToGetUninitialisedInstanceBuilder(typeName));
 		}
 
 		public Tuple<MemberAndReader<FieldInfo>[], MemberAndReader<PropertyInfo>[]> GetFieldsAndProperties(Type type)
@@ -61,9 +57,7 @@ namespace DanSerialiser.Reflection
 			if (_fieldAndPropertyCache.TryGetValue(type, out var cachedResult))
 				return cachedResult;
 
-			var result = _reader.GetFieldsAndProperties(type);
-			_fieldAndPropertyCache.TryAdd(type, result);
-			return result;
+			return _fieldAndPropertyCache.GetOrAdd(type, _reader.GetFieldsAndProperties(type));
 		}
 
 		public FieldInfo[] GetAllFieldsThatShouldBeSet(Type type)
@@ -74,9 +68,7 @@ namespace DanSerialiser.Reflection
 			if (_requiredFieldCache.TryGetValue(type, out var cachedResult))
 				return cachedResult;
 
-			var result = _reader.GetAllFieldsThatShouldBeSet(type);
-			_requiredFieldCache.TryAdd(type, result);
-			return result;
+			return _requiredFieldCache.GetOrAdd(type, _reader.GetAllFieldsThatShouldBeSet(type));
 		}
 
 		public MemberAndWriter<FieldInfo> TryToFindField(Type type, string fieldName, string specificTypeNameIfRequired)
@@ -90,9 +82,7 @@ namespace DanSerialiser.Reflection
 			if (_fieldNameCache.TryGetValue(cacheKey, out var cachedResult))
 				return cachedResult;
 
-			var result = _reader.TryToFindField(type, fieldName, specificTypeNameIfRequired);
-			_fieldNameCache.TryAdd(cacheKey, result);
-			return result;
+			return _fieldNameCache.GetOrAdd(cacheKey, _reader.TryToFindField(type, fieldName, specificTypeNameIfRequired));
 		}
 
 		public DeprecatedPropertySettingDetails TryToGetPropertySettersAndFieldsToConsiderToHaveBeenSet(Type typeToLookForPropertyOn, string fieldName, string typeNameIfRequired, Type fieldValueTypeIfAvailable)
@@ -106,9 +96,7 @@ namespace DanSerialiser.Reflection
 			if (_deprecatedPropertyCache.TryGetValue(cacheKey, out var cachedResult))
 				return cachedResult;
 
-			var result = _reader.TryToGetPropertySettersAndFieldsToConsiderToHaveBeenSet(typeToLookForPropertyOn, fieldName, typeNameIfRequired, fieldValueTypeIfAvailable);
-			_deprecatedPropertyCache.TryAdd(cacheKey, result);
-			return result;
+			return _deprecatedPropertyCache.GetOrAdd(cacheKey, _reader.TryToGetPropertySettersAndFieldsToConsiderToHaveBeenSet(typeToLookForPropertyOn, fieldName, typeNameIfRequired, fieldValueTypeIfAvailable));
 		}
 	}
 }

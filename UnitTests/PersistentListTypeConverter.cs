@@ -64,15 +64,14 @@ namespace UnitTests
 			return value;
 		}
 
-		private Transformer GetTransformer(Type type)
-		{
-			if (_serialisationConverters.TryGetValue(type, out var cachedTransformer))
-				return cachedTransformer;
+		private Transformer GetTransformer(Type type) => _serialisationConverters.GetOrAdd(type, BuildTransformer);
 
+		private Transformer BuildTransformer(Type type)
+		{
 			var genericConvertIfRequiredMethod = GetType().GetMethod(nameof(ConvertIfRequired), BindingFlags.Static | BindingFlags.NonPublic).MakeGenericMethod(type);
 			var sourceParameter = Expression.Parameter(typeof(object), "source");
 			var targetTypeIfDeserialisingParameter = Expression.Parameter(typeof(Type), "targetTypeIfDeserialising");
-			var transformer =
+			return
 				Expression.Lambda<Transformer>(
 					Expression.Call(
 						genericConvertIfRequiredMethod,
@@ -83,8 +82,6 @@ namespace UnitTests
 					targetTypeIfDeserialisingParameter
 				)
 				.Compile();
-			_serialisationConverters.TryAdd(type, transformer); // If the add failed then another thread generated and inserted the Transformer, which is not problem
-			return transformer;
 		}
 	}
 }

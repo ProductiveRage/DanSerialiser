@@ -105,15 +105,7 @@ namespace DanSerialiser
 		/// <summary>
 		/// This will return null if the specified type is not applicable to this type converter
 		/// </summary>
-		private static ListSerialiser TryToGetListSerialiserFromCache(Type genericType)
-		{
-			if (_serialisationConverters.TryGetValue(genericType, out var serialiser))
-				return serialiser;
-
-			serialiser = TryToGetListSerialiser(genericType);
-			_serialisationConverters.TryAdd(genericType, serialiser);
-			return serialiser;
-		}
+		private static ListSerialiser TryToGetListSerialiserFromCache(Type genericType) => _serialisationConverters.GetOrAdd(genericType, TryToGetListSerialiser);
 
 		/// <summary>
 		/// This will return null if the specified type is not applicable to this type converter

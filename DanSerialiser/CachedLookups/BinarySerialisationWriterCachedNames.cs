@@ -43,6 +43,8 @@ namespace DanSerialiser.CachedLookups
 			if (_typeNameCache.TryGetValue(type, out var cachedResult))
 				return cachedResult;
 
+			// Note: It's crucial that we don't allow double-add-to-dictionary-and-return-last-created-CachedNameData-instance behaviour here when multiple threads are getting
+			// involved because we need to return consistent CachedNameData ID values for all types
 			var referenceID = Interlocked.Increment(ref _nextNameReferenceID);
 			var bytesForReferenceID = GetBytesForNameReferenceID(referenceID);
 			var bytesForStringAndReferenceID = new List<byte>();
@@ -52,13 +54,14 @@ namespace DanSerialiser.CachedLookups
 				writer.String(type.AssemblyQualifiedName);
 			}
 			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
-			var cacheEntry = new CachedNameData(
-				id: referenceID,
-				asStringAndReferenceID: bytesForStringAndReferenceID.ToArray(),
-				onlyAsReferenceID: bytesForReferenceID.ToArray()
+			return _typeNameCache.GetOrAdd(
+				type,
+				new CachedNameData(
+					id: referenceID,
+					asStringAndReferenceID: bytesForStringAndReferenceID.ToArray(),
+					onlyAsReferenceID: bytesForReferenceID.ToArray()
+				)
 			);
-			_typeNameCache.TryAdd(type, cacheEntry);
-			return cacheEntry;
 		}
 
 		public static CachedNameData GetFieldNameBytesIfWantoSerialiseField(FieldInfo field, Type serialisationTargetType)
@@ -73,10 +76,7 @@ namespace DanSerialiser.CachedLookups
 				return cachedResult;
 
 			if (BinaryReaderWriterShared.IgnoreField(field))
-			{
-				_fieldInfoNameCache.TryAdd(cacheKey, null);
-				return null;
-			}
+				return _fieldInfoNameCache.GetOrAdd(cacheKey, value: null);
 
 			// Serialisation of pointer fields will fail - I don't know how they would be supportable anyway but they fail with a stack overflow if attempted, so catch it
 			// first and raise as a more useful exception
@@ -127,8 +127,7 @@ namespace DanSerialiser.CachedLookups
 					);
 				}
 			);
-			_fieldInfoNameCache.TryAdd(cacheKey, cacheEntry);
-			return cacheEntry;
+			return _fieldInfoNameCache.GetOrAdd(cacheKey, cacheEntry);
 		}
 
 		/// <summary>
@@ -172,13 +171,14 @@ namespace DanSerialiser.CachedLookups
 				writer.String(BinaryReaderWriterShared.CombineTypeAndFieldName(property.DeclaringType, BackingFieldHelpers.GetBackingFieldName(property.Name)));
 			}
 			bytesForStringAndReferenceID.AddRange(bytesForReferenceID);
-			var cacheEntry = new CachedNameData(
-				id: referenceID,
-				asStringAndReferenceID: bytesForStringAndReferenceID.ToArray(),
-				onlyAsReferenceID: bytesForReferenceID.ToArray()
+			return _propertyInfoNameCache.GetOrAdd(
+				property,
+				new CachedNameData(
+					id: referenceID,
+					asStringAndReferenceID: bytesForStringAndReferenceID.ToArray(),
+					onlyAsReferenceID: bytesForReferenceID.ToArray()
+				)
 			);
-			_propertyInfoNameCache.TryAdd(property, cacheEntry);
-			return cacheEntry;
 		}
 
 		private static byte[] GetBytesForNameReferenceID(int referenceID)

@@ -69,8 +69,7 @@ namespace DanSerialiser
 					)
 				);
 			}
-			_serialisationConverters.TryAdd(sourceType, conversionResult); // If another thread did the same work and populated this value, don't worry about it
-			return conversionResult;
+			return _serialisationConverters.GetOrAdd(sourceType, conversionResult);
 		}
 
 		/// <summary>

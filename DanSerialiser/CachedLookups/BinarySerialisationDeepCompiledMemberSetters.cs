@@ -64,9 +64,7 @@ namespace DanSerialiser.CachedLookups
 			var compiledMemberSetters = new ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>(
 				memberSetters.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.GetCompiledMemberSetter())
 			);
-			memberSetterData = new DeepCompiledMemberSettersGenerationResults(typeNamesToDeclare, fieldNamesToDeclare, compiledMemberSetters);
-			cache.TryAdd(serialisationTargetType, memberSetterData);
-			return memberSetterData;
+			return cache.GetOrAdd(serialisationTargetType, new DeepCompiledMemberSettersGenerationResults(typeNamesToDeclare, fieldNamesToDeclare, compiledMemberSetters));
 		}
 
 		private static void GenerateMemberSettersForTypeIfPossible(
