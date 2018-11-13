@@ -58,6 +58,53 @@ namespace UnitTests
 		}
 
 		/// <summary>
+		/// This is an extension to IgnoreFieldsInDataNotPresentOnDeserialisationType above that tests a fix that ensures that we don't call any deserialisation type converters for
+		/// fields that do not exist in the target type because this may result in an exception (the deserialisation type converter would not know what the destination type should
+		/// be because the destination field does not exist, without this information it is not possible for the type converter to do anything, which is why the summary comment on
+		/// the ConvertIfRequired states that it will not be called with a null 'targetType' reference)
+		/// </summary>
+		[Fact]
+		public static void IgnoreFieldsInDataNotPresentOnDeserialisationType_TODO_Rename()
+		{
+			const string idFieldName = "Id";
+			const string nameFieldName = "Name";
+			var sourceType = ConstructType(
+				GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)),
+				"ClassWithIntId",
+				new[]
+				{
+					Tuple.Create(idFieldName, typeof(int)),
+					Tuple.Create(nameFieldName, typeof(string))
+				}
+			);
+
+			var instance = Activator.CreateInstance(sourceType);
+			var idFieldOnSource = sourceType.GetField(idFieldName);
+			idFieldOnSource.SetValue(instance, 123);
+			var serialisedData = BinarySerialisation.Serialise(instance);
+
+			var destinationType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "ClassWithIntId", new[] { Tuple.Create(idFieldName, typeof(int)) });
+			var clone = ResolveDynamicAssembliesWhilePerformingAction(
+				() => Deserialise(serialisedData, destinationType, new[] { NullDeserialisationTypeConverter.Instance }),
+				destinationType
+			);
+			var idFieldOnDestination = destinationType.GetField(idFieldName);
+			Assert.Equal(123, idFieldOnDestination.GetValue(clone));
+		}
+
+		private sealed class NullDeserialisationTypeConverter : IDeserialisationTypeConverter
+		{
+			public static NullDeserialisationTypeConverter Instance { get; } = new NullDeserialisationTypeConverter();
+			private NullDeserialisationTypeConverter() { }
+			public object ConvertIfRequired(Type targetType, object value)
+			{
+				if (targetType == null)
+					throw new ArgumentNullException(nameof(targetType));
+				return value;
+			}
+		}
+
+		/// <summary>
 		/// If deserialising data where an older version of the type was serialised and the new version that is being deserialised to has a field that the old one did not have then
 		/// throw an exception. For a type to be deserialised and for some of its fields not to be set could result in confusing errors in some cases - for example, if the type has
 		/// a constructor that sets all fields to non-null values then consumers of that class could reasonably expect to never have to deal with a null value on any of that type's
@@ -378,12 +425,12 @@ namespace UnitTests
 		/// <summary>
 		/// This calls the BinarySerialisationCloner Deserialise method but populates the generic type parameter with a runtime type value
 		/// </summary>
-		private static object Deserialise(byte[] serialisedData, Type type)
+		private static object Deserialise(byte[] serialisedData, Type type, IDeserialisationTypeConverter[] optionalTypeConverters = null)
 		{
-			var genericDeserialiseMethod = typeof(BinarySerialisation).GetMethod(nameof(Deserialise), new[] { typeof(byte[]) }).MakeGenericMethod(type);
+			var genericDeserialiseMethod = typeof(BinarySerialisation).GetMethod(nameof(Deserialise), new[] { typeof(byte[]), typeof(IDeserialisationTypeConverter[]) }).MakeGenericMethod(type);
 			try
 			{
-				return genericDeserialiseMethod.Invoke(null, new[] { serialisedData });
+				return genericDeserialiseMethod.Invoke(null, new object[] { serialisedData, optionalTypeConverters ?? new IDeserialisationTypeConverter[0] });
 			}
 			catch (TargetInvocationException e)
 			{

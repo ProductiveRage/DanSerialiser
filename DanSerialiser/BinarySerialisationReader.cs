@@ -66,11 +66,16 @@ namespace DanSerialiser
 			var value = ReadBeforeApplyingAnyTransforms(dataType, ignoreAnyInvalidTypes);
 
 			// Give the type converters a crack at the current value - if any of them change the value then take that as the new value and don't consider any other converters
-			foreach (var typeConverter in _typeConverters)
+			// (don't do this if targetTypeIfAvailable is unavailable because the type converters expect a non-null value for it - it's acceptable to get here and it be null,
+			// though, as that is what will happen if the serialised data has information for a field that exist in the version of the entity currently being deserialised into)
+			if (targetTypeIfAvailable != null)
 			{
-				var updatedValue = typeConverter.ConvertIfRequired(targetTypeIfAvailable, value);
-				if (!ReferenceEquals(updatedValue, targetTypeIfAvailable))
-					return updatedValue;
+				foreach (var typeConverter in _typeConverters)
+				{
+					var updatedValue = typeConverter.ConvertIfRequired(targetTypeIfAvailable, value);
+					if (!ReferenceEquals(updatedValue, targetTypeIfAvailable))
+						return updatedValue;
+				}
 			}
 			return value;
 		}
