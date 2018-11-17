@@ -1,0 +1,25 @@
+// * Summary *
+
+BenchmarkDotNet=v0.10.14, OS=Windows 8.1 (6.3.9600.0)
+AMD FX(tm)-8350 Eight-Core Processor, 1 CPU, 8 logical and 4 physical cores
+Frequency=14318180 Hz, Resolution=69.8413 ns, Timer=HPET
+.NET Core SDK=2.1.300
+  [Host] : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+  Clr    : .NET Framework 4.6.1 (CLR 4.0.30319.42000), 64bit RyuJIT-v4.7.3221.0
+  Core   : .NET Core 2.1.0 (CoreCLR 4.6.26515.07, CoreFX 4.6.26515.06), 64bit RyuJIT
+
+
+                                                           Method |  Job | Runtime |     Mean |     Error |    StdDev |
+----------------------------------------------------------------- |----- |-------- |---------:|----------:|----------:|
+                                                ProtoBufSerialise |  Clr |     Clr | 11.53 ms | 0.2246 ms | 0.3430 ms | 3.5x faster (1.9x faster than DanSerialiser-with-hints)
+                                              ProtoBufDeserialise |  Clr |     Clr | 19.51 ms | 0.3534 ms | 0.3306 ms | 2.1x faster (1.7x faster than DanSerialiser-with-hints)
+                                           DanSerialiserSerialise |  Clr |     Clr | 40.44 ms | 0.5335 ms | 0.4991 ms |
+                                         DanSerialiserDeserialise |  Clr |     Clr | 40.62 ms | 0.5643 ms | 0.5002 ms |
+   DanSerialiserSerialise_FastestTreeBinarySerialisationWithHints |  Clr |     Clr | 21.72 ms | 0.4085 ms | 0.4012 ms | 1.9x faster
+ DanSerialiserDeserialise_FastestTreeBinarySerialisationWithHints |  Clr |     Clr | 32.63 ms | 0.6282 ms | 0.6170 ms | 1.2x faster
+                                                ProtoBufSerialise | Core |    Core | 10.44 ms | 0.2086 ms | 0.1952 ms | 3.4x faster (2.8x faster than DanSerialiser-with-hints)
+                                              ProtoBufDeserialise | Core |    Core | 20.39 ms | 0.0780 ms | 0.0730 ms | 2.1x faster (1.7x faster than DanSerialiser-with-hints)
+                                           DanSerialiserSerialise | Core |    Core | 35.42 ms | 0.0712 ms | 0.0631 ms |
+                                         DanSerialiserDeserialise | Core |    Core | 42.23 ms | 0.8094 ms | 0.7571 ms |
+   DanSerialiserSerialise_FastestTreeBinarySerialisationWithHints | Core |    Core | 29.21 ms | 0.5616 ms | 0.5767 ms | 1.2x faster
+ DanSerialiserDeserialise_FastestTreeBinarySerialisationWithHints | Core |    Core | 34.78 ms | 0.6820 ms | 0.8375 ms | 1.2x faster

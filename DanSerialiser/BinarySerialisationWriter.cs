@@ -14,6 +14,8 @@ namespace DanSerialiser
 {
 	public sealed class BinarySerialisationWriter : IWrite
 	{
+		private static readonly ConcurrentDictionary<Type, Action<object, BinarySerialisationWriter>> _memberSetterCacheForDefaultTypeAnalyser = new ConcurrentDictionary<Type, Action<object, BinarySerialisationWriter>>();
+
 		private readonly Stream _stream;
 		private readonly IAnalyseTypesForSerialisation _typeAnalyser;
 		private readonly ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults> _deepMemberSetterCacheIfEnabled;
@@ -322,17 +324,31 @@ namespace DanSerialiser
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
 
-			// The BinarySerialisationCompiledMemberSetters.TryToGenerateMemberSetter method has a facility to take existing member setters and use them for fields or properties
-			// on the current type in order to create a more complex member setter - one that can set values other than primitive-esque data types. This would bypass any reference
-			// tracking and is not currently enabled (so the "valueWriterRetriever" delegate always returns null). Since reference tracking is not required for struct instances, it
-			// may seem reasonable to change this behaviour to allow forming more complex member setters for types whose members are all primitive-like OR structs but structs can
-			// have fields that are reference types and reference-tracking IS required for those values and so more analysis would be required in order to be sure that it was safe
-			// (structs with reference fields could form part of a circular reference loop and we need to be aware of those, which we can't be if reference tracking is not available).
-			var memberSetterAndFieldsSet = BinarySerialisationCompiledMemberSetters.TryToGenerateMemberSetter(type, _typeAnalyser, t => null);
-			if (memberSetterAndFieldsSet == null)
+			// We want to cache the results of the member setter generation (even if it wasn't successful and resulted in a null) in a static dictionary so that the results may be
+			// shared across multiple serialisation processes (the Serialiser class will maintain a short-lived 'member setter cache' that relates to its current serialisation request
+			// but it will not be shared between one request and another). If we didn't do this then we might find LINQ expressions being compiled for some types for every serialisation.
+			// The only thing to be careful about is that BinarySerialisationCompiledMemberSetters.TryToGenerateMemberSetter may vary its behaviour depending upon the implementation of
+			// IAnalyseTypesForSerialisation used - to avoid any problems, caching is only enabled if the DefaultTypeAnalyser is used and it is only NOT used in unit tests since the
+			// constructor that takes an IAnalyseTypesForSerialisation is internal).
+			var allowCache = (_typeAnalyser == DefaultTypeAnalyser.Instance);
+			if (!allowCache || !_memberSetterCacheForDefaultTypeAnalyser.TryGetValue(type, out var compiledMemberSetter))
+			{
+				// The BinarySerialisationCompiledMemberSetters.TryToGenerateMemberSetter method has a facility to take existing member setters and use them for fields or properties
+				// on the current type in order to create a more complex member setter - one that can set values other than primitive-esque data types. This would bypass any reference
+				// tracking and is not currently enabled (so the "valueWriterRetriever" delegate always returns null). Since reference tracking is not required for struct instances, it
+				// may seem reasonable to change this behaviour to allow forming more complex member setters for types whose members are all primitive-like OR structs but structs can
+				// have fields that are reference types and reference-tracking IS required for those values and so more analysis would be required in order to be sure that it was safe
+				// (structs with reference fields could form part of a circular reference loop and we need to be aware of those, which we can't be if reference tracking is not available).
+				var memberSetterAndFieldsSet = BinarySerialisationCompiledMemberSetters.TryToGenerateMemberSetter(type, _typeAnalyser, t => null);
+				if (memberSetterAndFieldsSet == null)
+					compiledMemberSetter = null;
+				else
+					compiledMemberSetter = memberSetterAndFieldsSet.GetCompiledMemberSetter();
+				if (allowCache)
+					_memberSetterCacheForDefaultTypeAnalyser.TryAdd(type, compiledMemberSetter); // Don't worry if the add fails, it just means another thread did the same work to produce the same result
+			}
+			if (compiledMemberSetter == null)
 				return null;
-
-			var compiledMemberSetter = memberSetterAndFieldsSet.GetCompiledMemberSetter();
 			return value => compiledMemberSetter(value, this);
 		}
 
