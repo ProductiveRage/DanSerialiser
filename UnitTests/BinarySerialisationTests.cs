@@ -1,7 +1,11 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using DanSerialiser;
+using DanSerialiser.CachedLookups;
+using DanSerialiser.Reflection;
 using Xunit;
 
 namespace UnitTests
@@ -12,6 +16,34 @@ namespace UnitTests
 
 		// The "SpeedyButLimited" option doesn't detect OR handle circular references - so there are no tests for them because the only test would be to see if we get a stack overflow
 		// and the xunit runner won't handle that (it will terminate the process when the stack overflow occurs and then the test will be marked neither as a pass or a fail)
+
+		/// <summary>
+		/// I thought that I'd seen a problem where the SpeedyButLimited's PrepareForSerialisation call would return nothing if the target type was an array.. but this test shows that
+		/// that isn't the case and I must have misremembered!
+		/// </summary>
+		[Fact]
+		public void EnsureThatMemberSetterPreparedForElementTypeWhenTargetTypeIsArray()
+		{
+			using (var stream = new MemoryStream())
+			{
+				var writer = new BinarySerialisationWriter(
+					stream,
+					ReferenceReuseOptions.SpeedyButLimited,
+					DefaultTypeAnalyser.Instance,
+					new ConcurrentDictionary<Type, BinarySerialisationDeepCompiledMemberSetters.DeepCompiledMemberSettersGenerationResults>()
+				);
+				var generatedMemberSetters = writer.PrepareForSerialisation(typeof(SealedClassWithSingleStringProperty[]), new IFastSerialisationTypeConverter[0]);
+				Assert.NotNull(generatedMemberSetters); // Should never get a null response back 
+				Assert.Single(generatedMemberSetters); // In this case, there should be a single entry that is a non-null member setter for SealedClassWithSingleStringProperty (NOT array of)
+				Assert.Equal(typeof(SealedClassWithSingleStringProperty), generatedMemberSetters.First().Key);
+				Assert.NotNull(generatedMemberSetters.First().Value);
+			}
+		}
+
+		private sealed class SealedClassWithSingleStringProperty
+		{
+			public string Name { get; set; }
+		}
 	}
 
 	public sealed class BinarySerialisationTests_NoReferenceReuse : BinarySerialisationTests
