@@ -142,7 +142,7 @@ namespace UnitTests
 				writer.ObjectEnd();
 				serialised = stream.ToArray();
 			}
-			var clone = BinarySerialisation.Deserialise<object>(serialised);
+			var clone = BinarySerialisation.Deserialise<object>(serialised, typeConverters.OfType<IDeserialisationTypeConverter>().ToArray());
 			if (!ObjectComparer.AreEqual(source, clone, out var differenceSummaryIfNotEqual))
 				throw new Exception("Clone failed: " + differenceSummaryIfNotEqual);
 		}
