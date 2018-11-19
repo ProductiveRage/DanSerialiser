@@ -324,35 +324,35 @@ There is a project in the repository that uses [BenchmarkDotNet](https://github.
 
 |                                                            Method |  Job | Runtime |      Mean |     Error |    StdDev | Compared to DanSerialiser |
 |------------------------------------------------------------------ |:----:|:-------:|----------:|----------:|----------:|---------------------------|
-|                                                  JsonNetSerialise |  Clr |     Clr | 150.48 ms | 1.0164 ms | 0.9010 ms | 2.8x slower               |
-|                                          BinaryFormatterSerialise |  Clr |     Clr |  86.14 ms | 1.0413 ms | 0.9740 ms | 1.6x slower               |
-|   DanSerialiserSerialise (optimised for wide circular references) |  Clr |     Clr |  70.10 ms | 0.6726 ms | 0.6292 ms | 1.3x slower               |
-|                                            DanSerialiserSerialise |  Clr |     Clr |  53.07 ms | 0.2024 ms | 0.1690 ms | -                         |
-|                                                 ProtoBufSerialise |  Clr |     Clr |  11.08 ms | 0.2123 ms | 0.2085 ms | **4.8x faster**           |
+|                                                  JsonNetSerialise |  Clr |     Clr | 153.59 ms | 1.6641 ms | 1.5566 ms | 3.1x slower               |
+|                                          BinaryFormatterSerialise |  Clr |     Clr |  97.81 ms | 0.5259 ms | 0.4919 ms | 2.0x slower               |
+|                                            DanSerialiserSerialise |  Clr |     Clr |  49.63 ms | 0.9786 ms | 1.3395 ms | -                         |
+|   DanSerialiserSerialise (optimised for wide circular references) |  Clr |     Clr |  71.64 ms | 1.4021 ms | 1.8717 ms | 1.4x slower               |
+|                                                 ProtoBufSerialise |  Clr |     Clr |  12.42 ms | 0.1766 ms | 0.1566 ms | **4.0x faster**           |
 
 |                                                            Method |  Job | Runtime |      Mean |     Error |    StdDev | Compared to DanSerialiser |
 |------------------------------------------------------------------ |:----:|:-------:|----------:|----------:|----------:|---------------------------|
-|                                                JsonNetDeserialise |  Clr |     Clr | 128.86 ms | 2.1108 ms | 1.8712 ms | 3.4x slower               |
-|                                        BinaryFormatterDeserialise |  Clr |     Clr | 126.07 ms | 0.8547 ms | 0.7137 ms | 3.4x slower               |
-| DanSerialiserDeserialise (optimised for wide circular references) |  Clr |     Clr | 129.83 ms | 0.7201 ms | 0.6735 ms | 2.4x slower               |
-|                                          DanSerialiserDeserialise |  Clr |     Clr |  37.42 ms | 0.6876 ms | 0.6432 ms | -                         |
-|                                               ProtoBufDeserialise |  Clr |     Clr |  21.43 ms | 0.0683 ms | 0.0533 ms | **1.7x faster**           |
+|                                                JsonNetDeserialise |  Clr |     Clr | 135.29 ms | 2.6425 ms | 2.3425 ms | 2.9x slower               |
+|                                        BinaryFormatterDeserialise |  Clr |     Clr | 157.81 ms | 2.6601 ms | 2.2213 ms | 3.4x slower               |
+|                                          DanSerialiserDeserialise |  Clr |     Clr |  49.63 ms | 0.9786 ms | 1.3395 ms | -                         |
+| DanSerialiserDeserialise (optimised for wide circular references) |  Clr |     Clr | 171.02 ms | 4.4524 ms | 6.7993 ms | 3.7x slower               |
+|                                               ProtoBufDeserialise |  Clr |     Clr |  23.35 ms | 0.4018 ms | 0.3759 ms | **2.0x faster**           |
 
 |                                                            Method |  Job | Runtime |      Mean |     Error |    StdDev | Compared to DanSerialiser |
 |------------------------------------------------------------------ |:----:|:-------:|----------:|----------:|----------:|---------------------------|
-|                                          BinaryFormatterSerialise | Core |    Core | 102.03 ms | 0.9795 ms | 0.9162 ms | 2.2x slower               |
-|                                                  JsonNetSerialise | Core |    Core |  94.39 ms | 0.8056 ms | 0.6727 ms | 2.1x slower               |
-|   DanSerialiserSerialise (optimised for wide circular references) | Core |    Core |  61.84 ms | 0.4467 ms | 0.4178 ms | 1.4x slower               |
-|                                            DanSerialiserSerialise | Core |    Core |  45.80 ms | 0.6506 ms | 0.6086 ms | -                         |
-|                                                 ProtoBufSerialise | Core |    Core |  10.11 ms | 0.0346 ms | 0.0289 ms | **4.5x faster**           |
+|                                                  JsonNetSerialise | Core |    Core |  96.81 ms | 0.3655 ms | 0.3419 ms | 2.3x slower               |
+|                                          BinaryFormatterSerialise | Core |    Core | 114.47 ms | 0.1742 ms | 0.1455 ms | 2.7x slower               |
+|                                            DanSerialiserSerialise | Core |    Core |  42.83 ms | 0.0966 ms | 0.0903 ms | -                         |
+|   DanSerialiserSerialise (optimised for wide circular references) | Core |    Core |  63.71 ms | 0.0725 ms | 0.0605 ms | 1.5x slower               |
+|                                                 ProtoBufSerialise | Core |    Core |  11.04 ms | 0.0510 ms | 0.0477 ms | **3.9x faster**           |
 
 |                                                            Method |  Job | Runtime |      Mean |     Error |    StdDev | Compared to DanSerialiser |
 |------------------------------------------------------------------ |:----:|:-------:|----------:|----------:|----------:|---------------------------|
-|                                        BinaryFormatterDeserialise | Core |    Core | 134.02 ms | 0.8240 ms | 0.7305 ms | 3.6x slower               |
-|                                                JsonNetDeserialise | Core |    Core | 128.48 ms | 0.5947 ms | 0.5272 ms | 3.5x slower               |
-| DanSerialiserDeserialise (optimised for wide circular references) | Core |    Core | 127.16 ms | 1.4280 ms | 1.3358 ms | 2.8x slower               |
-|                                          DanSerialiserDeserialise | Core |    Core |  37.08 ms | 0.1632 ms | 0.1274 ms | -                         |
-|                                               ProtoBufDeserialise | Core |    Core |  20.19 ms | 0.1603 ms | 0.1421 ms | **1.8x faster**           |
+|                                                JsonNetDeserialise | Core |    Core | 131.65 ms | 0.6398 ms | 0.5671 ms | 3.0x slower               |
+|                                        BinaryFormatterDeserialise | Core |    Core | 155.48 ms | 2.1688 ms | 1.9226 ms | 3.6x slower               |
+|                                          DanSerialiserDeserialise | Core |    Core |  43.20 ms | 0.2675 ms | 0.2502 ms | -                         |
+| DanSerialiserDeserialise (optimised for wide circular references) | Core |    Core | 162.53 ms | 0.6407 ms | 0.4632 ms | 3.8x slower               |
+|                                               ProtoBufDeserialise | Core |    Core |  20.19 ms | 0.1603 ms | 0.1421 ms | **2.1x faster**           |
 
 Initially, I imagined that getting with one order of magnitude of protobuf would be acceptable but I hadn't realised how close Json.NET would be in performance - approx. 13.6x / 9.3x times slower than protobuf to serialise the data on .NET 4.6.1 / .NET Core 2.1 and only 6.0x / 6.4x slower to deserialise it. Considering that Json.NET is so general purpose, I thought that that was impressive!
 
@@ -360,7 +360,7 @@ I'm happy that *this* library is less than 5x as slow as protobuf in serialising
 
 ## A words about enums and entity versioning
 
-Enums in C# are a bit of a wobbly concept, they look like they might bring strong-typing to the game than they really do. For example, if we take this enum:
+Enums in C# are a bit of a wobbly concept, they look like they might bring more strong-typing to the game than they really do. For example, if we take this enum:
 
 	// https://thedailywtf.com/articles/What_Is_Truth_0x3f_
 	enum Bool { True, False, FileNotFound }
@@ -384,7 +384,7 @@ The default behaviour of this serialiser is to write the underlying numeric valu
 
 Serialising the underlying values for enums is expected to result in the least surprising behaviour in cases where enums vary across assembly versions (particularly since enums in C# are not limited to the declared named values in normal operation).
 
-If you would prefer to change this behaviour for your use case then you may do so using Type Converters.
+If you would prefer to change this behaviour for your use case then you may do so using Type Converters (see below).
 
 ## "Type Converters" for changing the shape of data while in transit
 
