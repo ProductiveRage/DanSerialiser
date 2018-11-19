@@ -22,7 +22,9 @@ namespace UnitTests
 			[Fact]
 			public static void ClassWithSinglePropertyThatIsSealedClassWithSinglePrimitiveProperty() => AssertCanGenerateCorrectMemberSetter(
 				new SealedPersonDetailsWithSealedNameDetails { Name = new SealedNameDetails { Name = "Test" } },
-				expectedNumberOfMemberSettersGenerated: 2
+				new IFastSerialisationTypeConverter[0],
+				expectedNumberOfMemberSettersGenerated: 2,
+				expectedNumberOfMemberSettersThatCanNotBeGenerated: 0
 			);
 
 			/// <summary>
@@ -32,13 +34,17 @@ namespace UnitTests
 			[Fact]
 			public static void ClassWithSinglePropertyThatIsStructWithSinglePrimitiveProperty() => AssertCanGenerateCorrectMemberSetter(
 				new SealedPersonDetailsWithStructNameDetails { Name = new StructNameDetails { Name = "Test" } },
-				expectedNumberOfMemberSettersGenerated: 2
+				new IFastSerialisationTypeConverter[0],
+				expectedNumberOfMemberSettersGenerated: 2,
+				expectedNumberOfMemberSettersThatCanNotBeGenerated: 0
 			);
 
 			[Fact]
 			public static void NestedTypesWillWorkInOneDimensionalArrayTypes() => AssertCanGenerateCorrectMemberSetter(
 				new ContactListDetails { Names = new[] { new SealedNameDetails { Name = "Test" }, new SealedNameDetails { Name = "Test" } } },
-				expectedNumberOfMemberSettersGenerated: 2
+				new IFastSerialisationTypeConverter[0],
+				expectedNumberOfMemberSettersGenerated: 2,
+				expectedNumberOfMemberSettersThatCanNotBeGenerated: 0
 			);
 
 			[Fact]
@@ -57,7 +63,23 @@ namespace UnitTests
 						Values17 = new[] { new Guid("E1E06164-0477-4FF7-AD79-86772AE5EF7A") }
 					}
 				},
-				expectedNumberOfMemberSettersGenerated: 2
+				new IFastSerialisationTypeConverter[0],
+				expectedNumberOfMemberSettersGenerated: 2,
+				expectedNumberOfMemberSettersThatCanNotBeGenerated: 0
+			);
+
+			/// <summary>
+			/// I noticed that when a type converter was used to change an immutable list into an array for transmission that GetMemberSettersFor was still trying
+			/// to generate member setters for the immutable list (and its nested Node type) when these would never be used. So this test ensures that it now only
+			/// tries to generate member setters for the types that are necessary (in this case, that will be two types; one is the source type and the second is
+			/// the wrapper class that contains the array - there should NOT be any member setters relating to PersistentList or PersistentList.Node)
+			/// </summary>
+			[Fact]
+			public static void DoNotTryToGenerateMemberSettersForConvertedTypes() => AssertCanGenerateCorrectMemberSetter(
+				new SomethingWithImmutableListProperty { Roles = PersistentList.Of(new[] { "abc", "def" }) },
+				new[] { ImmutableListTypeConverter.Instance }, // Use ImmutableListTypeConverter instead of PersistentListTypeConverter because the latter doesn't implement IFastSerialisationTypeConverter
+				expectedNumberOfMemberSettersGenerated: 2,
+				expectedNumberOfMemberSettersThatCanNotBeGenerated: 0
 			);
 		}
 
@@ -74,7 +96,11 @@ namespace UnitTests
 			public static void ClassWithSinglePropertyThatIsAbstractClassWithSinglePrimitiveProperty() => AssertCanGenerateNotCorrectMemberSetter(typeof(SealedPersonDetailsWithAbstractNameDetails));
 		}
 
-		private static void AssertCanGenerateCorrectMemberSetter(object source, int expectedNumberOfMemberSettersGenerated)
+		private static void AssertCanGenerateCorrectMemberSetter(
+			object source,
+			IFastSerialisationTypeConverter[] typeConverters,
+			int expectedNumberOfMemberSettersGenerated,
+			int expectedNumberOfMemberSettersThatCanNotBeGenerated)
 		{
 			// TryToGenerateMemberSetters will try to return member setters for each type that it encountered while analysing the source type - for example, if
 			// source is an instance of "PersonDetails" and if "PersonDetails" has an int Key property and a "NameDetails" Name property where "NameDetails" is
@@ -83,11 +109,7 @@ namespace UnitTests
 			// two member setters). It won't return member setters for values that have first class IWrite support (primitives, strings, DateTime, etc..)
 			var sourceType = source.GetType();
 			var deepMemberSetterCache = new ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults>();
-			var memberSetterDetailsForAllTypesInvolved = GetMemberSettersFor(
-				sourceType,
-				new IFastSerialisationTypeConverter[0],
-				deepMemberSetterCache
-			);
+			var memberSetterDetailsForAllTypesInvolved = GetMemberSettersFor(sourceType, typeConverters, deepMemberSetterCache);
 			Assert.NotNull(memberSetterDetailsForAllTypesInvolved); // We should always get a non-null reference for this (but doesn't hurt to confirm)
 
 			// Try to get member setter for the source type
@@ -95,8 +117,9 @@ namespace UnitTests
 				memberSetterDetailsForType = null;
 			Assert.NotNull(memberSetterDetailsForType);
 
-			// We should know how many member setters we expected to be generated, so let's confirm that
+			// We should know how many member setters we expected to be generated (and how many it's not possible to generate), so let's confirm
 			Assert.Equal(expectedNumberOfMemberSettersGenerated, memberSetterDetailsForAllTypesInvolved.MemberSetters.Count(kvp => kvp.Value != null));
+			Assert.Equal(expectedNumberOfMemberSettersThatCanNotBeGenerated, memberSetterDetailsForAllTypesInvolved.MemberSetters.Count(kvp => kvp.Value == null));
 
 			byte[] serialised;
 			using (var stream = new MemoryStream())
@@ -177,12 +200,12 @@ namespace UnitTests
 			public string Name { get; set; }
 		}
 
-		public abstract class AbstractNameDetails
+		private abstract class AbstractNameDetails
 		{
 			public string Name { get; set; }
 		}
 
-		public struct StructNameDetails
+		private struct StructNameDetails
 		{
 			public string Name { get; set; }
 		}
@@ -190,6 +213,11 @@ namespace UnitTests
 		private sealed class SomethingWithPropertyOfTypeWithEveryPrimitiveEsqueType
 		{
 			public SomethingWithAllSimpleTypesFields Value { get; set; }
+		}
+
+		private sealed class SomethingWithImmutableListProperty
+		{
+			public PersistentList<string> Roles { get; set; }
 		}
 
 		private sealed class SomethingWithAllSimpleTypesFields

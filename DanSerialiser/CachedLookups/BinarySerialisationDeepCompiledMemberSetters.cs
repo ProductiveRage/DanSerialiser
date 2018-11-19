@@ -98,6 +98,16 @@ namespace DanSerialiser.CachedLookups
 				return;
 			}
 
+			// Check the type converters here - if any of them would change the current type then we need to try to generate a member setter for the converted-to type
+			// (rather than the current type). This check is done after the IsArray check above because the Serialiser has special handling for arrays that occurs before
+			// handling for objects and so it's not possible to have a type converter than changes an array of T into something else.
+			var (_, convertedToType) = TryToGetValueWriterViaTypeConverters(type);
+			if (convertedToType != type)
+			{
+				typesEncountered.Add(type);
+				type = convertedToType;
+			}
+
 			// In order to generate a member setter for Type A, we might need member setters for Types B and C and for them we might need member setters for Types
 			// D and E, so we need to dig down to the bottom of the trees and work our way back up before we start trying to call TryToGenerateMemberSetter
 			typesEncountered.Add(type);
@@ -114,7 +124,7 @@ namespace DanSerialiser.CachedLookups
 				{
 					// Give the type converters a shot - if TryToGetValueWriterViaTypeConverters returns a non-null reference then one of them wants to control
 					// the serialisation of this type (if null is returned then continue on to process as normal)
-					var valueWriterViaTypeConverter = TryToGetValueWriterViaTypeConverters(t);
+					var (valueWriterViaTypeConverter, _) = TryToGetValueWriterViaTypeConverters(t);
 					if (valueWriterViaTypeConverter != null)
 						return valueWriterViaTypeConverter;
 
@@ -143,7 +153,7 @@ namespace DanSerialiser.CachedLookups
 				memberSetters.Add(type, null);
 			}
 
-			ValueWriter TryToGetValueWriterViaTypeConverters(Type t)
+			(ValueWriter, Type) TryToGetValueWriterViaTypeConverters(Type t)
 			{
 				foreach (var typeConverter in typeConverters)
 				{
@@ -171,7 +181,7 @@ namespace DanSerialiser.CachedLookups
 					if (typeConverterWriter != null)
 					{
 						if (typeConverterWriter.MemberSetterIfNotSettingToDefault == null)
-							return ValueWriter.SetValueToDefault;
+							return (ValueWriter.SetValueToDefault, typeConverterWriter.ConvertedToType);
 
 						var newTypeName = GetTypeNameBytes(typeConverterWriter.ConvertedToType);
 						typeNamesToDeclare.Add(newTypeName);
@@ -179,10 +189,10 @@ namespace DanSerialiser.CachedLookups
 							typeNamesToDeclare.Add(typeName);
 						foreach (var fieldName in fieldNames)
 							fieldNamesToDeclare.Add(fieldName);
-						return ValueWriter.OverrideValue(newTypeName, typeConverterWriter.MemberSetterIfNotSettingToDefault);
+						return (ValueWriter.OverrideValue(newTypeName, typeConverterWriter.MemberSetterIfNotSettingToDefault), typeConverterWriter.ConvertedToType);
 					}
 				}
-				return null;
+				return (null, t);
 			}
 		}
 
