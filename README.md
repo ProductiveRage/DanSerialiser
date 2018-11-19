@@ -356,7 +356,7 @@ There is a project in the repository that uses [BenchmarkDotNet](https://github.
 
 Initially, I imagined that getting with one order of magnitude of protobuf would be acceptable but I hadn't realised how close Json.NET would be in performance - approx. 13.6x / 9.3x times slower than protobuf to serialise the data on .NET 4.6.1 / .NET Core 2.1 and only 6.0x / 6.4x slower to deserialise it. Considering that Json.NET is so general purpose, I thought that that was impressive!
 
-I'm happy that *this* library is less than 5x as slow as protobuf in serialising the sample data and less than 2x as slow at deserialising.
+I'm happy that *this* library is only about than 4x as slow as protobuf in serialising the sample data and 2x as slow at deserialising.
 
 ## A words about enums and entity versioning
 
