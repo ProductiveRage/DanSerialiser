@@ -18,7 +18,7 @@ namespace DanSerialiser // Note that this is not in the TypeConverters namespace
 			if (convertedToType == null)
 				throw new ArgumentNullException(nameof(convertedToType));
 			if (convertedToType == typeof(void))
-				throw new ArgumentException($"may not be typeof(void) - a result's ConvertedToType should only be typeof(void) if the {nameof(SetToDefault)} factory method was used", nameof(convertedToType));
+				throw new ArgumentException($"may not be typeof(void)", nameof(convertedToType));
 			if (convertedToType.IsArray)
 				throw new ArgumentNullException("must be an array", nameof(convertedToType));
 			if (convertedToType.IsInterface)
@@ -37,14 +37,16 @@ namespace DanSerialiser // Note that this is not in the TypeConverters namespace
 		}
 
 		/// <summary>
-		/// Use this FastSerialisationTypeConversionResult factory method to indicate that the 
+		/// Use this FastSerialisationTypeConversionResult factory method to indicate that a default(T) value should always be written - this doesn't change the type,
+		/// it just changes how the serialisation of it is handled (by recording a default value and ignore any actual data)
 		/// </summary>
 		public static FastSerialisationTypeConversionResult SetToDefault(Type type)
 		{
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
 
-			return new FastSerialisationTypeConversionResult(type, typeof(void), memberSetterIfNotSettingToDefault: null);
+			// If recording a default(T) value for the type then the type will not change and so "convertedType" will be the same as "type"
+			return new FastSerialisationTypeConversionResult(type, type, memberSetterIfNotSettingToDefault: null);
 		}
 
 		private FastSerialisationTypeConversionResult(Type type, Type convertedToType, LambdaExpression memberSetterIfNotSettingToDefault)
