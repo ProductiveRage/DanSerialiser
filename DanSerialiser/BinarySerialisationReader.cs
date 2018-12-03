@@ -475,9 +475,50 @@ namespace DanSerialiser
 			else
 				throw new InvalidSerialisationDataFormatException("Unexpected BinarySerialisationDataType for Array length: " + lengthDataType);
 
+			// When an array contains enum elements, the underlying value is written by the serialisation process and so we'll need to read that value back out and then cast it to
+			// the enum type, otherwise the array SetValue call will fail. In order to do that, we need to check now whether the element type is an enum OR if the element type is
+			// a Nullable enum because the same rules apply to that (a Nullable Nullable enum is not supported, so there is no recursive checks required).
+			Type enumCastTargetTypeIfRequired;
+			if (length == 0)
+				enumCastTargetTypeIfRequired = null;
+			else
+			{
+				if (elementType.IsEnum)
+					enumCastTargetTypeIfRequired = elementType;
+				else
+				{
+					var nullableInnerTypeIfApplicable = Nullable.GetUnderlyingType(elementType);
+					enumCastTargetTypeIfRequired = ((nullableInnerTypeIfApplicable != null) && nullableInnerTypeIfApplicable.IsEnum) ? nullableInnerTypeIfApplicable : null;
+				}
+			}
+
 			var items = Array.CreateInstance(elementType, length);
-			for (var i = 0; i < items.Length; i++)
-				items.SetValue(Read(ignoreAnyInvalidTypes, elementType), i);
+			for (var index = 0; index < items.Length; index++)
+			{
+				var element = Read(ignoreAnyInvalidTypes, elementType);
+				if ((enumCastTargetTypeIfRequired != null) && (element != null))
+				{
+					if (element is byte b)
+						element = Enum.ToObject(enumCastTargetTypeIfRequired, b);
+					else if (element is short s)
+						element = Enum.ToObject(enumCastTargetTypeIfRequired, s);
+					else if (element is int i)
+						element = Enum.ToObject(enumCastTargetTypeIfRequired, i);
+					else if (element is long l)
+						element = Enum.ToObject(enumCastTargetTypeIfRequired, l);
+					else if (element is sbyte sb)
+						element = Enum.ToObject(enumCastTargetTypeIfRequired, sb);
+					else if (element is ushort us)
+						element = Enum.ToObject(enumCastTargetTypeIfRequired, us);
+					else if (element is uint ui)
+						element = Enum.ToObject(enumCastTargetTypeIfRequired, ui);
+					else if (element is ulong ul)
+						element = Enum.ToObject(enumCastTargetTypeIfRequired, ul);
+					else
+						element = Enum.ToObject(enumCastTargetTypeIfRequired, element);
+				}
+				items.SetValue(element, index);
+			}
 
 			// If the BinarySerialisationWriter is configured to optimise for wide circular references then there may be some content-for-delay-populated-objects here
 			// after the array (but if it was configured for trees then there won't be any deferred object populations and we'll go straight to ArrayEnd)

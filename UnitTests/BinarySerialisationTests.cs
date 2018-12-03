@@ -334,6 +334,18 @@ namespace UnitTests
 		}
 
 		[Fact]
+		public void ArrayOfDayOfWeek()
+		{
+			AssertCloneMatchesOriginal(new[] { DayOfWeek.Monday });
+		}
+
+		[Fact]
+		public void ArrayOfNullableDayOfWeek()
+		{
+			AssertCloneMatchesOriginal(new DayOfWeek?[] { DayOfWeek.Monday, DayOfWeek.Tuesday, null });
+		}
+
+		[Fact]
 		public void NullListOfInt32()
 		{
 			AssertCloneMatchesOriginal((List<int>)null);
