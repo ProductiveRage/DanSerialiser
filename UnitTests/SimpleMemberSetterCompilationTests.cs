@@ -5,7 +5,6 @@ using DanSerialiser;
 using DanSerialiser.CachedLookups;
 using DanSerialiser.Reflection;
 using Xunit;
-using static DanSerialiser.CachedLookups.BinarySerialisationCompiledMemberSetters;
 
 namespace UnitTests
 {
@@ -121,17 +120,19 @@ namespace UnitTests
 
 		private static MemberSetterDetails TryToGenerateMemberSetter(Type type)
 		{
-			return BinarySerialisationCompiledMemberSetters.TryToGenerateMemberSetter(
-				type,
-				DefaultTypeAnalyser.Instance,
-				valueWriterRetriever: t =>
-				{
-					// These tests are only for "simple" member setters - ones where properties are of types that may be serialised using IWrite methods (such as
-					// Boolean, String and DateTime) and not for when nested member setters are required for fields or properties of more complex types, which is
-					// when non-null values would need to be returned from a valueWriterRetriever delegate
-					return null;
-				}
-			);
+			return
+				BinarySerialisationCompiledMemberSetters.GetMemberSetterAvailability(
+					type,
+					DefaultTypeAnalyser.Instance,
+					valueWriterRetriever: t =>
+					{
+						// These tests are only for "simple" member setters - ones where properties are of types that may be serialised using IWrite methods (such as
+						// Boolean, String and DateTime) and not for when nested member setters are required for fields or properties of more complex types, which is
+						// when non-null values would need to be returned from a valueWriterRetriever delegate
+						return null;
+					}
+				)
+				.MemberSetterDetailsIfSuccessful;
 		}
 
 		private static void AssertCanGenerateCorrectMemberSetter(object source)

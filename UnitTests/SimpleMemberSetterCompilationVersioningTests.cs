@@ -104,11 +104,13 @@ namespace UnitTests
 			entityTypeV2.GetProperty("NameNew").SetValue(source, "abc");
 
 			// Try to create a member setter for it - this should work since it only has string fields and properties
-			var memberSetterDetails = TryToGenerateMemberSetter(
-				entityTypeV2,
-				DefaultTypeAnalyser.Instance,
-				valueWriterRetriever: t => null // No complex nested member setter madness required, so provide a valueWriterRetriever delegate that always returns null
-			);
+			var memberSetterDetails =
+				GetMemberSetterAvailability(
+					entityTypeV2,
+					DefaultTypeAnalyser.Instance,
+					valueWriterRetriever: t => null // No complex nested member setter madness required, so provide a valueWriterRetriever delegate that always returns null
+				)
+				.MemberSetterDetailsIfSuccessful;
 			Assert.NotNull(memberSetterDetails);
 
 			// Serialise this v2 entity instance
