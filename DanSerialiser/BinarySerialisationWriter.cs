@@ -339,7 +339,7 @@ namespace DanSerialiser
 				// may seem reasonable to change this behaviour to allow forming more complex member setters for types whose members are all primitive-like OR structs but structs can
 				// have fields that are reference types and reference-tracking IS required for those values and so more analysis would be required in order to be sure that it was safe
 				// (structs with reference fields could form part of a circular reference loop and we need to be aware of those, which we can't be if reference tracking is not available).
-				var memberSetterAndFieldsSet = BinarySerialisationCompiledMemberSetters.TryToGenerateMemberSetter(type, _typeAnalyser, t => null);
+				var memberSetterAndFieldsSet = BinarySerialisationCompiledMemberSetters.GetMemberSetterAvailability(type, _typeAnalyser, t => null).MemberSetterDetailsIfSuccessful;
 				if (memberSetterAndFieldsSet == null)
 					compiledMemberSetter = null;
 				else

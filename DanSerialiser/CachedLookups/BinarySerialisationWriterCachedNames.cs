@@ -80,7 +80,7 @@ namespace DanSerialiser.CachedLookups
 
 			// Serialisation of pointer fields will fail - I don't know how they would be supportable anyway but they fail with a stack overflow if attempted, so catch it
 			// first and raise as a more useful exception
-			if (field.FieldType.IsPointer || (field.FieldType == typeof(IntPtr)) || (field.FieldType == typeof(UIntPtr)))
+			if (field.FieldType.IsPointer())
 				throw new NotSupportedException($"Can not serialise pointer fields: {field.Name} on {field.DeclaringType.Name}");
 
 			// If a field is declared multiple times in the type hierarchy (whether through overrides or use of "new") then its name will need prefixing with the type
@@ -149,7 +149,7 @@ namespace DanSerialiser.CachedLookups
 				return null;
 			}
 
-			if (property.PropertyType.IsPointer || (property.PropertyType == typeof(IntPtr)) || (property.PropertyType == typeof(UIntPtr)))
+			if (property.PropertyType.IsPointer())
 				throw new NotSupportedException($"Can not serialise pointer properties: {property.Name} on {property.DeclaringType.Name}");
 
 			// .. however, if this is a property that has the [Deprecated] attribute on it then it is expected to exist for backwards compatibility and to be a computed property

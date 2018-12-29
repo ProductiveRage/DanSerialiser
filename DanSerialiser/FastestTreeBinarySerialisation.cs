@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
+using DanSerialiser.CachedLookups;
 using DanSerialiser.Reflection;
 using static DanSerialiser.CachedLookups.BinarySerialisationDeepCompiledMemberSetters;
 
@@ -59,6 +60,27 @@ namespace DanSerialiser
 				new ConcurrentDictionary<Type, DeepCompiledMemberSettersGenerationResults>(),
 				clonedTypeConverters
 			);
+		}
+
+		/// <summary>
+		/// This will throw a FastestTreeSerialisationNotPossibleException if the specified type does not fully support FastestTreeBinarySerialisation - this may be because
+		/// the type is a class that is not sealed or it has a member that is a class that is not sealed or if IntPtr values exist within the object graph (which are not
+		/// supported by this serialiser). It will only throw at the first problem because one problem can have knock on effects and so a single property of an unsupported
+		/// property type that is deeply nested in the object graph will prevent all of the parent types getting the full-speed treatment.
+		/// 
+		/// This method is intended for us in unit tests in code that references this library - if it is important for this fastest possible serialisation approach to be
+		/// used for particular types then it would be sensible to have unit tests that catch any changes to those types that would prevent optimal serialisation performance
+		/// because that change is likely to result in a performance regression.
+		/// </summary>
+		public static void EnsureThatTypeIsOptimalForFastestTreeSerialisation(Type type, IFastSerialisationTypeConverter[] typeConverters)
+		{
+			if (type == null)
+				throw new ArgumentNullException(nameof(type));
+			if (typeConverters == null)
+				throw new ArgumentNullException(nameof(typeConverters));
+
+			// If this method doesn't throw, then great! If it DOES throw then let that exception bubble up to the caller to let them know that all is not well.
+			BinarySerialisationDeepCompiledMemberSetters.EnsureThatTypeIsOptimalForFastestTreeSerialisation(type, typeConverters);
 		}
 
 		public interface IOptimisingSerialiser

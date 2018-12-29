@@ -23,7 +23,7 @@ namespace DanSerialiser
 			// should be an understanding that not everything within an exception can be captured when serialised
 			if (field.DeclaringType == typeof(Exception))
 			{
-				if (field.FieldType.IsPointer || (field.FieldType == typeof(IntPtr)) || (field.FieldType == typeof(UIntPtr)))
+				if (field.FieldType.IsPointer())
 					return true;
 			}
 

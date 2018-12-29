@@ -68,7 +68,7 @@ namespace DanSerialiser.CachedLookups
 		/// argument - again, if the caller is tracking references then it should only pass through member setters via valueWriterRetriever that are for non-reference types, such as
 		/// structs) because generating nested member setters in this manner will prevent any reference tracking.
 		/// </summary>
-		public static MemberSetterDetails TryToGenerateMemberSetter(Type type, IAnalyseTypesForSerialisation typeAnalyser, ValueWriterRetriever valueWriterRetriever)
+		public static MemberSetterGenerationAttemptResult GetMemberSetterAvailability(Type type, IAnalyseTypesForSerialisation typeAnalyser, ValueWriterRetriever valueWriterRetriever)
 		{
 			if (type == null)
 				throw new ArgumentNullException(nameof(type));
@@ -91,6 +91,7 @@ namespace DanSerialiser.CachedLookups
 					return new
 					{
 						FieldNameBytes = fieldNameBytes,
+						Member = (MemberInfo)f.Member,
 						ValueWriterIfPossibleToGenerate = TryToGetValueWriterForMember(f.Member, f.Member.FieldType, sourceParameter, writerParameter, valueWriterRetriever)
 					};
 				})
@@ -103,6 +104,7 @@ namespace DanSerialiser.CachedLookups
 						return new
 						{
 							FieldNameBytes = fieldNameBytes,
+							Member = (MemberInfo)p.Member,
 							ValueWriterIfPossibleToGenerate = TryToGetValueWriterForMember(p.Member, p.Member.PropertyType, sourceParameter, writerParameter, valueWriterRetriever)
 						};
 					})
@@ -112,7 +114,7 @@ namespace DanSerialiser.CachedLookups
 			{
 				// If it wasn't possible to get a member setter for this field/property type then it's not possible to generate a member setter for the type that it's on
 				if (member.ValueWriterIfPossibleToGenerate == null)
-					return null;
+					return MemberSetterGenerationAttemptResult.ForFailure(member.Member);
 
 				// Generate the write-FieldName-to-stream method call
 				statements.Add(
@@ -136,15 +138,17 @@ namespace DanSerialiser.CachedLookups
 				body = statements[0];
 			else
 				body = Expression.Block(statements);
-			return new MemberSetterDetails(
-				type,
-				Expression.Lambda(
-					body,
-					sourceParameter,
-					writerParameter
-				),
-				GetTypeNameBytes(type),
-				fieldsSet.ToArray()
+			return MemberSetterGenerationAttemptResult.ForSuccess(
+				new MemberSetterDetails(
+					type,
+					Expression.Lambda(
+						body,
+						sourceParameter,
+						writerParameter
+					),
+					GetTypeNameBytes(type),
+					fieldsSet.ToArray()
+				)
 			);
 		}
 
@@ -195,19 +199,6 @@ namespace DanSerialiser.CachedLookups
 				);
 			}
 
-			if (memberType.IsEnum)
-			{
-				// Note: There is some duplication of logic between here and the Serialiser class (that we write the underlying value)
-				var underlyingType = memberType.GetEnumUnderlyingType();
-				var enumValue = Expression.MakeMemberAccess(typedSource, member);
-				return TryToGetValueWriterForType(
-					underlyingType,
-					Expression.Convert(enumValue, underlyingType),
-					writerParameter,
-					valueWriterRetriever
-				);
-			}
-
 			return TryToGetValueWriterForType(memberType, Expression.MakeMemberAccess(typedSource, member), writerParameter, valueWriterRetriever);
 		}
 
@@ -216,75 +207,95 @@ namespace DanSerialiser.CachedLookups
 			// Try to get a BinarySerialisationWriter method to call to serialise the value
 			// - If it's a Nullable then unwrap the underlying type and try to find a method for that and then we'll have to include some null-checking to the member setter
 			//   if we identify a method that will write out the underlying type
-			var nullableTypeInner = GetUnderlyingNullableTypeIfApplicable(type);
-			var fieldWriterMethod = TryToGetWriterMethodToSerialiseType(nullableTypeInner ?? type);
 			Expression individualMemberSetterForNonNullValue;
-			if (fieldWriterMethod != null)
+			var nullableTypeInner = GetUnderlyingNullableTypeIfApplicable(type);
+			if ((nullableTypeInner ?? type).IsEnum)
 			{
-				// When writing a non-null value from a Nullable<> then we need to write the underlying value - Nullable<T> gets magic treatment from the compiler and we
-				// want to achieve the same sort of thing, which means that (in cases where the Nullable<T> is not null) we write the value AS THE UNDERLYING TYPE into
-				// the field (we DON'T write the value AS NULLABLE<T> into the field). If we're not dealing with a Nullable<T> then we CAN use the value to directly
-				// set the field.
-				individualMemberSetterForNonNullValue = Expression.Call(
-					writerParameter,
-					fieldWriterMethod,
-					(nullableTypeInner == null) ? value : Expression.Convert(value, nullableTypeInner)
-				);
+				// If the type is an enum then we'll write the underlying type (note: There is some duplication of logic between here and the Serialiser class in the write-
+				// underlying-value approach)
+				var underlyingType = (nullableTypeInner ?? type).GetEnumUnderlyingType();
+				var valueToWrite = value;
+				if (nullableTypeInner != null)
+				{
+					// When writing a non-null value from a Nullable<> then we need to write the underlying value - Nullable<T> gets magic treatment from the compiler and we
+					// want to achieve the same sort of thing, which means that (in cases where the Nullable<T> is not null) we write the value AS THE UNDERLYING TYPE into
+					// the field (we DON'T write the value AS NULLABLE<T> into the field). If we're not dealing with a Nullable<T> then we CAN use the value to directly
+					// set the field.
+					valueToWrite = Expression.Convert(valueToWrite, nullableTypeInner);
+				}
+				valueToWrite = Expression.Convert(valueToWrite, underlyingType);
+				individualMemberSetterForNonNullValue = TryToGetValueWriterForType(underlyingType, valueToWrite, writerParameter, valueWriterRetriever);
+				if (individualMemberSetterForNonNullValue == null)
+					return null;
 			}
 			else
 			{
-				// Since we weren't able to find a BinarySerialisationWriter method for the value, see if the valueWriterRetriever lookup can provide a member setter that
-				// was generated earlier. If not then we're out of options and have to give up. If we CAN get one then we'll use that (we'll have to bookend it with Object
-				// Start and End calls so that it describes the complete data for a non-reference-tracked instance)
-				var preBuiltMemberSetter = valueWriterRetriever(nullableTypeInner ?? type);
-				if (preBuiltMemberSetter == null)
-					return null;
-
-				// Instead of calling writer.ObjectStart(type)/ObjectEnd() when writing out the data for complete objects, we'll write out the data in the correct format here
-				// because it will be cheaper as we the ObjectStart method has to determine whether the type has appeared already in the content and, if not, write out the full
-				// type name string and, if it HAS been encountered already, write out just the Name Reference ID - here, we can skip this check and always go straight for the
-				// Name Reference ID approach, which will save us many dictionary lookups if the object graph is large. The reason that we can skip the write-name-or-id check
-				// is that member setters created here will be used in one of two situations:
-				//  1. During a regular serialisation (ie. any ReferenceReuseOptions other than SpeedyButLimited) and only after an instance of the type has been serialised the
-				//     slower way (through the Serialiser class), meaning that the type name has definitely been encountered already
-				//  2. During a SpeedyButLimited serialisation, in which case TypeNamePreLoad data will be emitted at the start of the serialisation data and we can be sure,
-				//     then, that the type name will have been encountered by the reader before it tries to deserialise any instances of the type (because TypeNamePreLoad
-				//     and FieldNamePreLoad data must always be the first content in serialised data)
-				if (preBuiltMemberSetter.SetToDefault)
+				// If the type is on that we have a dedicated writer method for (ie. it's a primitive or string or DateTime or similar) then use that
+				var fieldWriterMethod = TryToGetWriterMethodToSerialiseType(nullableTypeInner ?? type);
+				if (fieldWriterMethod != null)
 				{
-					// This means that we want to record serialisation data that will set this value to default(T)
-					//  - If we're looking at a reference type then that means that we will want to call "writer.Null()" when it comes to writing this value (in this case,
-					//    we can return the expression to do that immediately; if we don't return now then this method will wrap this expression so that it becomes a block
-					//    that says "when serialising, if the source value is null then calling writer.Null() but if the source value is non-null then also call write.Null()"
-					//    and that is a waste of time!)
-					//  - If we're looking at a value type then we need to write the ObjectStart ObjectEnd data so that it writes content for a struct in its default state
-					if (!type.IsValueType)
-						return Expression.Call(writerParameter, _writeNullMethod);
-
-					var typeNameBytes = GetTypeNameBytes(type);
-					var bytesForEmptyObjectInitialisation = new List<byte> { (byte)BinarySerialisationDataType.ObjectStart };
-					bytesForEmptyObjectInitialisation.AddRange(typeNameBytes.OnlyAsReferenceID);
-					bytesForEmptyObjectInitialisation.Add((byte)BinarySerialisationDataType.ObjectEnd);
+					// See notes above about Nullable<> handling
 					individualMemberSetterForNonNullValue = Expression.Call(
 						writerParameter,
-						_writeBytesMethod,
-						Expression.Constant(bytesForEmptyObjectInitialisation.ToArray())
+						fieldWriterMethod,
+						(nullableTypeInner == null) ? value : Expression.Convert(value, nullableTypeInner)
 					);
 				}
 				else
 				{
-					var typeNameBytes = preBuiltMemberSetter.OptionalTypeNameOverideIfNotSettingToDefault ?? GetTypeNameBytes(type);
-					var bytesForObjectStart = new List<byte> { (byte)BinarySerialisationDataType.ObjectStart };
-					bytesForObjectStart.AddRange(typeNameBytes.OnlyAsReferenceID);
-					individualMemberSetterForNonNullValue = Expression.Block(
-						Expression.Call(writerParameter, _writeBytesMethod, Expression.Constant(bytesForObjectStart.ToArray())),
-						Expression.Invoke(
-							preBuiltMemberSetter.MemberSetterIfNotSettingToDefault,
-							(nullableTypeInner == null) ? value : Expression.Convert(value, nullableTypeInner),
-							writerParameter
-						),
-						Expression.Call(writerParameter, _writeByteMethod, Expression.Constant((byte)BinarySerialisationDataType.ObjectEnd))
-					);
+					// Since we weren't able to find a BinarySerialisationWriter method for the value, see if the valueWriterRetriever lookup can provide a member setter that
+					// was generated earlier. If not then we're out of options and have to give up. If we CAN get one then we'll use that (we'll have to bookend it with Object
+					// Start and End calls so that it describes the complete data for a non-reference-tracked instance)
+					var preBuiltMemberSetter = valueWriterRetriever(nullableTypeInner ?? type);
+					if (preBuiltMemberSetter == null)
+						return null;
+
+					// Instead of calling writer.ObjectStart(type)/ObjectEnd() when writing out the data for complete objects, we'll write out the data in the correct format here
+					// because it will be cheaper as we the ObjectStart method has to determine whether the type has appeared already in the content and, if not, write out the full
+					// type name string and, if it HAS been encountered already, write out just the Name Reference ID - here, we can skip this check and always go straight for the
+					// Name Reference ID approach, which will save us many dictionary lookups if the object graph is large. The reason that we can skip the write-name-or-id check
+					// is that member setters created here will be used in one of two situations:
+					//  1. During a regular serialisation (ie. any ReferenceReuseOptions other than SpeedyButLimited) and only after an instance of the type has been serialised the
+					//     slower way (through the Serialiser class), meaning that the type name has definitely been encountered already
+					//  2. During a SpeedyButLimited serialisation, in which case TypeNamePreLoad data will be emitted at the start of the serialisation data and we can be sure,
+					//     then, that the type name will have been encountered by the reader before it tries to deserialise any instances of the type (because TypeNamePreLoad
+					//     and FieldNamePreLoad data must always be the first content in serialised data)
+					if (preBuiltMemberSetter.SetToDefault)
+					{
+						// This means that we want to record serialisation data that will set this value to default(T)
+						//  - If we're looking at a reference type then that means that we will want to call "writer.Null()" when it comes to writing this value (in this case,
+						//    we can return the expression to do that immediately; if we don't return now then this method will wrap this expression so that it becomes a block
+						//    that says "when serialising, if the source value is null then calling writer.Null() but if the source value is non-null then also call write.Null()"
+						//    and that is a waste of time!)
+						//  - If we're looking at a value type then we need to write the ObjectStart ObjectEnd data so that it writes content for a struct in its default state
+						if (!type.IsValueType)
+							return Expression.Call(writerParameter, _writeNullMethod);
+
+						var typeNameBytes = GetTypeNameBytes(type);
+						var bytesForEmptyObjectInitialisation = new List<byte> { (byte)BinarySerialisationDataType.ObjectStart };
+						bytesForEmptyObjectInitialisation.AddRange(typeNameBytes.OnlyAsReferenceID);
+						bytesForEmptyObjectInitialisation.Add((byte)BinarySerialisationDataType.ObjectEnd);
+						individualMemberSetterForNonNullValue = Expression.Call(
+							writerParameter,
+							_writeBytesMethod,
+							Expression.Constant(bytesForEmptyObjectInitialisation.ToArray())
+						);
+					}
+					else
+					{
+						var typeNameBytes = preBuiltMemberSetter.OptionalTypeNameOverideIfNotSettingToDefault ?? GetTypeNameBytes(type);
+						var bytesForObjectStart = new List<byte> { (byte)BinarySerialisationDataType.ObjectStart };
+						bytesForObjectStart.AddRange(typeNameBytes.OnlyAsReferenceID);
+						individualMemberSetterForNonNullValue = Expression.Block(
+							Expression.Call(writerParameter, _writeBytesMethod, Expression.Constant(bytesForObjectStart.ToArray())),
+							Expression.Invoke(
+								preBuiltMemberSetter.MemberSetterIfNotSettingToDefault,
+								(nullableTypeInner == null) ? value : Expression.Convert(value, nullableTypeInner),
+								writerParameter
+							),
+							Expression.Call(writerParameter, _writeByteMethod, Expression.Constant((byte)BinarySerialisationDataType.ObjectEnd))
+						);
+					}
 				}
 			}
 
@@ -352,6 +363,23 @@ namespace DanSerialiser.CachedLookups
 				return _writeGuidValueMethod;
 			else
 				return null;
+		}
+
+		public sealed class MemberSetterGenerationAttemptResult
+		{
+			public static MemberSetterGenerationAttemptResult ForSuccess(MemberSetterDetails memberSetterDetails)
+				=> new MemberSetterGenerationAttemptResult(memberSetterDetails ?? throw new ArgumentNullException(nameof(memberSetterDetails)), null);
+			public static MemberSetterGenerationAttemptResult ForFailure(MemberInfo firstMemberPreventingSuccess)
+				=> new MemberSetterGenerationAttemptResult(null, firstMemberPreventingSuccess ?? throw new ArgumentNullException(nameof(firstMemberPreventingSuccess)));
+			private MemberSetterGenerationAttemptResult(MemberSetterDetails memberSetterDetailsIfSuccessful, MemberInfo firstMemberPreventingSuccess)
+			{
+				if (((memberSetterDetailsIfSuccessful == null) && (firstMemberPreventingSuccess == null)) || ((memberSetterDetailsIfSuccessful == null) && (firstMemberPreventingSuccess == null)))
+					throw new ArgumentException($"Precisely one of {nameof(memberSetterDetailsIfSuccessful)} and {nameof(firstMemberPreventingSuccess)} must be non-null");
+				MemberSetterDetailsIfSuccessful = memberSetterDetailsIfSuccessful;
+				FirstMemberPreventingSuccess = firstMemberPreventingSuccess;
+			}
+			public MemberSetterDetails MemberSetterDetailsIfSuccessful { get; }
+			public MemberInfo FirstMemberPreventingSuccess { get; }
 		}
 
 		/// <summary>

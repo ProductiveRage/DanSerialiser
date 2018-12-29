@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using DanSerialiser.Reflection;
 using static DanSerialiser.CachedLookups.BinarySerialisationCompiledMemberSetters;
 using static DanSerialiser.CachedLookups.BinarySerialisationWriterCachedNames;
@@ -60,11 +61,41 @@ namespace DanSerialiser.CachedLookups
 			var memberSetters = new Dictionary<Type, MemberSetterDetails>();
 			var typeNamesToDeclare = new HashSet<CachedNameData>(CachedNameDataEqualityComparer.Instance);
 			var fieldNamesToDeclare = new HashSet<CachedNameData>(CachedNameDataEqualityComparer.Instance);
-			GenerateMemberSettersForTypeIfPossible(serialisationTargetType, new HashSet<Type>(), typeNamesToDeclare, fieldNamesToDeclare, memberSetters, typeConverters);
+			GenerateMemberSettersForTypeIfPossible(serialisationTargetType, new HashSet<Type>(), typeNamesToDeclare, fieldNamesToDeclare, memberSetters, typeConverters, memberIfAny: null, throwAtFirstHurdle: false);
 			var compiledMemberSetters = new ReadOnlyDictionary<Type, Action<object, BinarySerialisationWriter>>(
 				memberSetters.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.GetCompiledMemberSetter())
 			);
 			return cache.GetOrAdd(serialisationTargetType, new DeepCompiledMemberSettersGenerationResults(typeNamesToDeclare, fieldNamesToDeclare, compiledMemberSetters));
+		}
+
+		/// <summary>
+		/// This will throw a FastestTreeSerialisationNotPossibleException if the specified type does not fully support FastestTreeBinarySerialisation - this may be because
+		/// the type is a class that is not sealed or it has a member that is a class that is not sealed or if IntPtr values exist within the object graph (which are not
+		/// supported by this serialiser). It will only throw at the first problem because one problem can have knock on effects and so a single property of an unsupported
+		/// property type that is deeply nested in the object graph will prevent all of the parent types getting the full-speed treatment.
+		/// </summary>
+		public static void EnsureThatTypeIsOptimalForFastestTreeSerialisation(Type serialisationTargetType, IFastSerialisationTypeConverter[] typeConverters)
+		{
+			if (serialisationTargetType == null)
+				throw new ArgumentNullException(nameof(serialisationTargetType));
+			if (typeConverters == null)
+				throw new ArgumentNullException(nameof(typeConverters));
+
+			if (serialisationTargetType.IsPointer())
+				ThrowNonOptimalFastestTreeSerialisationException(serialisationTargetType, memberIfAny: null);
+
+			// Call GenerateMemberSettersForTypeIfPossible with throwAtFirstHurdle set to true so that it will throw if it's not possible to generate any of the member
+			// setters for the serialisationTargetType or any type that it depends on - so if this method doesn't throw then all is well!
+			GenerateMemberSettersForTypeIfPossible(
+				serialisationTargetType,
+				new HashSet<Type>(),
+				new HashSet<CachedNameData>(CachedNameDataEqualityComparer.Instance),
+				new HashSet<CachedNameData>(CachedNameDataEqualityComparer.Instance),
+				new Dictionary<Type, MemberSetterDetails>(),
+				typeConverters,
+				memberIfAny: null,
+				throwAtFirstHurdle: true
+			);
 		}
 
 		private static void GenerateMemberSettersForTypeIfPossible(
@@ -73,19 +104,25 @@ namespace DanSerialiser.CachedLookups
 			HashSet<CachedNameData> typeNamesToDeclare,
 			HashSet<CachedNameData> fieldNamesToDeclare,
 			Dictionary<Type, MemberSetterDetails> memberSetters,
-			IFastSerialisationTypeConverter[] typeConverters)
+			IFastSerialisationTypeConverter[] typeConverters,
+			MemberInfo memberIfAny,
+			bool throwAtFirstHurdle)
 		{
 			// Leave primitive-like values to the BinarySerialisationWriter's specialised methods (Boolean, String, DateTime, etc..)
 			if (Serialiser.IsTreatedAsPrimitive(type))
 				return;
 
 			// Ordinarily, we want to only consider consistent concrete types (sealed classes and structs, essentially) - if a field has type MyClass and MyClass is a
-			// non -sealed class then we might generate a member setter for MyClass but then encounter a MyDerivedClass at runtime that inherits from MyClass but has
+			// non-sealed class then we might generate a member setter for MyClass but then encounter a MyDerivedClass at runtime that inherits from MyClass but has
 			// three extra fields; those extra fields would not be serialised, then. If the field has a type that is a class that is sealed then we know that this
 			// can't happen and so we're safe (and structs don't support inheritance, so we're safe with those as well). 
 			var isPredictableType = (type.IsClass && type.IsSealed) || type.IsValueType;
 			if (!isPredictableType)
+			{
+				if (throwAtFirstHurdle)
+					ThrowNonOptimalFastestTreeSerialisationException(type, memberIfAny);
 				return;
+			}
 			if (typesEncountered.Contains(type))
 				return;
 
@@ -94,7 +131,7 @@ namespace DanSerialiser.CachedLookups
 			// in the future)
 			if (type.IsArray)
 			{
-				GenerateMemberSettersForTypeIfPossible(type.GetElementType(), typesEncountered, typeNamesToDeclare, fieldNamesToDeclare, memberSetters, typeConverters);
+				GenerateMemberSettersForTypeIfPossible(type.GetElementType(), typesEncountered, typeNamesToDeclare, fieldNamesToDeclare, memberSetters, typeConverters, memberIfAny, throwAtFirstHurdle);
 				return;
 			}
 
@@ -112,12 +149,30 @@ namespace DanSerialiser.CachedLookups
 			// D and E, so we need to dig down to the bottom of the trees and work our way back up before we start trying to call TryToGenerateMemberSetter
 			typesEncountered.Add(type);
 			var (fields, properties) = DefaultTypeAnalyser.Instance.GetFieldsAndProperties(type);
-			foreach (var field in fields.Where(f => GetFieldNameBytesIfWantoSerialiseField(f.Member, type) != null))
-				GenerateMemberSettersForTypeIfPossible(field.Member.FieldType, typesEncountered, typeNamesToDeclare, fieldNamesToDeclare, memberSetters, typeConverters);
-			foreach (var property in properties.Where(p => GetFieldNameBytesIfWantoSerialiseProperty(p.Member) != null))
-				GenerateMemberSettersForTypeIfPossible(property.Member.PropertyType, typesEncountered, typeNamesToDeclare, fieldNamesToDeclare, memberSetters, typeConverters);
+			foreach (var field in fields)
+			{
+				if (field.Member.FieldType.IsPointer())
+				{
+					if (throwAtFirstHurdle)
+						ThrowNonOptimalFastestTreeSerialisationException(type, memberIfAny);
+					continue;
+				}
+				if (GetFieldNameBytesIfWantoSerialiseField(field.Member, type) != null)
+					GenerateMemberSettersForTypeIfPossible(field.Member.FieldType, typesEncountered, typeNamesToDeclare, fieldNamesToDeclare, memberSetters, typeConverters, field.Member, throwAtFirstHurdle);
+			}
+			foreach (var property in properties)
+			{
+				if (property.Member.PropertyType.IsPointer())
+				{
+					if (throwAtFirstHurdle)
+						ThrowNonOptimalFastestTreeSerialisationException(type, memberIfAny);
+					continue;
+				}
+				if (GetFieldNameBytesIfWantoSerialiseProperty(property.Member) != null)
+					GenerateMemberSettersForTypeIfPossible(property.Member.PropertyType, typesEncountered, typeNamesToDeclare, fieldNamesToDeclare, memberSetters, typeConverters, property.Member, throwAtFirstHurdle);
+			}
 
-			var memberSetterDetails = TryToGenerateMemberSetter(
+			var memberSetterGenerationResult = GetMemberSetterAvailability(
 				type,
 				DefaultTypeAnalyser.Instance,
 				t =>
@@ -138,15 +193,18 @@ namespace DanSerialiser.CachedLookups
 					return null;
 				}
 			);
-			if (memberSetterDetails != null)
+			if (memberSetterGenerationResult.MemberSetterDetailsIfSuccessful != null)
 			{
-				typeNamesToDeclare.Add(memberSetterDetails.TypeName);
-				foreach (var fieldName in memberSetterDetails.FieldsSet)
+				typeNamesToDeclare.Add(memberSetterGenerationResult.MemberSetterDetailsIfSuccessful.TypeName);
+				foreach (var fieldName in memberSetterGenerationResult.MemberSetterDetailsIfSuccessful.FieldsSet)
 					fieldNamesToDeclare.Add(fieldName);
-				memberSetters.Add(type, memberSetterDetails);
+				memberSetters.Add(type, memberSetterGenerationResult.MemberSetterDetailsIfSuccessful);
 			}
 			else
 			{
+				if (throwAtFirstHurdle)
+					ThrowNonOptimalFastestTreeSerialisationException(type, memberIfAny);
+
 				// If we were unable to generate a member setter for this type then record the null value - it's useful for the GetMemberSettersFor method to be
 				// able to return member setters for types that it could generate them for but it's also useful to make it clear what types it was NOT possible
 				// to generate them for because it can save the caller some work (they won't waste time trying to generate a member setter themselves)
@@ -163,13 +221,15 @@ namespace DanSerialiser.CachedLookups
 						t,
 						requestedMemberSetterType =>
 						{
-							var requestedMemberSetterTypeWriter = TryToGenerateMemberSetter(
-								requestedMemberSetterType,
-								DefaultTypeAnalyser.Instance,
-								nestedType => (memberSetters.TryGetValue(nestedType, out var valueWriter) && (valueWriter != null))
-									? ValueWriter.PopulateValue(valueWriter.MemberSetter)
-									: null
-							);
+							var requestedMemberSetterTypeWriter =
+								GetMemberSetterAvailability(
+									requestedMemberSetterType,
+									DefaultTypeAnalyser.Instance,
+									nestedType => (memberSetters.TryGetValue(nestedType, out var valueWriter) && (valueWriter != null))
+										? ValueWriter.PopulateValue(valueWriter.MemberSetter)
+										: null
+								)
+								.MemberSetterDetailsIfSuccessful;
 							if (requestedMemberSetterTypeWriter != null)
 							{
 								typeNames.Add(requestedMemberSetterTypeWriter.TypeName);
@@ -194,6 +254,39 @@ namespace DanSerialiser.CachedLookups
 				}
 				return (null, t);
 			}
+		}
+
+		private static void ThrowNonOptimalFastestTreeSerialisationException(Type type, MemberInfo memberIfAny)
+		{
+			if (memberIfAny == null)
+				throw new FastestTreeSerialisationNotPossibleException(type.AssemblyQualifiedName, memberIfAny: null);
+
+			if (memberIfAny is PropertyInfo property)
+			{
+				throw new FastestTreeSerialisationNotPossibleException(
+					type.AssemblyQualifiedName,
+					new FastestTreeSerialisationNotPossibleException.ImpossibleMemberDetails(property.Name, property.PropertyType.AssemblyQualifiedName)
+				);
+			}
+
+			if (memberIfAny is FieldInfo field)
+			{
+				var autoPropertyIfApplicable = BackingFieldHelpers.TryToGetPropertyRelatingToBackingField(field);
+				if (autoPropertyIfApplicable != null)
+				{
+					throw new FastestTreeSerialisationNotPossibleException(
+						type.AssemblyQualifiedName,
+						new FastestTreeSerialisationNotPossibleException.ImpossibleMemberDetails(autoPropertyIfApplicable.Name, autoPropertyIfApplicable.PropertyType.AssemblyQualifiedName)
+					);
+				}
+
+				throw new FastestTreeSerialisationNotPossibleException(
+					type.AssemblyQualifiedName,
+					new FastestTreeSerialisationNotPossibleException.ImpossibleMemberDetails(field.Name, field.FieldType.AssemblyQualifiedName)
+				);
+			}
+
+			throw new NotSupportedException("Unsupported MemberInfo type: " + memberIfAny.GetType().Name);
 		}
 
 		/// <summary>
