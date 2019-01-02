@@ -18,6 +18,19 @@ namespace UnitTests
 			);
 		}
 
+		/// <summary>
+		/// This would happen if an invalid value is cast to the enum or if there are combined enum flag values (which are not supported) - the value will be written as a blank
+		/// string, which will be interpreted as the default enum value when deserialised (see UnrecognisedValueWillBeDeserialisedIntoEnumDefault)
+		/// </summary>
+		[Fact]
+		public static void UnrecognisedValueWillBeSerialisedAsBlankString()
+		{
+			Assert.Equal(
+				"",
+				((ISerialisationTypeConverter)EnumAsStringTypeConverter.Instance).ConvertIfRequired((DayOfWeek)99)
+			);
+		}
+
 		[Fact]
 		public static void RoundTripOfNonZeroEnumValueWorks()
 		{

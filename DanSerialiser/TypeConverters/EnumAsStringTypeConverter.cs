@@ -34,7 +34,7 @@ namespace DanSerialiser
 					.Cast<object>()
 					.Zip(Enum.GetNames(valueType), Tuple.Create)
 					.ToDictionary(entry => entry.Item1, entry => entry.Item2);
-				nameLookup = enumValue => nameLookupDictionary.TryGetValue(enumValue, out var name) ? name : null;
+				nameLookup = enumValue => nameLookupDictionary.TryGetValue(enumValue, out var name) ? name : ""; // Set invalid values to "" so that they can be successfully round-tripped
 				_toStringLookups.TryAdd(valueType, nameLookup);
 			}
 			return nameLookup(value);
