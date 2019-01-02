@@ -25,7 +25,7 @@ namespace DanSerialiser
 	/// type converter(s) would be required for other immutable types, such as the ImmutableHashSet or ImmutableDictionary, if they use linked list structures internally and
 	/// if instances of those types have large numbers of items (where 'large' is relative to how deep the call stack can be).
 	/// </summary>
-	public sealed class ImmutableListTypeConverter : IFastSerialisationTypeConverter, ISerialisationTypeConverter, IDeserialisationTypeConverter
+	public sealed class ImmutableListTypeConverter : IFastSerialisationTypeConverter, IDeserialisationTypeConverter
 	{
 		private static readonly ConcurrentDictionary<Type, ListSerialiser> _serialisationConverters = new ConcurrentDictionary<Type, ListSerialiser>();
 
