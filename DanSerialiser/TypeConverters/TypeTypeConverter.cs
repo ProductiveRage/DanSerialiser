@@ -27,7 +27,7 @@ namespace DanSerialiser
 			if (memberSetterDetailsRetriever == null)
 				throw new ArgumentNullException(nameof(memberSetterDetailsRetriever));
 
-			if (!(sourceType is Type))
+			if (!typeof(Type).IsAssignableFrom(sourceType))
 				return null;
 
 			var sourceParameter = Expression.Parameter(sourceType, "source");
