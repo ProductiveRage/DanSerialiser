@@ -274,6 +274,38 @@ namespace UnitTests
 		}
 
 		/// <summary>
+		/// This also tests backward compatibility - if a version of a class C1 has field 'Items' that is *an array* of element type C2 and this is serialised
+		/// and then deserialised somewhere with a version of C1 that does not have the 'Items' field and does not have the type C2 available then it shouldn't
+		/// matter that C2 can't be loaded because the C2 value would never be used to set anything.
+		/// This tests the change added in https://github.com/ProductiveRage/DanSerialiser/pull/4.
+		/// </summary>
+		[Fact]
+		public static void DoNotThrowWhenTryingToParseUnavailableArrayElementTypeIfThereIsNoFieldThatTheTypeWouldBeUsedToSet()
+		{
+			// Declare a type that has a field that is an array of another element type that is declared here. The destination type will be in an assembly that
+			// does not have this second type in it but the destination type also won't have the field and so the deserialiser should be able to skip over the
+			// data about the field that we don't care about.
+			var itemsFieldName = "Items";
+			var sourceModule = GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0));
+			var nestedSourceType = ConstructType(sourceModule, "MyNestedClass", new Tuple<string, Type>[0]);
+			var nestedSourceTypeArrayType = nestedSourceType.MakeArrayType();
+			var sourceType = ConstructType(sourceModule, "MyClass", new[] { Tuple.Create(itemsFieldName, nestedSourceTypeArrayType) });
+			var sourceInstance = Activator.CreateInstance(sourceType);
+			var itemsArray = Array.CreateInstance(nestedSourceType, 3);
+			for (int i = 0; i < itemsArray.Length; i++)
+				itemsArray.SetValue(Activator.CreateInstance(nestedSourceType), i);
+			sourceType.GetField(itemsFieldName).SetValue(sourceInstance, itemsArray);
+			var serialisedData = BinarySerialisation.Serialise(sourceInstance);
+
+			var destinationType = ConstructType(GetModuleBuilder("DynamicAssemblyFor" + GetMyName(), new Version(1, 0)), "MyClass", new Tuple<string, Type>[0]);
+			var deserialised = ResolveDynamicAssembliesWhilePerformingAction(
+				() => Deserialise(serialisedData, destinationType),
+				destinationType
+			);
+			Assert.IsType(destinationType, deserialised);
+		}
+
+		/// <summary>
 		/// This is a companion to DoNotThrowWhenTryingToParseUnavailableTypeIfThereIsNoFieldThatTheTypeWouldBeUsedToSet to illustrate that it is NOT ok to ignore a type
 		/// that is not available if the instance of that type would be used to populate a property
 		/// </summary>
