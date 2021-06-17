@@ -461,7 +461,11 @@ namespace DanSerialiser
 			if (elementTypeName == null)
 				throw new InvalidSerialisationDataFormatException("Null array element type names should not exist in object data since there is a Null binary serialisation data type");
 
-			var elementType = _typeAnalyser.GetType(elementTypeName); // These lookups will be cached by the_typeAnalyser, which can help (vs calling Type.GetType every time)
+			// 2021-06-17 Dion: We might not know the element type here if we're dealing with a newer type than what we have locally. In that case we can allow
+			// _typeAnalyser.GetType to fail IF ignoreAnyInvalidTypes is true. We won't need to allocate any array if we're ignoring invalid types, but we will
+			// need to read the rest of the data for the array anyway so we can skip over it.
+			// These lookups will be cached by the_typeAnalyser, which can help (vs calling Type.GetType every time)
+			var elementTypeIfKnown = _typeAnalyser.GetType(elementTypeName, ignoreAnyInvalidTypes);
 			var lengthDataType = ReadNextDataType();
 			int length;
 			if (lengthDataType == BinarySerialisationDataType.Int32_8)
@@ -479,23 +483,27 @@ namespace DanSerialiser
 			// the enum type, otherwise the array SetValue call will fail. In order to do that, we need to check now whether the element type is an enum OR if the element type is
 			// a Nullable enum because the same rules apply to that (a Nullable Nullable enum is not supported, so there is no recursive checks required).
 			Type enumCastTargetTypeIfRequired;
-			if (length == 0)
+			if (elementTypeIfKnown == null || length == 0)
 				enumCastTargetTypeIfRequired = null;
 			else
 			{
-				if (elementType.IsEnum)
-					enumCastTargetTypeIfRequired = elementType;
+				if (elementTypeIfKnown.IsEnum)
+					enumCastTargetTypeIfRequired = elementTypeIfKnown;
 				else
 				{
-					var nullableInnerTypeIfApplicable = Nullable.GetUnderlyingType(elementType);
+					var nullableInnerTypeIfApplicable = Nullable.GetUnderlyingType(elementTypeIfKnown);
 					enumCastTargetTypeIfRequired = ((nullableInnerTypeIfApplicable != null) && nullableInnerTypeIfApplicable.IsEnum) ? nullableInnerTypeIfApplicable : null;
 				}
 			}
 
-			var items = Array.CreateInstance(elementType, length);
-			for (var index = 0; index < items.Length; index++)
+			// 2021-06-17 Dion: Just read in all the items without storing them in an array if we don't have the target type available (which will be the case
+			// if the element type is not known and ignoreAnyInvalidTypes is true)
+			Array itemsIfApplicable = elementTypeIfKnown != null
+				? Array.CreateInstance(elementTypeIfKnown, length)
+				: null;
+			for (var index = 0; index < length; index++)
 			{
-				var element = Read(ignoreAnyInvalidTypes, elementType);
+				var element = Read(ignoreAnyInvalidTypes, elementTypeIfKnown);
 				if ((enumCastTargetTypeIfRequired != null) && (element != null))
 				{
 					if (element is byte b)
@@ -517,7 +525,7 @@ namespace DanSerialiser
 					else
 						element = Enum.ToObject(enumCastTargetTypeIfRequired, element);
 				}
-				items.SetValue(element, index);
+				itemsIfApplicable?.SetValue(element, index);
 			}
 
 			// If the BinarySerialisationWriter is configured to optimise for wide circular references then there may be some content-for-delay-populated-objects here
@@ -532,7 +540,7 @@ namespace DanSerialiser
 			}
 			if (nextEntryType != BinarySerialisationDataType.ArrayEnd)
 				throw new InvalidSerialisationDataFormatException($"Expected {nameof(BinarySerialisationDataType.ArrayEnd)} was not encountered");
-			return items;
+			return itemsIfApplicable;
 		}
 
 		private string ReadNextTypeName(out int typeNameReferenceID)
