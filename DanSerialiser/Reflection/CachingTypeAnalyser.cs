@@ -25,9 +25,9 @@ namespace DanSerialiser.Reflection
 		}
 
 		/// <summary>
-		/// This will throw an exception if unable to resolve the type (it will never return null)
+		/// If unable to resolve the type, this will throw an exception when ignoreAnyInvalidTypes is false; otherwise return null when it's true.
 		/// </summary>
-		public Type GetType(string typeName)
+		public Type GetType(string typeName, bool ignoreAnyInvalidTypes)
 		{
 			if (string.IsNullOrWhiteSpace(typeName))
 				throw new ArgumentException($"Null/blank {nameof(typeName)} specified");
@@ -35,7 +35,7 @@ namespace DanSerialiser.Reflection
 			if (_typeLookupCache.TryGetValue(typeName, out var cachedResult))
 				return cachedResult;
 
-			return _typeLookupCache.GetOrAdd(typeName, _reader.GetType(typeName));
+			return _typeLookupCache.GetOrAdd(typeName, _reader.GetType(typeName, ignoreAnyInvalidTypes));
 		}
 
 		public Func<object> TryToGetUninitialisedInstanceBuilder(string typeName)

@@ -16,9 +16,9 @@ namespace DanSerialiser.Reflection
 		private ReflectionTypeAnalyser() { }
 
 		/// <summary>
-		/// This will throw an exception if unable to resolve the type (it will never return null)
+		/// If unable to resolve the type, this will throw an exception when ignoreAnyInvalidTypes is false; otherwise return null when it's true.
 		/// </summary>
-		public Type GetType(string typeName)
+		public Type GetType(string typeName, bool ignoreAnyInvalidTypes)
 		{
 			if (string.IsNullOrWhiteSpace(typeName))
 				throw new ArgumentException($"Null/blank {nameof(typeName)} specified");
@@ -27,7 +27,7 @@ namespace DanSerialiser.Reflection
 			// the processing time (it was particularly noticeable one time and less so others.. I'm not sure why) and so IAnalyseTypesForSerialisation has a GetType method
 			// so that the caching implementation of it can avoid the repeated Type.GetType calls (http://higherlogics.blogspot.com/2010/05/cost-of-typegettype.html suggests
 			// that I'm not the only one to have noticed this!)
-			return Type.GetType(typeName, throwOnError: true);
+			return Type.GetType(typeName, throwOnError: !ignoreAnyInvalidTypes);
 		}
 
 		public Func<object> TryToGetUninitialisedInstanceBuilder(string typeName)

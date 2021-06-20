@@ -6,9 +6,9 @@ namespace DanSerialiser.Reflection
 	internal interface IAnalyseTypesForSerialisation
 	{
 		/// <summary>
-		/// This will throw an exception if unable to resolve the type (it will never return null)
+		/// If unable to resolve the type, this will throw an exception when ignoreAnyInvalidTypes is false; otherwise return null when it's true.
 		/// </summary>
-		Type GetType(string typeName);
+		Type GetType(string typeName, bool ignoreAnyInvalidTypes);
 
 		Func<object> TryToGetUninitialisedInstanceBuilder(string typeName);
 		Tuple<MemberAndReader<FieldInfo>[], MemberAndReader<PropertyInfo>[]> GetFieldsAndProperties(Type type);
